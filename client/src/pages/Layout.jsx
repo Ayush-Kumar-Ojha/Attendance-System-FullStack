@@ -1,4 +1,4 @@
-import Sidebar from "../components/Sidebar";
+import SideBar from "../components/SideBar";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Loading from "../components/Loading";
