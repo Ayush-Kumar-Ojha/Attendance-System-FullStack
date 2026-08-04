@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { dummyEmployeeData, dummyPayslipData } from "../assets/assets";
 import Loading from "../components/Loading";
-import PayslipList from "../components/payslip/PaySlipList";
+import PayslipList from "../components/payslip/PayslipList";
 import GeneratePayslipForm from "../components/payslip/GeneratePayslipForm";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
