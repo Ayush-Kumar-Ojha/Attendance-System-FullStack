@@ -38,8 +38,13 @@ const AttendanceHistory = ({ history }) => {
                                 const dayType = getDayTypeDisplay(record);
 
                                 return (
-                                    <tr key={record.id}>
-                                        {/* Date */}
+                                    <tr
+                                        key={
+                                            record.id ||
+                                            record._id ||
+                                            record.date
+                                        }
+                                    >
                                         <td className="px-6 py-4 font-medium text-slate-900">
                                             {format(
                                                 new Date(record.date),
@@ -47,7 +52,6 @@ const AttendanceHistory = ({ history }) => {
                                             )}
                                         </td>
 
-                                        {/* Check In */}
                                         <td className="px-6 py-4 text-slate-600">
                                             {record.checkIn
                                                 ? format(
@@ -57,7 +61,6 @@ const AttendanceHistory = ({ history }) => {
                                                 : "-"}
                                         </td>
 
-                                        {/* Check Out */}
                                         <td className="px-6 py-4 text-slate-600">
                                             {record.checkOut
                                                 ? format(
@@ -67,12 +70,10 @@ const AttendanceHistory = ({ history }) => {
                                                 : "-"}
                                         </td>
 
-                                        {/* Working Hours */}
                                         <td className="px-6 py-4 text-slate-600 font-medium">
                                             {getWorkingHoursDisplay(record)}
                                         </td>
 
-                                        {/* Day Type */}
                                         <td className="px-6 py-4">
                                             {dayType.label !== "-" ? (
                                                 <span
@@ -85,7 +86,6 @@ const AttendanceHistory = ({ history }) => {
                                             )}
                                         </td>
 
-                                        {/* Status */}
                                         <td className="px-6 py-4">
                                             <span
                                                 className={`badge ${

@@ -4,23 +4,31 @@ import { Lock } from "lucide-react";
 import Loading from "../components/Loading";
 import ProfileForm from "../components/ProfileForm";
 import ChangePasswordModal from "../components/ChangePasswordModal";
+import { useAuth } from "../context/AuthContext";
+import toast from "react-hot-toast";
+import api from "../api/axios";
 
 const Settings = () => {
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const fetchProfile = async () => {
-    setProfile(dummyProfileData);
-
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    try {
+      const res = await api.get("/profile")
+      const profile = res.data;
+      if (profile) setProfile(profile)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message)
+    } finally {
+      setLoading(false)
+    }
   };
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [user]);
 
   if (loading) return <Loading />;
 
@@ -33,7 +41,7 @@ const Settings = () => {
         </p>
       </div>
 
-      {profile && <ProfileForm initialData={profile} onSuccess={fetchProfile}/>}
+      {profile && <ProfileForm initialData={profile} onSuccess={fetchProfile} />}
 
       {/* Change Password trigger */}
       <div className="card max-w-md p-6 flex items-center justify-between">
@@ -57,7 +65,7 @@ const Settings = () => {
           Change
         </button>
       </div>
-      <ChangePasswordModal open={showPasswordModal} onClose={()=>setShowPasswordModal(false)}/>
+      <ChangePasswordModal open={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
     </div>
   );
 };

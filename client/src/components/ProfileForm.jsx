@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Loader2, User, Save } from "lucide-react";
+import api from "../api/axios";
 
 const ProfileForm = ({ initialData, onSuccess }) => {
     const [loading, setLoading] = useState(false);
@@ -8,6 +9,19 @@ const ProfileForm = ({ initialData, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true)
+        setError("")
+        setMessage("")
+        const formData = new FormData(e.currentTarget)
+        try {
+            await api.post("/profile", formData)
+            setMessage("Profile updated successfully")
+            onSuccess?.()
+        } catch (err) {
+            setError(err.response?.data?.error || err.message)
+        } finally {
+            setLoading(false)
+        }
     };
 
     return (
@@ -25,8 +39,8 @@ const ProfileForm = ({ initialData, onSuccess }) => {
             )}
 
             {message && (
-                <div className='bg-rose-50 text-rose-700 p-4 rounded-xl text-sm border border-rose-200 mb-6 flex items-start gap-3'>
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                <div className='bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm border border-emerald-200 mb-6 flex items-start gap-3'>
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                     {message}
                 </div>
             )}
@@ -64,7 +78,7 @@ const ProfileForm = ({ initialData, onSuccess }) => {
                 ) : (
                     <div className="flex justify-end pt-2">
                         <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2 justify-center w-full sm:w-auto">
-                            {loading? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             Save Changes
                         </button>
                     </div>

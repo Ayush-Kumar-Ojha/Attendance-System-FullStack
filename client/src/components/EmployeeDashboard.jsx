@@ -4,6 +4,7 @@ import {
     FileTextIcon,
     CalendarDaysIcon,
     ArrowRightIcon,
+    DollarSignIcon,
 } from "lucide-react";
 
 const EmployeeDashboard = ({ data }) => {
@@ -23,10 +24,12 @@ const EmployeeDashboard = ({ data }) => {
             subtitle: "Awaiting approval",
         },
         {
-            icon: CalendarDaysIcon,
-            value: data.upcomingHolidays,
-            title: "Upcoming Holidays",
-            subtitle: "This year",
+            title: "Latest Payslip",
+            value: data.latestPayslip?.netSalary
+                ? `₹${data.latestPayslip.netSalary}`
+                : "N/A",
+            subtitle: "Latest Payslip",
+            icon: DollarSignIcon,
         },
     ];
 
@@ -76,7 +79,7 @@ const EmployeeDashboard = ({ data }) => {
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
                 <Link to="/attendance" className="btn-primary text-center inline-flex items-center justify-center gap-2">
-                Mark Attendance<ArrowRightIcon className="w-4 h-4"/></Link>
+                    Mark Attendance<ArrowRightIcon className="w-4 h-4" /></Link>
 
                 <Link to="/leave" className="btn-secondary text-center">Apply for Leave</Link>
             </div>
