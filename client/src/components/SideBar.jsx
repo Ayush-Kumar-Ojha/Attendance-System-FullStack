@@ -8,26 +8,27 @@ import {
   ChevronRight,
   FileTextIcon,
   LogOutIcon,
-  DollarSignIcon
+  DollarSignIcon,
+  Loader2, // <-- Added this
 } from "lucide-react";
 
 import { Link, useLocation } from "react-router-dom";
-import { dummyProfileData } from "../assets/assets";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 
-const Sidebar = () => {
+const SideBar = () => {
   const { pathname } = useLocation();
 
   const [userName, setUserName] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout } = useAuth();
 
   useEffect(() => {
     api.get("/profile").then(({ data }) => {
-      if (data.firstName) setUserName(`${data.firstName} ${data.lastName || ""}`.trim());
-    })
+      if (data.firstName)
+        setUserName(`${data.firstName} ${data.lastName || ""}`.trim());
+    });
   }, []);
 
   // Close mobile sidebar on route change
@@ -46,15 +47,15 @@ const Sidebar = () => {
 
     role === "ADMIN"
       ? {
-        name: "Employees",
-        href: "/employees",
-        icon: UserIcon,
-      }
+          name: "Employees",
+          href: "/employees",
+          icon: UserIcon,
+        }
       : {
-        name: "Attendance",
-        href: "/attendance",
-        icon: CalendarIcon,
-      },
+          name: "Attendance",
+          href: "/attendance",
+          icon: CalendarIcon,
+        },
 
     {
       name: "Leave",
@@ -76,9 +77,9 @@ const Sidebar = () => {
   ];
 
   const handleLogout = () => {
-    logout()
-    window.location.href = "/login"
-  }
+    logout();
+    window.location.href = "/login";
+  };
 
   const sidebarContent = (
     <>
@@ -142,7 +143,7 @@ const Sidebar = () => {
       {/* Navigation List */}
       <div className="flex-1 px-3 space-y-1 overflow-y-auto">
         {loading ? (
-          <div className='px-3 py-3 flex items-center gap-2 text-slate-500'>
+          <div className="px-3 py-3 flex items-center gap-2 text-slate-500">
             <Loader2 className="animate-spin w-4 h-4" />
             <span className="text-sm">Loading...</span>
           </div>
@@ -154,20 +155,22 @@ const Sidebar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive
-                  ? "bg-indigo-600/10 text-indigo-300"
-                  : "text-slate-300 hover:bg-white/5"
-                  }`}
+                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${
+                  isActive
+                    ? "bg-indigo-600/10 text-indigo-300"
+                    : "text-slate-300 hover:bg-white/5"
+                }`}
               >
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
                 )}
 
                 <item.icon
-                  className={`w-[17px] h-[17px] shrink-0 ${isActive
-                    ? "text-indigo-300"
-                    : "text-slate-400 group-hover:text-slate-300"
-                    }`}
+                  className={`w-[17px] h-[17px] shrink-0 ${
+                    isActive
+                      ? "text-indigo-300"
+                      : "text-slate-400 group-hover:text-slate-300"
+                  }`}
                 />
 
                 <span className="flex-1 text-sm font-medium">
@@ -180,14 +183,15 @@ const Sidebar = () => {
               </Link>
             );
           })
-
         )}
-
       </div>
 
       {/* Logout */}
       <div className="p-3 border-t border-white/6">
-        <button onClick={handleLogout} className="flex items-center ga-3 w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/8 transition-all duration-150">
+        <button
+          onClick={handleLogout}
+          className="flex items-center ga-3 w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/8 transition-all duration-150"
+        >
           <LogOutIcon className="w-[17px] h-[17px]" />
           <span>Log out</span>
         </button>
@@ -220,8 +224,9 @@ const Sidebar = () => {
 
       {/* Sidebar - Mobile */}
       <aside
-        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         {sidebarContent}
       </aside>
@@ -229,4 +234,4 @@ const Sidebar = () => {
   );
 };
 
-export default Sidebar;
+export default SideBar;
