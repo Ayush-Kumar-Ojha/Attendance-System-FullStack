@@ -11,10 +11,24 @@ const AttendanceStats = ({ history }) => {
         (h) => h.status === "LATE"
     ).length;
 
+    // Only include days that actually have a computed workingHours value
+    // (i.e. the employee has checked out) — ongoing/incomplete days are excluded.
+    const completedRecords = records.filter(
+        (h) => typeof h.workingHours === "number"
+    );
+
+    const avgWorkHours =
+        completedRecords.length > 0
+            ? (
+                  completedRecords.reduce((sum, h) => sum + h.workingHours, 0) /
+                  completedRecords.length
+              ).toFixed(1)
+            : "0";
+
     const stats = [
         { label: "Days Present", value: totalPresent, icon: CalendarIcon },
         { label: "Late Arrivals", value: totalLate, icon: AlertCircleIcon },
-        { label: "Avg. Work Hrs", value: "8.5 Hrs", icon: ClockIcon },
+        { label: "Avg. Work Hrs", value: `${avgWorkHours} Hrs`, icon: ClockIcon },
     ];
 
     return (
