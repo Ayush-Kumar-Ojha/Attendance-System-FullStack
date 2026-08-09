@@ -1,25 +1,24 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
-const uploadDir = "uploads";
-const photoDir = path.join(uploadDir, "photos");
-const cvDir = path.join(uploadDir, "cvs");
-
-// Ensure upload folders exist
-[uploadDir, photoDir, cvDir].forEach((dir) => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        if (file.fieldname === "photo") cb(null, photoDir);
-        else if (file.fieldname === "cv") cb(null, cvDir);
-        else cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = `${req.session.userId}-${Date.now()}${path.extname(file.originalname)}`;
-        cb(null, uniqueSuffix);
+const storage = new CloudinaryStorage({
+    cloudinary,
+    params: (req, file) => {
+        if (file.fieldname === "photo") {
+            return {
+                folder: "employee-photos",
+                allowed_formats: ["jpg", "jpeg", "png"],
+                public_id: `${req.session.userId}-${Date.now()}`,
+            };
+        } else if (file.fieldname === "cv") {
+            return {
+                folder: "employee-cvs",
+                resource_type: "raw", // needed for non-image files like PDFs/docs
+                public_id: `${req.session.userId}-${Date.now()}-${file.originalname}`,
+            };
+        }
+        return { folder: "misc" };
     },
 });
 

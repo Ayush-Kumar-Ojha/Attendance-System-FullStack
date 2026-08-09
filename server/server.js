@@ -24,9 +24,6 @@ const PORT = process.env.PORT || 4000;
 app.use(cors())
 app.use(express.json())
 
-// Serve uploaded files (photos, CVs) publicly
-app.use("/uploads", express.static("uploads"))
-
 // Routes
 app.get("/", (req, res)=> res.send("Server is running"))
 app.use("/api/auth",authRouter)

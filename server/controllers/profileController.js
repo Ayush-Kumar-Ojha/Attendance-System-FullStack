@@ -47,11 +47,12 @@ export const updateProfile = async (req, res) => {
         }
 
         if (req.files?.photo?.[0]) {
-            updateData.image = `/uploads/photos/${req.files.photo[0].filename}`;
+            // Cloudinary returns the full hosted URL directly on the file object
+            updateData.image = req.files.photo[0].path;
         }
 
         if (req.files?.cv?.[0]) {
-            updateData.cvUrl = `/uploads/cvs/${req.files.cv[0].filename}`;
+            updateData.cvUrl = req.files.cv[0].path;
             updateData.cvFileName = req.files.cv[0].originalname;
         }
 

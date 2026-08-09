@@ -7,15 +7,7 @@ const ProfileForm = ({ initialData, onSuccess }) => {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
 
-    const BACKEND_URL = import.meta.env.VITE_BASE_URL || "http://localhost:4000";
-
-    const getFileUrl = (path) => {
-        if (!path) return null;
-        if (path.startsWith("http") || path.startsWith("blob:")) return path;
-        return `${BACKEND_URL}${path}`;
-    };
-
-    const [photoPreview, setPhotoPreview] = useState(getFileUrl(initialData.image));
+    const [photoPreview, setPhotoPreview] = useState(initialData.image || null);
     const [photoFile, setPhotoFile] = useState(null);
     const photoInputRef = useRef(null);
 
