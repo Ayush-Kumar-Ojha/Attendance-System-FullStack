@@ -134,6 +134,7 @@ export const updateEmployee = async (req, res) => {
             role,
             bio,
             employmentStatus,
+            joinDate,
         } = req.body;
 
         const employee = await Employee.findById(id);
@@ -156,6 +157,7 @@ export const updateEmployee = async (req, res) => {
             deductions: Number(deductions) || 0,
             employmentStatus: employmentStatus || "ACTIVE",
             bio: bio || "",
+            joinDate: joinDate ? new Date(joinDate) : employee.joinDate,
         });
 
         const userUpdate = {

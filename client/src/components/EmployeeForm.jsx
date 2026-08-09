@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DEPARTMENTS } from "../assets/assets";
+import { useDepartments } from "../hooks/useDepartments";
 import { Loader2Icon } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "../api/axios"; 
+import api from "../api/axios";
 
 const EmployeeForm = ({ initialData, onSuccess, onCancel }) => {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
+    const { departments } = useDepartments();
 
     const isEditMode = !!initialData;
 
@@ -30,7 +31,7 @@ const EmployeeForm = ({ initialData, onSuccess, onCancel }) => {
             onSuccess ? onSuccess() : navigate("/employees")
         } catch (error) {
             toast.error(error.response?.data?.error || error.message);
-        }finally{
+        } finally {
             setLoading(false);
         }
     };
@@ -120,7 +121,7 @@ const EmployeeForm = ({ initialData, onSuccess, onCancel }) => {
                         >
                             <option value="">Select Department</option>
 
-                            {DEPARTMENTS.map((deptName) => (
+                            {departments.map((deptName) => (
                                 <option key={deptName} value={deptName}>
                                     {deptName}
                                 </option>
@@ -129,7 +130,7 @@ const EmployeeForm = ({ initialData, onSuccess, onCancel }) => {
                     </div>
 
                     <div>
-                        <label className="block mb-2">Position</label>
+                        <label className="block mb-2">Designation</label>
 
                         <input
                             name="position"

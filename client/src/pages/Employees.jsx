@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { DEPARTMENTS } from "../assets/assets";
 import { Plus, Search, X } from "lucide-react";
 import EmployeeCard from "../components/EmployeeCard";
 import EmployeeForm from "../components/EmployeeForm";
+import AddDepartmentModal from "../components/AddDepartmentModal";
+import { useDepartments } from "../hooks/useDepartments";
 import api from "../api/axios";
 
 const Employees = () => {
@@ -12,6 +13,9 @@ const Employees = () => {
   const [selectedDept, setSelectedDept] = useState("");
   const [editEmployee, setEditEmployee] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAddDeptModal, setShowAddDeptModal] = useState(false);
+
+  const { departments, addDepartment } = useDepartments();
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
@@ -78,12 +82,21 @@ const Employees = () => {
         >
           <option value="">All Departments</option>
 
-          {DEPARTMENTS.map((deptName) => (
+          {departments.map((deptName) => (
             <option key={deptName} value={deptName}>
               {deptName}
             </option>
           ))}
         </select>
+
+        <button
+          onClick={() => setShowAddDeptModal(true)}
+          className="btn-secondary flex items-center gap-2 whitespace-nowrap"
+          type="button"
+        >
+          <Plus size={16} />
+          Add Department
+        </button>
       </div>
 
       {/* Employee Cards */}
@@ -192,6 +205,12 @@ const Employees = () => {
           </div>
         </div>
       )}
+
+      <AddDepartmentModal
+        open={showAddDeptModal}
+        onClose={() => setShowAddDeptModal(false)}
+        onAdd={addDepartment}
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { Check, Loader2, X } from 'lucide-react'
 import React, { useState } from 'react'
-import { format } from "date-fns"
+import { format, differenceInCalendarDays } from "date-fns"
 import api from '../../api/axios'
 import toast from 'react-hot-toast'
 
@@ -9,15 +9,34 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
 
     const handleStatusUpdate = async (id, status) => {
         setProcessing(id)
-        try{
-            await api.patch(`/leave/${id}`, {status})
+        try {
+            await api.patch(`/leave/${id}`, { status })
             onUpdate();
-        }catch(error){
-            toast.error(error?.response?.data?.error||error?.message)
-        }finally{
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error?.message)
+        } finally {
             setProcessing(null)
         }
     }
+
+    const getTotalDays = (leave) => {
+        if (leave.type === "HALF_DAY") return 0.5;
+        const days = differenceInCalendarDays(new Date(leave.endDate), new Date(leave.startDate)) + 1;
+        return days;
+    };
+
+    const leaveTypeLabels = {
+        SICK: "Sick",
+        CASUAL: "Casual",
+        ANNUAL: "Annual",
+        MENSTRUAL: "Menstrual",
+        HALF_DAY: "Half Day",
+    };
+
+    const halfPeriodLabels = {
+        FIRST_HALF: "1st Half",
+        SECOND_HALF: "2nd Half",
+    };
 
     return (
         <div className="card overflow-hidden">
@@ -29,8 +48,10 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                             {isAdmin && <th>Employee</th>}
                             <th>Type</th>
                             <th>Dates</th>
+                            <th>Total Days</th>
                             <th>Reason</th>
                             <th>Status</th>
+                            <th>Paid/Unpaid</th>
                             {isAdmin && <th className='text-center'>Actions</th>}
                         </tr>
                     </thead>
@@ -39,7 +60,7 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                         {leaves.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={isAdmin ? 6 : 4}
+                                    colSpan={isAdmin ? 8 : 6}
                                     className="text-center py-12 text-slate-400"
                                 >
                                     No leave applications found
@@ -47,6 +68,7 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                             </tr>
                         ) : (
                             leaves.map((leave) => {
+                                const totalDays = getTotalDays(leave);
                                 return (
                                     <tr key={leave._id || leave.id}>
                                         {isAdmin && (
@@ -58,13 +80,26 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
 
                                         <td>
                                             <span className='inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium'>
-                                                {leave.type}
+                                                {leaveTypeLabels[leave.type] || leave.type}
+                                                {leave.type === "HALF_DAY" && leave.halfDayPeriod && (
+                                                    <span className="ml-1 text-slate-400">
+                                                        ({halfPeriodLabels[leave.halfDayPeriod]})
+                                                    </span>
+                                                )}
                                             </span>
                                         </td>
 
                                         <td className="text-xs text-slate-500">
-                                            {format(new Date(leave.startDate), "MMM dd")}-
-                                            {format(new Date(leave.endDate), "MMM dd")}
+                                            {leave.type === "HALF_DAY"
+                                                ? format(new Date(leave.startDate), "MMM dd")
+                                                : `${format(new Date(leave.startDate), "MMM dd")}-${format(new Date(leave.endDate), "MMM dd")}`}
+                                        </td>
+
+                                        <td className="text-sm text-slate-600">
+                                            {totalDays}{" "}
+                                            <span className="text-xs text-slate-400">
+                                                {totalDays === 1 ? "day" : "days"}
+                                            </span>
                                         </td>
 
                                         <td className="max-w-xs truncate text-slate-500" title={leave.reason}>
@@ -73,16 +108,31 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
 
                                         <td>
                                             <span
-                                                className={`badge ${
-                                                    leave.status === "APPROVED"
+                                                className={`badge ${leave.status === "APPROVED"
                                                         ? "badge-success"
                                                         : leave.status === "REJECTED"
-                                                        ? "badge-danger"
-                                                        : "badge-warning"
-                                                }`}
+                                                            ? "badge-danger"
+                                                            : "badge-warning"
+                                                    }`}
                                             >
                                                 {leave.status}
                                             </span>
+                                        </td>
+
+                                        <td>
+                                            {leave.paymentType ? (
+                                                <span
+                                                    className={`badge ${
+                                                        leave.paymentType === "PAID"
+                                                            ? "badge-success"
+                                                            : "badge-danger"
+                                                    }`}
+                                                >
+                                                    {leave.paymentType}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">—</span>
+                                            )}
                                         </td>
 
                                         {isAdmin && (

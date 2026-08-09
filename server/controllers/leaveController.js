@@ -2,6 +2,18 @@ import { inngest } from "../inngest/index.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 
+const MONTHLY_PAID_LEAVE_LIMIT = 3;
+
+// Helper: how many days does this leave count as
+const getLeaveDayCount = (leave) => {
+    if (leave.type === "HALF_DAY") return 0.5;
+    const start = new Date(leave.startDate);
+    const end = new Date(leave.endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+};
+
 // Create leave
 // POST /api/leaves
 export const createLeave = async (req, res) => {
@@ -12,10 +24,14 @@ export const createLeave = async (req, res) => {
             return res.status(401).json({ error: "Unauthorized" });
         }
 
-        const { type, startDate, endDate, reason } = req.body;
+        const { type, startDate, endDate, reason, halfDayPeriod } = req.body;
 
         if (!type || !startDate || !endDate || !reason) {
             return res.status(400).json({ error: "Missing fields" });
+        }
+
+        if (type === "HALF_DAY" && !halfDayPeriod) {
+            return res.status(400).json({ error: "Half day period is required" });
         }
 
         const employee = await Employee.findOne({
@@ -53,6 +69,7 @@ export const createLeave = async (req, res) => {
         const leave = await LeaveApplication.create({
             employeeId: employee._id,
             type,
+            halfDayPeriod: type === "HALF_DAY" ? halfDayPeriod : null,
             startDate: new Date(startDate),
             endDate: new Date(endDate),
             reason,
@@ -176,8 +193,6 @@ export const getLeaves = async (req, res) => {
 
 
 
-
-
 // Update leave status
 // PATCH /api/leaves/:id
 export const updateLeaveStatus = async (req, res) => {
@@ -194,17 +209,7 @@ export const updateLeaveStatus = async (req, res) => {
             });
         }
 
-
-        const leave = await LeaveApplication.findByIdAndUpdate(
-            req.params.id,
-            {
-                status,
-            },
-            {
-                new: true,
-            }
-        );
-
+        const leave = await LeaveApplication.findById(req.params.id);
 
         if (!leave) {
             return res.status(404).json({
@@ -212,10 +217,50 @@ export const updateLeaveStatus = async (req, res) => {
             });
         }
 
+        const updateData = { status };
+
+        // If approving, determine PAID/UNPAID based on monthly cap
+        if (status === "APPROVED") {
+            const leaveMonth = leave.startDate.getMonth();
+            const leaveYear = leave.startDate.getFullYear();
+
+            const monthStart = new Date(leaveYear, leaveMonth, 1);
+            const monthEnd = new Date(leaveYear, leaveMonth + 1, 0, 23, 59, 59);
+
+            // Sum up days from already-approved leaves this employee has in the same month
+            // (excluding this leave itself, in case it was previously approved and is being re-approved)
+            const existingApprovedLeaves = await LeaveApplication.find({
+                employeeId: leave.employeeId,
+                status: "APPROVED",
+                _id: { $ne: leave._id },
+                startDate: { $gte: monthStart, $lte: monthEnd },
+            });
+
+            const daysAlreadyTaken = existingApprovedLeaves.reduce(
+                (sum, l) => sum + getLeaveDayCount(l),
+                0
+            );
+
+            const thisLeaveDays = getLeaveDayCount(leave);
+            const totalAfterThis = daysAlreadyTaken + thisLeaveDays;
+
+            updateData.paymentType =
+                totalAfterThis <= MONTHLY_PAID_LEAVE_LIMIT ? "PAID" : "UNPAID";
+        } else {
+            // Rejected or reverted to pending - clear payment type
+            updateData.paymentType = null;
+        }
+
+        const updatedLeave = await LeaveApplication.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true }
+        );
+
 
         return res.json({
             success: true,
-            data: leave,
+            data: updatedLeave,
         });
 
 

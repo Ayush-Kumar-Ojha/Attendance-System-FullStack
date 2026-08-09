@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { DEPARTMENTS } from "../constants/departments.js";
 
 const employeeSchema = new mongoose.Schema({
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
@@ -15,9 +14,13 @@ const employeeSchema = new mongoose.Schema({
     joinDate: {type: Date, required: true },
     isDeleted: {type: Boolean, default: false },
     bio: {type: String, default: "" },
-    department:{type:String, enum:DEPARTMENTS}
-
-
+    department: { type: String },
+    image: { type: String, default: null },
+    cvUrl: { type: String, default: null },
+    cvFileName: { type: String, default: null },
+    skills: { type: [String], default: [] },
+    dateOfBirth: { type: Date, default: null },
+    anniversaryDate: { type: Date, default: null },
 },{timestamps:true})
 const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema)
 

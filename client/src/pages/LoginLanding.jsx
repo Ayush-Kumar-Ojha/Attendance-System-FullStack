@@ -8,6 +8,7 @@ import LoginLeftSide from "../components/LoginLeftSide";
 import { Link, Navigate } from "react-router-dom";
 import Loading from "../components/Loading";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.jpg";
 
 const LoginLanding = () => {
 
@@ -18,7 +19,7 @@ const LoginLanding = () => {
   }
 
   if (user) {
-    return <Navigate to="/"/>;
+    return <Navigate to="/" />;
   }
   const portalOptions = [
     {
@@ -45,7 +46,10 @@ const LoginLanding = () => {
         <div className="w-full max-w-md animate-fade-in relative z-10">
 
           {/* Header */}
+          {/* Header */}
           <div className="mb-10 text-center md:text-left">
+            <img src={logo} alt="Wehark Solutions" className="h-20 mb-7 mx-auto md:mx-0" />
+
             <h2 className="text-3xl font-medium text-slate-900 tracking-tight mb-3">
               Welcome back
             </h2>

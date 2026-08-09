@@ -41,7 +41,7 @@ const EmployeeDashboard = ({ data }) => {
                 </h1>
 
                 <p className="page-subtitle">
-                    {emp?.position} - {emp?.department || "No Department"}
+                    {emp?.designation} - {emp?.department || "No Department"}
                 </p>
             </div>
 

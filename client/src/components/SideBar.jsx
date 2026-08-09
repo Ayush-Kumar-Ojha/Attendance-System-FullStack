@@ -9,7 +9,10 @@ import {
   FileTextIcon,
   LogOutIcon,
   DollarSignIcon,
-  Loader2, // <-- Added this
+  Loader2,
+  MegaphoneIcon,
+  GiftIcon,
+  BarChart3Icon,
 } from "lucide-react";
 
 import { Link, useLocation } from "react-router-dom";
@@ -47,15 +50,15 @@ const SideBar = () => {
 
     role === "ADMIN"
       ? {
-          name: "Employees",
-          href: "/employees",
-          icon: UserIcon,
-        }
+        name: "Employees",
+        href: "/employees",
+        icon: UserIcon,
+      }
       : {
-          name: "Attendance",
-          href: "/attendance",
-          icon: CalendarIcon,
-        },
+        name: "Attendance",
+        href: "/attendance",
+        icon: CalendarIcon,
+      },
 
     {
       name: "Leave",
@@ -70,11 +73,29 @@ const SideBar = () => {
     },
 
     {
+      name: "Announcements",
+      href: "/announcements",
+      icon: MegaphoneIcon,
+    },
+
+    {
+      name: "Special Dates",
+      href: "/special-dates",
+      icon: GiftIcon,
+    },
+
+    role === "ADMIN" && {
+      name: "Reports",
+      href: "/reports",
+      icon: BarChart3Icon,
+    },
+
+    {
       name: "Settings",
       href: "/settings",
       icon: LayoutGridIcon,
     },
-  ];
+  ].filter(Boolean);
 
   const handleLogout = () => {
     logout();
@@ -155,22 +176,20 @@ const SideBar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${
-                  isActive
+                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive
                     ? "bg-indigo-600/10 text-indigo-300"
                     : "text-slate-300 hover:bg-white/5"
-                }`}
+                  }`}
               >
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
                 )}
 
                 <item.icon
-                  className={`w-[17px] h-[17px] shrink-0 ${
-                    isActive
+                  className={`w-[17px] h-[17px] shrink-0 ${isActive
                       ? "text-indigo-300"
                       : "text-slate-400 group-hover:text-slate-300"
-                  }`}
+                    }`}
                 />
 
                 <span className="flex-1 text-sm font-medium">
@@ -204,7 +223,7 @@ const SideBar = () => {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 text-white rounded-lg shadow-lg border border-white/10"
+        className="lg:hidden print:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 text-white rounded-lg shadow-lg border border-white/10"
       >
         <MenuIcon size={20} />
       </button>
@@ -224,9 +243,8 @@ const SideBar = () => {
 
       {/* Sidebar - Mobile */}
       <aside
-        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {sidebarContent}
       </aside>

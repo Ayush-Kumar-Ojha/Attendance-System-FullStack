@@ -11,23 +11,32 @@ import toast from "react-hot-toast";
 
 const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
+    const [leaveType, setLeaveType] = useState("SICK");
 
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
     const minDate = tomorrow.toISOString().split("T")[0];
 
+    const isHalfDay = leaveType === "HALF_DAY";
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true)
-        const formData=new FormData(e.currentTarget)
-        const data=Object.fromEntries(formData.entries())
-        try{
-            await api.post('/leave',data)
+        const formData = new FormData(e.currentTarget)
+        const data = Object.fromEntries(formData.entries())
+
+        // For half day, force start and end date to be the same
+        if (isHalfDay) {
+            data.endDate = data.startDate;
+        }
+
+        try {
+            await api.post('/leave', data)
             onSuccess();
             onClose();
-        }catch(err){
-            toast.error(err.response?.data?.error||err?.message)
+        } catch (err) {
+            toast.error(err.response?.data?.error || err?.message)
         }
         finally { setLoading(false) }
     };
@@ -69,47 +78,76 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
                             Leave Type
                         </label>
 
-                        <select name="type" required>
+                        <select
+                            name="type"
+                            required
+                            value={leaveType}
+                            onChange={(e) => setLeaveType(e.target.value)}
+                        >
                             <option value="SICK">Sick Leave</option>
                             <option value="CASUAL">Casual Leave</option>
                             <option value="ANNUAL">Annual Leave</option>
+                            <option value="MENSTRUAL">Menstrual Leave</option>
+                            <option value="HALF_DAY">Half Day Leave</option>
                         </select>
                     </div>
+
+                    {/* Half Day sub-selection */}
+                    {isHalfDay && (
+                        <div>
+                            <label className="text-sm font-medium text-slate-700 mb-2 block">
+                                Which Half?
+                            </label>
+                            <select name="halfDayPeriod" required>
+                                <option value="FIRST_HALF">First Half</option>
+                                <option value="SECOND_HALF">Second Half</option>
+                            </select>
+                        </div>
+                    )}
 
                     {/* Duration */}
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                             <CalendarDays className="w-4 h-4 text-slate-400" />
-                            Duration
+                            {isHalfDay ? "Date" : "Duration"}
                         </label>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <span className="block text-xs text-slate-400 mb-1">
-                                    From
-                                </span>
+                        {isHalfDay ? (
+                            <input
+                                type="date"
+                                name="startDate"
+                                required
+                                min={minDate}
+                            />
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">
+                                        From
+                                    </span>
 
-                                <input
-                                    type="date"
-                                    name="startDate"
-                                    required
-                                    min={minDate}
-                                />
+                                    <input
+                                        type="date"
+                                        name="startDate"
+                                        required
+                                        min={minDate}
+                                    />
+                                </div>
+
+                                <div>
+                                    <span className="block text-xs text-slate-400 mb-1">
+                                        To
+                                    </span>
+
+                                    <input
+                                        type="date"
+                                        name="endDate"
+                                        required
+                                        min={minDate}
+                                    />
+                                </div>
                             </div>
-
-                            <div>
-                                <span className="block text-xs text-slate-400 mb-1">
-                                    To
-                                </span>
-
-                                <input
-                                    type="date"
-                                    name="endDate"
-                                    required
-                                    min={minDate}
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Reason */}

@@ -4,8 +4,11 @@ import {
     Building2Icon,
     FileTextIcon,
 } from "lucide-react";
+import { useDepartments } from "../hooks/useDepartments";
 
 const AdminDashboard = ({ data }) => {
+    const { departments } = useDepartments();
+
     const stats = [
         {
             icon: UsersIcon,
@@ -15,7 +18,7 @@ const AdminDashboard = ({ data }) => {
         },
         {
             icon: Building2Icon,
-            value: data.totalDepartments,
+            value: departments.length,
             label: "Departments",
             description: "Organization units",
         },

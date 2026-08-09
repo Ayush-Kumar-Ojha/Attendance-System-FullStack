@@ -53,7 +53,7 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
                 </h3>
 
                 <p className="text-xs text-slate-500">
-                    {employee.position}
+                    {employee.designation}
                 </p>
             </div>
         </div>

@@ -1,6 +1,7 @@
 import Employee from "../models/Employee.js"
+
 // Get profile
-// Get /api/profile
+// GET /api/profile
 export const getPorfile = async (req, res) => {
     try {
         const session = req.session;
@@ -21,7 +22,7 @@ export const getPorfile = async (req, res) => {
 }    
 
 // Update Profile
-// PUT /api/profile
+// POST /api/profile
 export const updateProfile = async (req, res) => {
     try {
         const session = req.session;
@@ -32,12 +33,33 @@ export const updateProfile = async (req, res) => {
         if(employee.isDeleted){
             return res.status(403).json({error:"Your account is deactived. You cannot update your profile.",})
         }
-        await Employee.findByIdAndUpdate(employee._id,{
-            bio:req.body.bio
-        })
+
+        const updateData = {
+            bio: req.body.bio ?? employee.bio,
+        };
+
+        if (req.body.skills) {
+            try {
+                updateData.skills = JSON.parse(req.body.skills);
+            } catch (e) {
+                // if it's not valid JSON, ignore silently
+            }
+        }
+
+        if (req.files?.photo?.[0]) {
+            updateData.image = `/uploads/photos/${req.files.photo[0].filename}`;
+        }
+
+        if (req.files?.cv?.[0]) {
+            updateData.cvUrl = `/uploads/cvs/${req.files.cv[0].filename}`;
+            updateData.cvFileName = req.files.cv[0].originalname;
+        }
+
+        await Employee.findByIdAndUpdate(employee._id, updateData)
         return res.json({success:true});
 
     }catch(error){
+        console.error("Update Profile Error:", error);
         return res.status(500).json({error:"Failed to update profile"});
     }
 }
