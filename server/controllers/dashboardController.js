@@ -16,11 +16,11 @@ export const getDashboard = async (req, res) => {
       const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
       const todayEnd = new Date(new Date().setHours(24, 0, 0, 0));
 
-      const [totalEmployees, todayAttendanceRecords, pendingLeaves] =
+      const [allActiveEmployees, todayAttendanceRecords, pendingLeaves] =
         await Promise.all([
-          Employee.countDocuments({
+          Employee.find({
             isDeleted: { $ne: true },
-          }),
+          }).select("firstName lastName department").lean(),
 
           Attendance.find({
             date: {
@@ -34,6 +34,7 @@ export const getDashboard = async (req, res) => {
           }),
         ]);
 
+      const totalEmployees = allActiveEmployees.length;
       const todayAttendance = todayAttendanceRecords.length;
 
       const checkedInEmployeeIds = new Set(
@@ -50,10 +51,13 @@ export const getDashboard = async (req, res) => {
           (r.dayType === "Half Day" || r.dayType === "Short Day")
       ).length;
 
-      const notCheckedInYet = Math.max(
-        totalEmployees - checkedInEmployeeIds.size,
-        0
-      );
+      const notCheckedInEmployees = allActiveEmployees
+        .filter((emp) => !checkedInEmployeeIds.has(emp._id.toString()))
+        .map((emp) => ({
+          id: emp._id.toString(),
+          name: `${emp.firstName} ${emp.lastName}`,
+          department: emp.department || "N/A",
+        }));
 
       const attendancePercent =
         totalEmployees > 0
@@ -69,7 +73,8 @@ export const getDashboard = async (req, res) => {
         attendancePercent,
         lateCheckIns,
         earlyCheckOuts,
-        notCheckedInYet,
+        notCheckedInYet: notCheckedInEmployees.length,
+        notCheckedInEmployees,
       });
     }
 

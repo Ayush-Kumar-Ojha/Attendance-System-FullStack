@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     UsersIcon,
     CalendarIcon,
@@ -6,6 +7,7 @@ import {
     ClockIcon,
     LogOutIcon,
     UserXIcon,
+    X,
 } from "lucide-react";
 import { useDepartments } from "../hooks/useDepartments";
 
@@ -48,6 +50,7 @@ const AttendanceDonut = ({ percent }) => {
 
 const AdminDashboard = ({ data }) => {
     const { departments } = useDepartments();
+    const [showNotCheckedInList, setShowNotCheckedInList] = useState(false);
 
     const stats = [
         {
@@ -161,11 +164,15 @@ const AdminDashboard = ({ data }) => {
 
                 {todayStats.map((s) => {
                     const Icon = s.icon;
+                    const isClickable = s.label === "Not Checked In Yet" && s.value > 0;
 
                     return (
                         <div
                             key={s.label}
-                            className="card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between"
+                            onClick={() => isClickable && setShowNotCheckedInList(true)}
+                            className={`card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between ${
+                                isClickable ? "cursor-pointer" : ""
+                            }`}
                         >
                             <div>
                                 <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
@@ -179,7 +186,7 @@ const AdminDashboard = ({ data }) => {
                                 </p>
 
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {s.description}
+                                    {isClickable ? "Click to view names" : s.description}
                                 </p>
                             </div>
 
@@ -188,6 +195,48 @@ const AdminDashboard = ({ data }) => {
                     );
                 })}
             </div>
+
+            {/* Not Checked In Employees Modal */}
+            {showNotCheckedInList && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                    onClick={() => setShowNotCheckedInList(false)}
+                >
+                    <div
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-6 pb-0">
+                            <h2 className="text-lg font-semibold text-slate-800">
+                                Not Checked In Yet
+                            </h2>
+                            <button
+                                onClick={() => setShowNotCheckedInList(false)}
+                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {(!data.notCheckedInEmployees || data.notCheckedInEmployees.length === 0) ? (
+                                <p className="text-center text-slate-400 py-6">
+                                    Everyone has checked in today 🎉
+                                </p>
+                            ) : (
+                                <ul className="divide-y divide-slate-100">
+                                    {data.notCheckedInEmployees.map((emp) => (
+                                        <li key={emp.id} className="py-3 flex items-center justify-between">
+                                            <span className="text-sm font-medium text-slate-900">{emp.name}</span>
+                                            <span className="text-xs text-slate-400">{emp.department}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
