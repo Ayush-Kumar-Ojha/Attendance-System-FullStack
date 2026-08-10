@@ -3,9 +3,12 @@ import Employee from "../models/Employee.js";
 
 // Count weekdays (Mon-Fri) in a given month/year
 const getWorkingDaysInMonth = (month, year) => {
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
+    const lastDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
+
     let count = 0;
-    for (let day = 1; day <= daysInMonth; day++) {
+    for (let day = 1; day <= lastDay; day++) {
         const date = new Date(year, month - 1, day);
         const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
         if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;

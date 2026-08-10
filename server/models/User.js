@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    bio: { type: String, default: "" },
+    image: { type: String, default: null },
+    cvUrl: { type: String, default: null },
+    cvFileName: { type: String, default: null },
+    skills: { type: [String], default: [] },
   },
   {
     timestamps: true,

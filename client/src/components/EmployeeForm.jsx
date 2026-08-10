@@ -104,6 +104,64 @@ const EmployeeForm = ({ initialData, onSuccess, onCancel }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Employee Profile (Self-Managed) - view only */}
+            {isEditMode && (initialData?.image || initialData?.skills?.length > 0 || initialData?.cvUrl) && (
+                <div className="card p-5 sm:p-6">
+                    <h3 className="text-base font-medium text-slate-900 mb-6 pb-4 border-b border-slate-100">
+                        Employee Profile (Self-Managed)
+                    </h3>
+                    <div className="space-y-5 text-sm text-slate-700">
+                        {initialData?.image && (
+                            <div>
+                                <label className="block mb-2 text-slate-600">Photo</label>
+                                <img
+                                    src={initialData.image}
+                                    alt="Employee"
+                                    className="w-16 h-16 rounded-full object-cover border border-slate-200"
+                                />
+                            </div>
+                        )}
+                        {initialData?.skills?.length > 0 && (
+                            <div>
+                                <label className="block mb-2 text-slate-600">Skills</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {initialData.skills.map((skill) => (
+                                        <span
+                                            key={skill}
+                                            className="inline-block bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full"
+                                        >
+                                            {skill}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {initialData?.cvUrl && (
+                            <div>
+                                <label className="block mb-2 text-slate-600">CV / Resume</label>
+                                {(() => {
+                                    const CvLink = "a";
+                                    return (
+                                        <CvLink
+                                            href={initialData.cvUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-indigo-600 hover:text-indigo-700 text-sm font-medium underline"
+                                        >
+                                            {initialData.cvFileName || "View CV"}
+                                        </CvLink>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                        <p className="text-xs text-slate-400 pt-2 border-t border-slate-100">
+                            These fields are managed by the employee via their own Settings page.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Employment Details */}
             <div className="card p-5 sm:p-6">
                 <h3 className="text-base font-medium text-slate-900 mb-6 pb-4 border-b border-slate-100">

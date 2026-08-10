@@ -1,4 +1,5 @@
 import Employee from "../models/Employee.js"
+import User from "../models/User.js"
 
 // Get profile
 // GET /api/profile
@@ -9,10 +10,16 @@ export const getPorfile = async (req, res) => {
 
         if (!employee) {
             // Authenticated user is not an employee - return admin profile
+            const user = await User.findById(session.userId);
             return res.json({
                 firstName: "Admin",
                 lastName: "",
                 email: session.email,
+                bio: user?.bio || "",
+                image: user?.image || null,
+                cvUrl: user?.cvUrl || null,
+                cvFileName: user?.cvFileName || null,
+                skills: user?.skills || [],
             })
         }
         return res.json(employee)
@@ -28,14 +35,8 @@ export const updateProfile = async (req, res) => {
         const session = req.session;
         const employee = await Employee.findOne({ userId: session.userId })
 
-        if (!employee)
-        return res.status(400).json({error:"Employee not found"});
-        if(employee.isDeleted){
-            return res.status(403).json({error:"Your account is deactived. You cannot update your profile.",})
-        }
-
         const updateData = {
-            bio: req.body.bio ?? employee.bio,
+            bio: req.body.bio ?? "",
         };
 
         if (req.body.skills) {
@@ -47,7 +48,6 @@ export const updateProfile = async (req, res) => {
         }
 
         if (req.files?.photo?.[0]) {
-            // Cloudinary returns the full hosted URL directly on the file object
             updateData.image = req.files.photo[0].path;
         }
 
@@ -56,7 +56,17 @@ export const updateProfile = async (req, res) => {
             updateData.cvFileName = req.files.cv[0].originalname;
         }
 
-        await Employee.findByIdAndUpdate(employee._id, updateData)
+        if (employee) {
+            // Employee flow
+            if (employee.isDeleted) {
+                return res.status(403).json({error:"Your account is deactived. You cannot update your profile.",})
+            }
+            await Employee.findByIdAndUpdate(employee._id, updateData)
+        } else {
+            // Admin flow (no Employee record exists)
+            await User.findByIdAndUpdate(session.userId, updateData)
+        }
+
         return res.json({success:true});
 
     }catch(error){
