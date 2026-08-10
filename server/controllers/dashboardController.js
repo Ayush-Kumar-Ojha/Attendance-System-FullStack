@@ -13,23 +13,52 @@ export const getDashboard = async (req, res) => {
 
     // ================= ADMIN DASHBOARD =================
     if (session.role === "ADMIN") {
-      const [totalEmployees, todayAttendance, pendingLeaves] =
+      const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+      const todayEnd = new Date(new Date().setHours(24, 0, 0, 0));
+
+      const [totalEmployees, todayAttendanceRecords, pendingLeaves] =
         await Promise.all([
           Employee.countDocuments({
             isDeleted: { $ne: true },
           }),
 
-          Attendance.countDocuments({
+          Attendance.find({
             date: {
-              $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-              $lt: new Date(new Date().setHours(24, 0, 0, 0)),
+              $gte: todayStart,
+              $lt: todayEnd,
             },
-          }),
+          }).lean(),
 
           LeaveApplication.countDocuments({
             status: "PENDING",
           }),
         ]);
+
+      const todayAttendance = todayAttendanceRecords.length;
+
+      const checkedInEmployeeIds = new Set(
+        todayAttendanceRecords.map((r) => r.employeeId.toString())
+      );
+
+      const lateCheckIns = todayAttendanceRecords.filter(
+        (r) => r.status === "LATE"
+      ).length;
+
+      const earlyCheckOuts = todayAttendanceRecords.filter(
+        (r) =>
+          r.checkOut &&
+          (r.dayType === "Half Day" || r.dayType === "Short Day")
+      ).length;
+
+      const notCheckedInYet = Math.max(
+        totalEmployees - checkedInEmployeeIds.size,
+        0
+      );
+
+      const attendancePercent =
+        totalEmployees > 0
+          ? Math.round((checkedInEmployeeIds.size / totalEmployees) * 100)
+          : 0;
 
       return res.json({
         role: "ADMIN",
@@ -37,6 +66,10 @@ export const getDashboard = async (req, res) => {
         totalDepartments: DEPARTMENTS.length,
         todayAttendance,
         pendingLeaves,
+        attendancePercent,
+        lateCheckIns,
+        earlyCheckOuts,
+        notCheckedInYet,
       });
     }
 
