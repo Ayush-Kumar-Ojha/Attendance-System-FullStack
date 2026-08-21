@@ -1,6 +1,7 @@
 import { inngest } from "../inngest/index.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
+import sendEmail from "../config/nodemailer.js";
 
 const MONTHLY_PAID_LEAVE_LIMIT = 3;
 
@@ -209,54 +210,39 @@ export const updateLeaveStatus = async (req, res) => {
             });
         }
 
-        const leave = await LeaveApplication.findById(req.params.id);
+        const updatedLeave = await LeaveApplication.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        );
 
-        if (!leave) {
+        if (!updatedLeave) {
             return res.status(404).json({
                 error: "Leave not found",
             });
         }
 
-        const updateData = { status };
-
-        // If approving, determine PAID/UNPAID based on monthly cap
-        if (status === "APPROVED") {
-            const leaveMonth = leave.startDate.getMonth();
-            const leaveYear = leave.startDate.getFullYear();
-
-            const monthStart = new Date(leaveYear, leaveMonth, 1);
-            const monthEnd = new Date(leaveYear, leaveMonth + 1, 0, 23, 59, 59);
-
-            // Sum up days from already-approved leaves this employee has in the same month
-            // (excluding this leave itself, in case it was previously approved and is being re-approved)
-            const existingApprovedLeaves = await LeaveApplication.find({
-                employeeId: leave.employeeId,
-                status: "APPROVED",
-                _id: { $ne: leave._id },
-                startDate: { $gte: monthStart, $lte: monthEnd },
-            });
-
-            const daysAlreadyTaken = existingApprovedLeaves.reduce(
-                (sum, l) => sum + getLeaveDayCount(l),
-                0
-            );
-
-            const thisLeaveDays = getLeaveDayCount(leave);
-            const totalAfterThis = daysAlreadyTaken + thisLeaveDays;
-
-            updateData.paymentType =
-                totalAfterThis <= MONTHLY_PAID_LEAVE_LIMIT ? "PAID" : "UNPAID";
-        } else {
-            // Rejected or reverted to pending - clear payment type
-            updateData.paymentType = null;
+        // Send email notification to employee for APPROVED/REJECTED decisions
+        if (status === "APPROVED" || status === "REJECTED") {
+            const employee = await Employee.findById(updatedLeave.employeeId);
+            if (employee?.email) {
+                const isApproved = status === "APPROVED";
+                sendEmail({
+                    to: employee.email,
+                    subject: `Leave Application ${isApproved ? "Approved" : "Rejected"}`,
+                    body: `<div style="max-width: 600px; font-family: Arial, sans-serif;">
+                        <h2>Hi ${employee.firstName}, 👋</h2>
+                        <p style="font-size: 16px;">Your leave application has been <strong style="color: ${isApproved ? "#059669" : "#dc2626"};">${status}</strong>.</p>
+                        <p style="font-size: 16px;">Type: <strong>${updatedLeave.type}</strong></p>
+                        <p style="font-size: 16px;">Dates: <strong>${new Date(updatedLeave.startDate).toLocaleDateString()} - ${new Date(updatedLeave.endDate).toLocaleDateString()}</strong></p>
+                        ${isApproved ? "<p style='font-size: 16px;'>Enjoy your time off!</p>" : "<p style='font-size: 16px;'>Please contact your admin if you have any questions.</p>"}
+                        <br />
+                        <p style="font-size: 16px;">Best Regards,</p>
+                        <p style="font-size: 16px;"><strong>HR MS</strong></p>
+                    </div>`,
+                }).catch((err) => console.error("Failed to send leave status email:", err));
+            }
         }
-
-        const updatedLeave = await LeaveApplication.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true }
-        );
-
 
         return res.json({
             success: true,
@@ -271,5 +257,27 @@ export const updateLeaveStatus = async (req, res) => {
         return res.status(500).json({
             error: "Failed to update leave",
         });
+    }
+};
+
+// Cancel own pending leave
+// DELETE /api/leave/:id
+export const cancelLeave = async (req, res) => {
+    try {
+        const session = req.session;
+        const employee = await Employee.findOne({ userId: session.userId });
+        if (!employee) return res.status(404).json({ error: "Employee not found" });
+
+        const leave = await LeaveApplication.findOne({ _id: req.params.id, employeeId: employee._id });
+        if (!leave) return res.status(404).json({ error: "Leave not found" });
+        if (leave.status !== "PENDING") {
+            return res.status(400).json({ error: "Only pending leaves can be cancelled" });
+        }
+
+        await LeaveApplication.findByIdAndDelete(req.params.id);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error("Cancel Leave Error:", error);
+        return res.status(500).json({ error: "Failed to cancel leave" });
     }
 };

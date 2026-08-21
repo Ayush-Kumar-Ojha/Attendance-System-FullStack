@@ -8,6 +8,7 @@ import {
 import Loading from "../components/Loading";
 import LeaveHistory from "../components/leave/LeaveHistory";
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal";
+import DocumentAttachment from "../components/leave/DocumentAttachment";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import toast from "react-hot-toast";
@@ -19,6 +20,7 @@ const Leave = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
+  const [documents, setDocuments] = useState({ HOLIDAY_LIST: null, LEAVE_POLICY: null });
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -38,9 +40,19 @@ const Leave = () => {
     }
   }, []);
 
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const res = await api.get("/documents");
+      setDocuments(res.data);
+    } catch (error) {
+      // silently ignore - documents are optional
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
-  }, [fetchLeaves]);
+    fetchDocuments();
+  }, [fetchLeaves, fetchDocuments]);
 
   if (loading) return <Loading />;
 
@@ -100,6 +112,24 @@ const Leave = () => {
             Apply for Leave
           </button>
         )}
+      </div>
+
+      {/* Document Attachments */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <DocumentAttachment
+          type="HOLIDAY_LIST"
+          label="Holiday List"
+          doc={documents.HOLIDAY_LIST}
+          isAdmin={isAdmin}
+          onUpdate={fetchDocuments}
+        />
+        <DocumentAttachment
+          type="LEAVE_POLICY"
+          label="Leave Policy"
+          doc={documents.LEAVE_POLICY}
+          isAdmin={isAdmin}
+          onUpdate={fetchDocuments}
+        />
       </div>
 
       {!isAdmin && (

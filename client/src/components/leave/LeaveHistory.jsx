@@ -51,7 +51,6 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                             <th>Total Days</th>
                             <th>Reason</th>
                             <th>Status</th>
-                            <th>Paid/Unpaid</th>
                             {isAdmin && <th className='text-center'>Actions</th>}
                         </tr>
                     </thead>
@@ -60,7 +59,7 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                         {leaves.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={isAdmin ? 8 : 6}
+                                    colSpan={isAdmin ? 7 : 5}
                                     className="text-center py-12 text-slate-400"
                                 >
                                     No leave applications found
@@ -117,22 +116,6 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                                             >
                                                 {leave.status}
                                             </span>
-                                        </td>
-
-                                        <td>
-                                            {leave.paymentType ? (
-                                                <span
-                                                    className={`badge ${
-                                                        leave.paymentType === "PAID"
-                                                            ? "badge-success"
-                                                            : "badge-danger"
-                                                    }`}
-                                                >
-                                                    {leave.paymentType}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-slate-300">—</span>
-                                            )}
                                         </td>
 
                                         {isAdmin && (

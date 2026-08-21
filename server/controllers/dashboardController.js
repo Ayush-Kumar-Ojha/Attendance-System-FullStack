@@ -3,6 +3,7 @@ import Employee from "../models/Employee.js";
 import Attendance from "../models/Attendance.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 import Payslip from "../models/Payslip.js";
+import Department from "../models/Department.js";
 
 // Get dashboard for employee and admin
 // GET /api/dashboard
@@ -16,63 +17,39 @@ export const getDashboard = async (req, res) => {
       const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
       const todayEnd = new Date(new Date().setHours(24, 0, 0, 0));
 
-      const [allActiveEmployees, todayAttendanceRecords, pendingLeaves] =
-        await Promise.all([
-          Employee.find({
-            isDeleted: { $ne: true },
-          }).select("firstName lastName department").lean(),
-
-          Attendance.find({
-            date: {
-              $gte: todayStart,
-              $lt: todayEnd,
-            },
-          }).lean(),
-
-          LeaveApplication.countDocuments({
-            status: "PENDING",
-          }),
-        ]);
+      const allActiveEmployees = await Employee.find({ isDeleted: { $ne: true } }).select("firstName lastName department").lean();
+      const todayAttendanceRecords = await Attendance.find({ date: { $gte: todayStart, $lt: todayEnd } }).populate("employeeId").lean();
+      const pendingLeaves = await LeaveApplication.countDocuments({ status: "PENDING" });
+      const departments = await Department.find().lean();
 
       const totalEmployees = allActiveEmployees.length;
-      const todayAttendance = todayAttendanceRecords.length;
+      const checkedInEmployeeIds = new Set(todayAttendanceRecords.map((r) => r.employeeId?._id?.toString()));
 
-      const checkedInEmployeeIds = new Set(
-        todayAttendanceRecords.map((r) => r.employeeId.toString())
-      );
+      const lateCheckInEmployees = todayAttendanceRecords
+        .filter((r) => r.status === "LATE" && r.employeeId)
+        .map((r) => `${r.employeeId.firstName} ${r.employeeId.lastName}`);
 
-      const lateCheckIns = todayAttendanceRecords.filter(
-        (r) => r.status === "LATE"
-      ).length;
-
-      const earlyCheckOuts = todayAttendanceRecords.filter(
-        (r) =>
-          r.checkOut &&
-          (r.dayType === "Half Day" || r.dayType === "Short Day")
-      ).length;
+      const earlyCheckOutEmployees = todayAttendanceRecords
+        .filter((r) => r.checkOut && r.employeeId && (r.dayType === "Half Day" || r.dayType === "Short Day"))
+        .map((r) => `${r.employeeId.firstName} ${r.employeeId.lastName}`);
 
       const notCheckedInEmployees = allActiveEmployees
         .filter((emp) => !checkedInEmployeeIds.has(emp._id.toString()))
-        .map((emp) => ({
-          id: emp._id.toString(),
-          name: `${emp.firstName} ${emp.lastName}`,
-          department: emp.department || "N/A",
-        }));
+        .map((emp) => `${emp.firstName} ${emp.lastName}`);
 
-      const attendancePercent =
-        totalEmployees > 0
-          ? Math.round((checkedInEmployeeIds.size / totalEmployees) * 100)
-          : 0;
+      const attendancePercent = totalEmployees > 0 ? Math.round((checkedInEmployeeIds.size / totalEmployees) * 100) : 0;
 
       return res.json({
         role: "ADMIN",
         totalEmployees,
-        totalDepartments: DEPARTMENTS.length,
-        todayAttendance,
+        totalDepartments: departments.length,
+        todayAttendance: todayAttendanceRecords.length,
         pendingLeaves,
         attendancePercent,
-        lateCheckIns,
-        earlyCheckOuts,
+        lateCheckIns: lateCheckInEmployees.length,
+        lateCheckInEmployees,
+        earlyCheckOuts: earlyCheckOutEmployees.length,
+        earlyCheckOutEmployees,
         notCheckedInYet: notCheckedInEmployees.length,
         notCheckedInEmployees,
       });

@@ -9,6 +9,8 @@ const announcementSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+announcementSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 const Announcement =
     mongoose.models.Announcement || mongoose.model("Announcement", announcementSchema);
 

@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeftIcon,
   EyeIcon,
   EyeOffIcon,
   Loader2Icon,
@@ -9,8 +8,9 @@ import { toast } from "react-hot-toast";
 import LoginLeftSide from "./LoginLeftSide";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.jpg";
 
-const LoginForm = ({ role, title, subtitle }) => {
+const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +24,7 @@ const LoginForm = ({ role, title, subtitle }) => {
     setError("")
     setLoading(true)
     try {
-      await login(email, password, role)
+      await login(email, password)
       navigate("/dashboard")
     } catch (error) {
       toast.error(error.response?.data?.error || error.message || "Login failed")
@@ -40,22 +40,20 @@ const LoginForm = ({ role, title, subtitle }) => {
       <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-6 sm:p-12 lg:p-16 relative overflow-y-auto min-h-screen">
         <div className="w-full max-w-md animate-fade-in">
 
-          {/* Back Button */}
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-700 text-sm mb-10 transition-colors"
-          >
-            <ArrowLeftIcon size={16} />
-            Back to portals
-          </Link>
-
-          {/* Heading */}
+          {/* Logo */}
           <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-medium text-zinc-800">
-              {title}
+            <img
+              src={logo}
+              alt="Wehark Solutions"
+              className="mb-2 h-17 w-auto object-contain"
+            />
+
+            <h1 className="mt-0 text-2xl font-medium text-zinc-800 sm:text-3xl">
+              Welcome back
             </h1>
-            <p className="text-slate-500 text-sm sm:text-base">
-              {subtitle}
+
+            <p className="text-sm text-slate-500 sm:text-base">
+              Sign in to access your account
             </p>
           </div>
 
@@ -69,7 +67,6 @@ const LoginForm = ({ role, title, subtitle }) => {
 
           {/* Login Form */}
           <form className="space-y-5" onSubmit={handleSubmit}>
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Email address
@@ -84,7 +81,6 @@ const LoginForm = ({ role, title, subtitle }) => {
               />
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Password
@@ -124,7 +120,6 @@ const LoginForm = ({ role, title, subtitle }) => {
               </Link>
             </div>
 
-            {/* Sign In Button */}
             <button
               type="submit"
               disabled={loading}
@@ -133,7 +128,6 @@ const LoginForm = ({ role, title, subtitle }) => {
               {loading && (
                 <Loader2Icon className="animate-spin h-4 w-4 mr-2" />
               )}
-
               Sign in
             </button>
           </form>

@@ -20,6 +20,7 @@ export const getPorfile = async (req, res) => {
                 cvUrl: user?.cvUrl || null,
                 cvFileName: user?.cvFileName || null,
                 skills: user?.skills || [],
+                phone: user?.phone || "",
             })
         }
         return res.json(employee)
@@ -38,6 +39,10 @@ export const updateProfile = async (req, res) => {
         const updateData = {
             bio: req.body.bio ?? "",
         };
+
+        if (req.body.phone !== undefined) {
+            updateData.phone = req.body.phone;
+        }
 
         if (req.body.skills) {
             try {

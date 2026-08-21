@@ -136,9 +136,18 @@ const ProfileForm = ({ initialData, onSuccess }) => {
                         <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
                         <input disabled value={initialData.email} className='bg-slate-50 text-slate-400 cursor-not-allowed' />
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
+                        <input
+                            type="tel"
+                            name="phone"
+                            defaultValue={initialData.phone || ""}
+                            placeholder="Your phone number"
+                        />
+                    </div>
+                    <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Designation</label>
-                        <input disabled value={initialData.position} className='bg-slate-50 text-slate-400 cursor-not-allowed' />
+                        <input disabled value={initialData.position || ""} className='bg-slate-50 text-slate-400 cursor-not-allowed' />
                     </div>
                 </div>
 

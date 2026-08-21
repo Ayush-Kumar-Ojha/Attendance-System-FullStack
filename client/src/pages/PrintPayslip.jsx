@@ -83,6 +83,19 @@ const PrintPayslip = () => {
 
     const amountInWords = `Rupees ${numberToWords(Math.round(netPayable))} Only`;
 
+    const employeeCode = payslip.employee?.employeeCode || 'N/A';
+    const dateOfJoining = payslip.employee?.joinDate
+        ? format(new Date(payslip.employee.joinDate), "d/M/yyyy")
+        : 'N/A';
+    const bankName = payslip.employee?.bankName || 'N/A';
+    const bankAccountNumber = payslip.employee?.bankAccountNumber || 'N/A';
+    const uanNumber = payslip.employee?.uanNumber || 'N/A';
+    const panNumber = payslip.employee?.panNumber || 'N/A';
+
+    const workingDays = payslip.workingDays ?? 0;
+    const actualWorkingDays = payslip.actualWorkingDays ?? 0;
+    const lopDays = payslip.lopDays ?? 0;
+
     const earningsRows = [
         { label: "Basic", value: basic },
         { label: "HRA", value: hra },
@@ -94,6 +107,17 @@ const PrintPayslip = () => {
         { label: "PF (Employee)", value: pfEmployee },
         { label: "Professional Tax", value: professionalTax },
         { label: "Health Insurance", value: medicalEmployee },
+    ];
+
+    // Rows for the two-column Employee Pay Summary grid:
+    // each entry is [label, value, label, value]
+    const summaryRows = [
+        ["Employee Code", employeeCode, "Employee Name", `${payslip.employee?.firstName || ''} ${payslip.employee?.lastName || ''}`.trim()],
+        ["Date of Joining", dateOfJoining, "Designation", designation],
+        ["Working Days", workingDays, "Department", department],
+        ["LOP Days", lopDays, "Actual Working Days", actualWorkingDays],
+        ["Bank Name", bankName, "Bank A/C Number", bankAccountNumber],
+        ["UAN", uanNumber, "PAN", panNumber],
     ];
 
     return (
@@ -117,15 +141,28 @@ const PrintPayslip = () => {
                     <h2 className="font-bold text-slate-800 text-sm">Employee Pay Summary</h2>
                 </div>
 
-                <div className="grid grid-cols-2 text-sm">
-                    <div className="border-b border-r border-slate-300 px-3 py-2 font-semibold text-slate-800 bg-slate-50">Employee Name</div>
-                    <div className="border-b border-slate-300 px-3 py-2 text-slate-700">{payslip.employee?.firstName} {payslip.employee?.lastName}</div>
+                <div className="grid grid-cols-4 text-sm">
+                    {summaryRows.map(([label1, value1, label2, value2], idx) => {
+                        const isLastRow = idx === summaryRows.length - 1;
+                        const borderB = isLastRow ? "" : "border-b border-slate-300";
 
-                    <div className="border-b border-r border-slate-300 px-3 py-2 font-semibold text-slate-800 bg-slate-50">Designation</div>
-                    <div className="border-b border-slate-300 px-3 py-2 text-slate-700">{designation}</div>
-
-                    <div className="border-r border-slate-300 px-3 py-2 font-semibold text-slate-800 bg-slate-50">Department</div>
-                    <div className="px-3 py-2 text-slate-700">{department}</div>
+                        return (
+                            <>
+                                <div key={`l1-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
+                                    {label1}
+                                </div>
+                                <div key={`v1-${idx}`} className={`border-r ${borderB} px-3 py-2 text-slate-700`}>
+                                    {value1}
+                                </div>
+                                <div key={`l2-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
+                                    {label2}
+                                </div>
+                                <div key={`v2-${idx}`} className={`${borderB} px-3 py-2 text-slate-700`}>
+                                    {value2}
+                                </div>
+                            </>
+                        );
+                    })}
                 </div>
             </div>
 

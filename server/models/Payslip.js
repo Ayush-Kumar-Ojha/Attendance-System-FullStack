@@ -25,6 +25,11 @@ const payslipSchema = new mongoose.Schema({
 
     netSalary: { type: Number, required: true },
 
+    // Attendance-derived, calculated at generation time
+    workingDays: { type: Number, default: 0 },
+    actualWorkingDays: { type: Number, default: 0 },
+    lopDays: { type: Number, default: 0 },
+
 }, {timestamps: true})
 const Payslip = mongoose.models.Payslip || mongoose.model("Payslip", payslipSchema)
 

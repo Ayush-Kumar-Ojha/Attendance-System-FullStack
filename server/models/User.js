@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema(
     cvUrl: { type: String, default: null },
     cvFileName: { type: String, default: null },
     skills: { type: [String], default: [] },
+    phone: { type: String, default: "" },
   },
   {
     timestamps: true,

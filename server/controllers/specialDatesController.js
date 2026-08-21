@@ -24,15 +24,15 @@ export const getSpecialDates = async (req, res) => {
                 const name = `${emp.firstName} ${emp.lastName}`;
 
                 if (isTodayMatch(emp.dateOfBirth)) {
-                    today.push({ employeeId: emp._id.toString(), name, type: "birthday" });
+                    today.push({ employeeId: emp._id.toString(), name, type: "birthday", message: emp.specialDateMessage || "" });
                 }
                 if (isTodayMatch(emp.anniversaryDate)) {
-                    today.push({ employeeId: emp._id.toString(), name, type: "anniversary" });
+                    today.push({ employeeId: emp._id.toString(), name, type: "anniversary", message: emp.specialDateMessage || "" });
                 }
                 if (isTodayMatch(emp.joinDate)) {
                     const years = differenceInYears(new Date(), new Date(emp.joinDate));
                     if (years > 0) {
-                        today.push({ employeeId: emp._id.toString(), name, type: "workAnniversary", years });
+                        today.push({ employeeId: emp._id.toString(), name, type: "workAnniversary", years, message: emp.specialDateMessage || "" });
                     }
                 }
             });
@@ -54,11 +54,17 @@ export const getSpecialDates = async (req, res) => {
                 return res.status(404).json({ error: "Employee not found" });
             }
 
+            const isSpecialDateToday =
+                isTodayMatch(employee.dateOfBirth) ||
+                isTodayMatch(employee.anniversaryDate) ||
+                isTodayMatch(employee.joinDate);
+
             return res.json({
                 data: {
                     dateOfBirth: employee.dateOfBirth,
                     anniversaryDate: employee.anniversaryDate,
                     joinDate: employee.joinDate,
+                    hrMessage: isSpecialDateToday ? employee.specialDateMessage || "" : "",
                 },
             });
         }
@@ -90,5 +96,23 @@ export const updateSpecialDates = async (req, res) => {
     } catch (error) {
         console.error("Update Special Dates Error:", error);
         return res.status(500).json({ error: "Failed to update special dates" });
+    }
+};
+
+// Admin: set HR message for a specific employee's special date
+// POST /api/special-dates/:employeeId/message
+export const setHrMessage = async (req, res) => {
+    try {
+        const { message } = req.body;
+        const employee = await Employee.findByIdAndUpdate(
+            req.params.employeeId,
+            { specialDateMessage: message || "" },
+            { new: true }
+        );
+        if (!employee) return res.status(404).json({ error: "Employee not found" });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error("Set HR Message Error:", error);
+        return res.status(500).json({ error: "Failed to save message" });
     }
 };

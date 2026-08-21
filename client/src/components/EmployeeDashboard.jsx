@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import {
     CalendarIcon,
     FileTextIcon,
-    CalendarDaysIcon,
     ArrowRightIcon,
     DollarSignIcon,
 } from "lucide-react";
@@ -16,12 +15,14 @@ const EmployeeDashboard = ({ data }) => {
             value: data.currentMonthAttendance,
             title: "Days Present",
             subtitle: "This month",
+            to: null,
         },
         {
             icon: FileTextIcon,
             value: data.pendingLeaves,
             title: "Pending Leaves",
             subtitle: "Awaiting approval",
+            to: "/leave",
         },
         {
             title: "Latest Payslip",
@@ -30,6 +31,7 @@ const EmployeeDashboard = ({ data }) => {
                 : "N/A",
             subtitle: "Latest Payslip",
             icon: DollarSignIcon,
+            to: "/payslip",
         },
     ];
 
@@ -48,11 +50,11 @@ const EmployeeDashboard = ({ data }) => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-8">
                 {cards.map((card, index) => {
                     const Icon = card.icon;
+                    const isClickable = !!card.to;
 
-                    return (
+                    const cardContent = (
                         <div
-                            key={index}
-                            className="card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between"
+                            className={`card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between ${isClickable ? "cursor-pointer" : ""}`}
                         >
                             <div>
                                 <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
@@ -74,6 +76,14 @@ const EmployeeDashboard = ({ data }) => {
                                 className="size-10 p-2.5 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors duration-200"
                             />
                         </div>
+                    );
+
+                    return isClickable ? (
+                        <Link key={index} to={card.to}>
+                            {cardContent}
+                        </Link>
+                    ) : (
+                        <div key={index}>{cardContent}</div>
                     );
                 })}
             </div>

@@ -13,6 +13,10 @@ import {
   MegaphoneIcon,
   GiftIcon,
   BarChart3Icon,
+  MessageSquareIcon,
+  ReceiptTextIcon,
+  HandCoinsIcon,
+  TicketIcon,
 } from "lucide-react";
 
 import { Link, useLocation } from "react-router-dom";
@@ -28,13 +32,21 @@ const SideBar = () => {
   const { user, loading, logout } = useAuth();
 
   useEffect(() => {
-    api.get("/profile").then(({ data }) => {
-      if (data.firstName)
-        setUserName(`${data.firstName} ${data.lastName || ""}`.trim());
-    });
+    api
+      .get("/profile")
+      .then(({ data }) => {
+        if (data.firstName) {
+          setUserName(
+            `${data.firstName} ${data.lastName || ""}`.trim()
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load profile:", error);
+      });
   }, []);
 
-  // Close mobile sidebar on route change
+  // Close mobile sidebar whenever route changes
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
@@ -48,17 +60,23 @@ const SideBar = () => {
       icon: LayoutGridIcon,
     },
 
+    {
+      name: "Walls",
+      href: "/walls",
+      icon: MessageSquareIcon,
+    },
+
     role === "ADMIN"
       ? {
-        name: "Employees",
-        href: "/employees",
-        icon: UserIcon,
-      }
+          name: "Employees",
+          href: "/employees",
+          icon: UserIcon,
+        }
       : {
-        name: "Attendance",
-        href: "/attendance",
-        icon: CalendarIcon,
-      },
+          name: "Attendance",
+          href: "/attendance",
+          icon: CalendarIcon,
+        },
 
     {
       name: "Leave",
@@ -70,6 +88,34 @@ const SideBar = () => {
       name: "Payslip",
       href: "/payslip",
       icon: DollarSignIcon,
+    },
+
+    // =========================
+    // NEW - BILL CLAIMS
+    // =========================
+    {
+      name: "Bill Claims",
+      href: "/bill-claims",
+      icon: ReceiptTextIcon,
+    },
+
+    // =========================
+    // NEW - ADVANCE REQUESTS
+    // =========================
+    {
+      name: "Advance",
+      href: "/advance",
+      icon: HandCoinsIcon,
+    },
+
+    // =========================
+    // NEW - GATE PASS
+    // Visible to both Admin and Employee
+    // =========================
+    {
+      name: "Gate Pass",
+      href: "/gate-pass",
+      icon: TicketIcon,
     },
 
     {
@@ -104,7 +150,9 @@ const SideBar = () => {
 
   const sidebarContent = (
     <>
-      {/* Brand header */}
+      {/* =========================
+          BRAND HEADER
+      ========================= */}
       <div className="px-5 pt-6 pb-5 border-b border-white/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -112,7 +160,7 @@ const SideBar = () => {
 
             <div>
               <p className="font-semibold text-[13px] tracking-wide text-white">
-                Employee MS
+                HR MS
               </p>
 
               <p className="text-[11px] text-slate-400 font-medium">
@@ -121,7 +169,7 @@ const SideBar = () => {
             </div>
           </div>
 
-          {/* Close menu on mobile */}
+          {/* Mobile close */}
           <button
             onClick={() => setMobileOpen(false)}
             className="lg:hidden text-slate-400 hover:text-white p-1"
@@ -131,7 +179,9 @@ const SideBar = () => {
         </div>
       </div>
 
-      {/* User profile card */}
+      {/* =========================
+          USER PROFILE
+      ========================= */}
       {userName && (
         <div className="mx-3 mt-4 mb-1 p-3 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-3">
@@ -154,19 +204,26 @@ const SideBar = () => {
         </div>
       )}
 
-      {/* Section label */}
+      {/* =========================
+          SECTION LABEL
+      ========================= */}
       <div className="px-5 pt-5 pb-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           Navigation
         </p>
       </div>
 
-      {/* Navigation List */}
+      {/* =========================
+          NAVIGATION
+      ========================= */}
       <div className="flex-1 px-3 space-y-1 overflow-y-auto">
         {loading ? (
           <div className="px-3 py-3 flex items-center gap-2 text-slate-500">
             <Loader2 className="animate-spin w-4 h-4" />
-            <span className="text-sm">Loading...</span>
+
+            <span className="text-sm">
+              Loading...
+            </span>
           </div>
         ) : (
           navItems.map((item) => {
@@ -176,20 +233,23 @@ const SideBar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive
+                className={`group relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${
+                  isActive
                     ? "bg-indigo-600/10 text-indigo-300"
                     : "text-slate-300 hover:bg-white/5"
-                  }`}
+                }`}
               >
+                {/* Active indicator */}
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
                 )}
 
                 <item.icon
-                  className={`w-[17px] h-[17px] shrink-0 ${isActive
+                  className={`w-[17px] h-[17px] shrink-0 ${
+                    isActive
                       ? "text-indigo-300"
                       : "text-slate-400 group-hover:text-slate-300"
-                    }`}
+                  }`}
                 />
 
                 <span className="flex-1 text-sm font-medium">
@@ -205,14 +265,19 @@ const SideBar = () => {
         )}
       </div>
 
-      {/* Logout */}
+      {/* =========================
+          LOGOUT
+      ========================= */}
       <div className="p-3 border-t border-white/6">
         <button
           onClick={handleLogout}
-          className="flex items-center ga-3 w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/8 transition-all duration-150"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/8 transition-all duration-150"
         >
           <LogOutIcon className="w-[17px] h-[17px]" />
-          <span>Log out</span>
+
+          <span>
+            Log out
+          </span>
         </button>
       </div>
     </>
@@ -220,7 +285,9 @@ const SideBar = () => {
 
   return (
     <>
-      {/* Mobile hamburger button */}
+      {/* =========================
+          MOBILE HAMBURGER
+      ========================= */}
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden print:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 text-white rounded-lg shadow-lg border border-white/10"
@@ -228,7 +295,9 @@ const SideBar = () => {
         <MenuIcon size={20} />
       </button>
 
-      {/* Mobile overlay */}
+      {/* =========================
+          MOBILE OVERLAY
+      ========================= */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
@@ -236,15 +305,22 @@ const SideBar = () => {
         />
       )}
 
-      {/* Sidebar - Desktop */}
+      {/* =========================
+          DESKTOP SIDEBAR
+      ========================= */}
       <aside className="hidden lg:flex flex-col h-full w-[260px] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white shrink-0 border-r border-white/10">
         {sidebarContent}
       </aside>
 
-      {/* Sidebar - Mobile */}
+      {/* =========================
+          MOBILE SIDEBAR
+      ========================= */}
       <aside
-        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${
+          mobileOpen
+            ? "translate-x-0"
+            : "-translate-x-full"
+        }`}
       >
         {sidebarContent}
       </aside>

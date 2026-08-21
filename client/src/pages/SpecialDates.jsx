@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Gift, Heart, PartyPopper, Save, Loader2, X, Briefcase } from "lucide-react";
+import { Gift, Heart, PartyPopper, Save, Loader2, X, Briefcase, MessageSquarePlus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import toast from "react-hot-toast";
@@ -17,11 +17,15 @@ const SpecialDates = () => {
     const [dateOfBirth, setDateOfBirth] = useState("");
     const [anniversaryDate, setAnniversaryDate] = useState("");
     const [joinDate, setJoinDate] = useState(null);
-    const [celebration, setCelebration] = useState(null); // { type: "birthday" | "anniversary" | "workAnniversary", years }
+    const [celebration, setCelebration] = useState(null);
+    const [hrMessage, setHrMessage] = useState("");
 
     // Admin state
     const [todaysCelebrations, setTodaysCelebrations] = useState([]);
     const [allDates, setAllDates] = useState([]);
+    const [messageModal, setMessageModal] = useState(null); // { employeeId, name, currentMessage }
+    const [messageInput, setMessageInput] = useState("");
+    const [savingMessage, setSavingMessage] = useState(false);
 
     const checkCelebration = (data) => {
         if (!data) return;
@@ -64,6 +68,7 @@ const SpecialDates = () => {
                 if (data?.dateOfBirth) setDateOfBirth(data.dateOfBirth.split("T")[0]);
                 if (data?.anniversaryDate) setAnniversaryDate(data.anniversaryDate.split("T")[0]);
                 if (data?.joinDate) setJoinDate(data.joinDate);
+                if (data?.hrMessage) setHrMessage(data.hrMessage);
                 checkCelebration(data);
             }
         } catch (error) {
@@ -87,6 +92,26 @@ const SpecialDates = () => {
             toast.error(error?.response?.data?.error || error.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const openMessageModal = (c) => {
+        setMessageModal(c);
+        setMessageInput(c.message || "");
+    };
+
+    const handleSaveMessage = async (e) => {
+        e.preventDefault();
+        setSavingMessage(true);
+        try {
+            await api.post(`/special-dates/${messageModal.employeeId}/message`, { message: messageInput });
+            toast.success("Message saved");
+            setMessageModal(null);
+            fetchData();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message);
+        } finally {
+            setSavingMessage(false);
         }
     };
 
@@ -117,7 +142,6 @@ const SpecialDates = () => {
 
             {isAdmin ? (
                 <>
-                    {/* Today's Celebrations */}
                     <div className="mb-8">
                         <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                             <PartyPopper className="w-4 h-4 text-indigo-600" />
@@ -131,23 +155,34 @@ const SpecialDates = () => {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {todaysCelebrations.map((c) => (
-                                    <div key={c.employeeId + c.type} className="card p-5 flex items-center gap-3 border-l-4 border-amber-400">
-                                        {celebrationIcons[c.type]}
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{c.name}</p>
-                                            <p className="text-xs text-slate-500">
-                                                {c.type === "workAnniversary"
-                                                    ? celebrationLabels.workAnniversary(c.years)
-                                                    : celebrationLabels[c.type]}
-                                            </p>
+                                    <div key={c.employeeId + c.type} className="card p-5 border-l-4 border-amber-400">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            {celebrationIcons[c.type]}
+                                            <div>
+                                                <p className="font-semibold text-slate-900">{c.name}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {c.type === "workAnniversary"
+                                                        ? celebrationLabels.workAnniversary(c.years)
+                                                        : celebrationLabels[c.type]}
+                                                </p>
+                                            </div>
                                         </div>
+                                        {c.message && (
+                                            <p className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2 mb-2 italic">"{c.message}"</p>
+                                        )}
+                                        <button
+                                            onClick={() => openMessageModal(c)}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                                        >
+                                            <MessageSquarePlus className="w-3.5 h-3.5" />
+                                            {c.message ? "Edit message" : "Write a message"}
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* All Employees' Special Dates */}
                     <div className="card overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="table-modern">
@@ -242,7 +277,7 @@ const SpecialDates = () => {
                 </form>
             )}
 
-            {/* Celebration Popup */}
+            {/* Celebration Popup (Employee) */}
             {celebration && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -269,11 +304,60 @@ const SpecialDates = () => {
                             {celebration.type === "anniversary" && "Happy Anniversary!"}
                             {celebration.type === "workAnniversary" && `${celebration.years} Year${celebration.years > 1 ? "s" : ""} With Us!`}
                         </h2>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-slate-500 mb-3">
                             {celebration.type === "birthday" && "Wishing you a fantastic year ahead! 🎂"}
                             {celebration.type === "anniversary" && "Wishing you many more wonderful years! 💍"}
                             {celebration.type === "workAnniversary" && "Thank you for being part of the team! 🎉"}
                         </p>
+                        {hrMessage && (
+                            <p className="text-sm text-slate-700 bg-indigo-50 rounded-xl p-3 italic mt-3">
+                                "{hrMessage}"
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Admin: Write/Edit Message Modal */}
+            {messageModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                    onClick={() => setMessageModal(null)}
+                >
+                    <div
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-6 pb-0">
+                            <h2 className="text-lg font-semibold text-slate-800">
+                                Message for {messageModal.name}
+                            </h2>
+                            <button
+                                onClick={() => setMessageModal(null)}
+                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveMessage} className="p-6 space-y-4">
+                            <textarea
+                                value={messageInput}
+                                onChange={(e) => setMessageInput(e.target.value)}
+                                rows={4}
+                                className="resize-none"
+                                placeholder="Write a personal message they'll see on their special day..."
+                            />
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setMessageModal(null)} className="btn-secondary flex-1">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={savingMessage} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                                    {savingMessage && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Save Message
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
