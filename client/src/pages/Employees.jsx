@@ -52,6 +52,8 @@ const Employees = () => {
       return;
     }
 
+    // Collect every unique custom field label across all employees,
+    // so each gets its own column even if only some employees have it.
     const customLabels = [];
     employees.forEach((emp) => {
       (Array.isArray(emp.customFields) ? emp.customFields : []).forEach((f) => {
@@ -102,11 +104,11 @@ const Employees = () => {
   };
 
   return (
-    <div className="animate-fade-in-up">
-      {/* Header with Left-to-Right Title Slide Animation */}
+    <div className="animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="page-title animate-title-slide">Employees</h1>
+          <h1 className="page-title">Employees</h1>
           <p className="page-subtitle">Manage your team members</p>
         </div>
 
@@ -199,7 +201,7 @@ const Employees = () => {
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-modal-in"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 pb-0">
@@ -240,7 +242,7 @@ const Employees = () => {
           onClick={() => setEditEmployee(null)}
         >
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-modal-in"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 pb-0">
