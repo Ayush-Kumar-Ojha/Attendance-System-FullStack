@@ -141,10 +141,9 @@ const Settings = () => {
   if (loading) return <Loading />;
 
   return (
-    <div className="animate-fade-in-up space-y-8">
-      {/* Header with Left-to-Right Title Slide Animation */}
+    <div className="animate-fade-in space-y-8">
       <div className="page-header">
-        <h1 className="page-title animate-title-slide">Settings</h1>
+        <h1 className="page-title">Settings</h1>
         <p className="page-subtitle">Manage your account and preferences</p>
       </div>
 
@@ -170,7 +169,7 @@ const Settings = () => {
 
             <button
               onClick={() => setShowAddOffice(!showAddOffice)}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
             >
               <Plus size={18} />
               Add Office Location
@@ -257,7 +256,7 @@ const Settings = () => {
                     type="button"
                     onClick={handleDetectCurrentLocation}
                     disabled={gettingLocation}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60 cursor-pointer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
                   >
                     <Crosshair size={15} />
                     {gettingLocation ? "Detecting GPS..." : "Use My Current GPS"}
@@ -269,13 +268,13 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddOffice(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 cursor-pointer"
+                  className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
                 >
                   Save Office Location
                 </button>
@@ -306,7 +305,7 @@ const Settings = () => {
 
                 <button
                   onClick={() => handleDeleteOffice(off.id)}
-                  className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                  className="text-slate-400 hover:text-rose-600 transition"
                   title="Remove office"
                 >
                   <Trash2 size={16} />
@@ -332,7 +331,7 @@ const Settings = () => {
 
         <button
           onClick={() => setShowPasswordModal(true)}
-          className="btn-secondary text-sm cursor-pointer"
+          className="btn-secondary text-sm"
         >
           Change
         </button>

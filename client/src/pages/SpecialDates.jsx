@@ -130,10 +130,9 @@ const SpecialDates = () => {
     if (loading) return <Loading />;
 
     return (
-        <div className="animate-fade-in-up">
-            {/* Header with Left-to-Right Title Slide Animation */}
+        <div className="animate-fade-in">
             <div className="page-header">
-                <h1 className="page-title animate-title-slide">Special Dates</h1>
+                <h1 className="page-title">Special Dates</h1>
                 <p className="page-subtitle">
                     {isAdmin
                         ? "Celebrate your team's milestones"
@@ -156,7 +155,7 @@ const SpecialDates = () => {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {todaysCelebrations.map((c) => (
-                                    <div key={c.employeeId + c.type} className="card p-5 border-l-4 border-amber-400 card-hover">
+                                    <div key={c.employeeId + c.type} className="card p-5 border-l-4 border-amber-400">
                                         <div className="flex items-center gap-3 mb-3">
                                             {celebrationIcons[c.type]}
                                             <div>
@@ -173,7 +172,7 @@ const SpecialDates = () => {
                                         )}
                                         <button
                                             onClick={() => openMessageModal(c)}
-                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 cursor-pointer"
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
                                         >
                                             <MessageSquarePlus className="w-3.5 h-3.5" />
                                             {c.message ? "Edit message" : "Write a message"}
@@ -206,7 +205,7 @@ const SpecialDates = () => {
                                     ) : (
                                         allDates.map((emp) => (
                                             <tr key={emp.employeeId}>
-                                                <td className="text-slate-900 font-medium">{emp.name}</td>
+                                                <td className="text-slate-900">{emp.name}</td>
                                                 <td className="text-slate-500">{emp.department || "-"}</td>
                                                 <td className="text-slate-500">
                                                     {emp.dateOfBirth ? format(new Date(emp.dateOfBirth), "MMM dd") : "-"}
@@ -269,7 +268,7 @@ const SpecialDates = () => {
                         </div>
 
                         <div className="flex justify-end pt-2">
-                            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 justify-center w-full sm:w-auto cursor-pointer">
+                            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 justify-center w-full sm:w-auto">
                                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                 Save Changes
                             </button>
@@ -285,12 +284,12 @@ const SpecialDates = () => {
                     onClick={() => setCelebration(null)}
                 >
                     <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center animate-modal-in"
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center animate-fade-in"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
                             onClick={() => setCelebration(null)}
-                            className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer"
+                            className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -326,7 +325,7 @@ const SpecialDates = () => {
                     onClick={() => setMessageModal(null)}
                 >
                     <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-in"
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between p-6 pb-0">
@@ -335,7 +334,7 @@ const SpecialDates = () => {
                             </h2>
                             <button
                                 onClick={() => setMessageModal(null)}
-                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -346,14 +345,14 @@ const SpecialDates = () => {
                                 value={messageInput}
                                 onChange={(e) => setMessageInput(e.target.value)}
                                 rows={4}
-                                className="resize-none w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-500"
+                                className="resize-none"
                                 placeholder="Write a personal message they'll see on their special day..."
                             />
                             <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setMessageModal(null)} className="btn-secondary flex-1 cursor-pointer">
+                                <button type="button" onClick={() => setMessageModal(null)} className="btn-secondary flex-1">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={savingMessage} className="btn-primary flex-1 flex items-center justify-center gap-2 cursor-pointer">
+                                <button type="submit" disabled={savingMessage} className="btn-primary flex-1 flex items-center justify-center gap-2">
                                     {savingMessage && <Loader2 className="w-4 h-4 animate-spin" />}
                                     Save Message
                                 </button>

@@ -183,11 +183,10 @@ const Leave = () => {
   ];
 
   return (
-    <div className="animate-fade-in-up">
-      {/* Header with Left-to-Right Title Slide Animation */}
+    <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="page-title animate-title-slide">Leave Management</h1>
+          <h1 className="page-title">Leave Management</h1>
 
           <p className="page-subtitle">
             {isAdmin
@@ -199,7 +198,7 @@ const Leave = () => {
         {!isAdmin && !isDeleted && (
           <button
             onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer"
+            className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
           >
             <PlusIcon className="w-4 h-4" />
             Apply for Leave
@@ -209,7 +208,7 @@ const Leave = () => {
         {isAdmin && (
           <button
             onClick={exportLeaves}
-            className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer"
+            className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center"
             type="button"
           >
             <Download className="w-4 h-4" />
@@ -251,7 +250,7 @@ const Leave = () => {
               key={stat.label}
               className="card card-hover p-5 sm:p-6 flex items-center gap-4 relative overflow-hidden group"
             >
-              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500 transition-colors" />
+              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500" />
 
               <div className="p-3 bg-slate-100 rounded-lg group-hover:bg-indigo-50 transition-colors duration-200">
                 <stat.icon className="w-5 h-5 text-slate-600 group-hover:text-indigo-600 transition-colors duration-200" />
@@ -327,6 +326,7 @@ const Leave = () => {
           </div>
         </div>
       )}
+      
 
       <LeaveHistory
         leaves={filteredLeaves}

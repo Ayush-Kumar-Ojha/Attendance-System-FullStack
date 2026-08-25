@@ -140,7 +140,7 @@ const Walls = () => {
     }
 
     return (
-        <div className="animate-fade-in-up pb-6">
+        <div className="animate-fade-in pb-6">
             {/* SHORTER WALLS HEADER */}
             <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-500 rounded-2xl px-6 py-5 sm:px-7 sm:py-6 mb-5 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full blur-2xl" />
@@ -149,8 +149,7 @@ const Walls = () => {
 
                 <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        {/* Header Title with Left-to-Right Slide Animation */}
-                        <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight animate-title-slide">
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
                             Walls
                         </h1>
 
@@ -165,7 +164,7 @@ const Walls = () => {
                                 true
                             )
                         }
-                        className="bg-white text-indigo-600 hover:bg-indigo-50 font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 w-full sm:w-auto justify-center transition-colors shadow-lg cursor-pointer"
+                        className="bg-white text-indigo-600 hover:bg-indigo-50 font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 w-full sm:w-auto justify-center transition-colors shadow-lg"
                     >
                         <Plus className="w-4 h-4" />
 

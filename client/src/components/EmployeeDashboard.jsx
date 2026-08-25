@@ -36,10 +36,9 @@ const EmployeeDashboard = ({ data }) => {
     ];
 
     return (
-        <div className="animate-fade-in-up">
-            {/* Header with Left-to-Right Title Slide Animation */}
+        <div className="animate-fade-in">
             <div className="page-header">
-                <h1 className="page-title animate-title-slide">
+                <h1 className="page-title">
                     Welcome, {emp?.firstName}!
                 </h1>
 
@@ -58,7 +57,7 @@ const EmployeeDashboard = ({ data }) => {
                             className={`card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between ${isClickable ? "cursor-pointer" : ""}`}
                         >
                             <div>
-                                <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70 transition-colors" />
+                                <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
 
                                 <p className="text-sm font-medium text-slate-700">
                                     {card.title}
@@ -90,8 +89,7 @@ const EmployeeDashboard = ({ data }) => {
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
                 <Link to="/attendance" className="btn-primary text-center inline-flex items-center justify-center gap-2">
-                    Mark Attendance<ArrowRightIcon className="w-4 h-4" />
-                </Link>
+                    Mark Attendance<ArrowRightIcon className="w-4 h-4" /></Link>
 
                 <Link to="/leave" className="btn-secondary text-center">Apply for Leave</Link>
             </div>

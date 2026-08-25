@@ -222,6 +222,12 @@ const Reports = () => {
     const [report, setReport] = useState(null);
     const [fetchingReport, setFetchingReport] = useState(false);
 
+    /*
+     * ============================================================
+     * Load Employees
+     * ============================================================
+     */
+
     useEffect(() => {
         const loadEmployees = async () => {
             try {
@@ -237,13 +243,19 @@ const Reports = () => {
             } catch (error) {
                 console.error("Load Employees Error:", error);
                 toast.error("Failed to load employees");
-            } font: {
+            } finally {
                 setLoading(false);
             }
         };
 
         loadEmployees();
     }, []);
+
+    /*
+     * ============================================================
+     * Department list
+     * ============================================================
+     */
 
     const departments = useMemo(() => {
         return [
@@ -255,6 +267,12 @@ const Reports = () => {
         ].sort();
     }, [employees]);
 
+    /*
+     * ============================================================
+     * Available years
+     * ============================================================
+     */
+
     const availableYears = useMemo(() => {
         const currentYear = new Date().getFullYear();
 
@@ -264,6 +282,12 @@ const Reports = () => {
         );
     }, []);
 
+    /*
+     * ============================================================
+     * Fetch Report
+     * ============================================================
+     */
+
     const fetchReport = useCallback(async () => {
         setFetchingReport(true);
 
@@ -271,90 +295,182 @@ const Reports = () => {
             let endpoint = "";
             const params = new URLSearchParams();
 
+            /*
+             * MONTHLY
+             */
             if (reportType === "monthly") {
                 endpoint = "/reports/attendance/monthly";
+
                 params.append("month", filterMonth);
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * EMPLOYEE
+             */
             if (reportType === "employee") {
                 if (!filterEmployeeId) {
                     setReport(null);
                     setFetchingReport(false);
                     return;
                 }
+
                 endpoint = `/reports/attendance/employee/${filterEmployeeId}`;
+
                 params.append("year", filterYear);
                 params.append("month", filterMonth);
             }
 
+            /*
+             * WEEKLY
+             */
             if (reportType === "weekly") {
                 endpoint = "/reports/attendance/weekly";
+
                 params.append("date", filterDate);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * DAILY
+             */
             if (reportType === "daily") {
                 endpoint = "/reports/attendance/daily";
+
                 params.append("date", filterDate);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * DEPARTMENT
+             */
             if (reportType === "department") {
                 endpoint = "/reports/attendance/department";
+
                 params.append("month", filterMonth);
                 params.append("year", filterYear);
             }
 
+            /*
+             * YEARLY
+             */
             if (reportType === "yearly") {
                 endpoint = "/reports/attendance/yearly";
+
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * TREND
+             */
             if (reportType === "trend") {
                 endpoint = "/reports/attendance/trend";
+
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
             }
 
+            /*
+             * LATE
+             */
             if (reportType === "late") {
                 endpoint = "/reports/attendance/late-arrivals";
+
                 params.append("month", filterMonth);
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * EARLY EXIT
+             */
             if (reportType === "early") {
                 endpoint = "/reports/attendance/early-exits";
+
                 params.append("month", filterMonth);
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
+            /*
+             * WORKING HOURS
+             */
             if (reportType === "hours") {
                 endpoint = "/reports/attendance/working-hours";
+
                 params.append("month", filterMonth);
                 params.append("year", filterYear);
-                if (filterDepartment) params.append("department", filterDepartment);
-                if (filterEmployeeId) params.append("employeeId", filterEmployeeId);
+
+                if (filterDepartment) {
+                    params.append("department", filterDepartment);
+                }
+
+                if (filterEmployeeId) {
+                    params.append("employeeId", filterEmployeeId);
+                }
             }
 
             if (!endpoint) return;
 
             const query = params.toString();
-            const response = await api.get(`${endpoint}${query ? `?${query}` : ""}`);
+
+            const response = await api.get(
+                `${endpoint}${query ? `?${query}` : ""}`
+            );
+
             setReport(response.data);
         } catch (error) {
             console.error("Fetch Report Error:", error);
+
             setReport(null);
+
             toast.error(
                 error?.response?.data?.error ||
                     "Failed to generate attendance report"
@@ -377,14 +493,37 @@ const Reports = () => {
         }
     }, [fetchReport, loading]);
 
+    /*
+     * ============================================================
+     * Reset filters when changing report
+     * ============================================================
+     */
+
     const handleReportTypeChange = (type) => {
         setReportType(type);
         setReport(null);
+
+        if (type !== "employee") {
+            // Keep selected employee because it is a valid filter
+            // for most reports.
+        }
     };
+
+    /*
+     * ============================================================
+     * Download / Print
+     * ============================================================
+     */
 
     const handlePrint = () => {
         window.print();
     };
+
+    /*
+     * ============================================================
+     * Loading
+     * ============================================================
+     */
 
     if (loading) {
         return <Loading />;
@@ -394,12 +533,21 @@ const Reports = () => {
         (item) => item.id === reportType
     );
 
+    /*
+     * ============================================================
+     * Render
+     * ============================================================
+     */
+
     return (
-        <div className="animate-fade-in-up pb-10">
-            {/* Header with Left-to-Right Title Slide Animation */}
+        <div className="animate-fade-in pb-10">
+            {/* =====================================================
+                HEADER
+            ====================================================== */}
+
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                 <div>
-                    <h1 className="page-title animate-title-slide">Attendance Reports</h1>
+                    <h1 className="page-title">Attendance Reports</h1>
 
                     <p className="page-subtitle">
                         Analyze attendance, working hours, late arrivals,
@@ -411,27 +559,32 @@ const Reports = () => {
                     <button
                         onClick={fetchReport}
                         disabled={fetchingReport}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
                     >
                         <RefreshCw
                             className={`w-4 h-4 ${
                                 fetchingReport ? "animate-spin" : ""
                             }`}
                         />
+
                         Refresh
                     </button>
 
                     <button
                         onClick={handlePrint}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors border border-indigo-200"
                     >
                         <Download className="w-4 h-4" />
+
                         Download
                     </button>
                 </div>
             </div>
 
-            {/* Report Type Selector */}
+            {/* =====================================================
+                REPORT TYPE SELECTOR
+            ====================================================== */}
+
             <div className="card p-3 mb-6 print:hidden">
                 <div className="flex gap-2 overflow-x-auto pb-1">
                     {REPORT_TYPES.map((item) => {
@@ -444,13 +597,14 @@ const Reports = () => {
                                 onClick={() =>
                                     handleReportTypeChange(item.id)
                                 }
-                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                                className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                                     active
                                         ? "bg-indigo-600 text-white shadow-sm"
                                         : "bg-slate-50 text-slate-600 hover:bg-slate-100"
                                 }`}
                             >
                                 <Icon className="w-4 h-4" />
+
                                 {item.label}
                             </button>
                         );
@@ -458,7 +612,10 @@ const Reports = () => {
                 </div>
             </div>
 
-            {/* Report Title */}
+            {/* =====================================================
+                REPORT TITLE
+            ====================================================== */}
+
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                     {selectedReport &&
@@ -479,9 +636,14 @@ const Reports = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* =====================================================
+                FILTERS
+            ====================================================== */}
+
             <div className="card p-4 mb-6 print:hidden">
                 <div className="flex flex-wrap items-end gap-3">
+                    {/* Employee */}
+
                     {reportType !== "department" &&
                         reportType !== "trend" && (
                             <div className="min-w-[210px]">
@@ -521,6 +683,8 @@ const Reports = () => {
                             </div>
                         )}
 
+                    {/* Department */}
+
                     {reportType !== "department" &&
                         reportType !== "employee" &&
                         reportType !== "daily" &&
@@ -555,6 +719,8 @@ const Reports = () => {
                             </div>
                         )}
 
+                    {/* Month */}
+
                     {[
                         "monthly",
                         "employee",
@@ -588,6 +754,8 @@ const Reports = () => {
                             </select>
                         </div>
                     )}
+
+                    {/* Year */}
 
                     {[
                         "monthly",
@@ -625,6 +793,8 @@ const Reports = () => {
                         </div>
                     )}
 
+                    {/* Date */}
+
                     {["weekly", "daily"].includes(reportType) && (
                         <div className="min-w-[170px]">
                             <label className="block text-xs font-medium text-slate-500 mb-1.5">
@@ -641,6 +811,8 @@ const Reports = () => {
                             />
                         </div>
                     )}
+
+                    {/* Department filter for weekly/daily */}
 
                     {["weekly", "daily"].includes(reportType) && (
                         <div className="min-w-[180px]">
@@ -683,7 +855,10 @@ const Reports = () => {
                     )}
             </div>
 
-            {/* Report Content */}
+            {/* =====================================================
+                REPORT CONTENT
+            ====================================================== */}
+
             {fetchingReport ? (
                 <Loading />
             ) : !report ? (
@@ -700,13 +875,19 @@ const Reports = () => {
                 </div>
             ) : (
                 <>
-                    {/* 1. MONTHLY REPORT */}
+                    {/* =================================================
+                        1. MONTHLY REPORT
+                    ================================================== */}
+
                     {reportType === "monthly" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 <SummaryCard
                                     title="Total Employees"
-                                    value={report.summary?.totalEmployees ?? 0}
+                                    value={
+                                        report.summary
+                                            ?.totalEmployees ?? 0
+                                    }
                                     icon={Users}
                                     iconClass="bg-slate-100 text-slate-600"
                                 />
@@ -720,14 +901,20 @@ const Reports = () => {
 
                                 <SummaryCard
                                     title="Present Today"
-                                    value={report.summary?.presentToday ?? 0}
+                                    value={
+                                        report.summary
+                                            ?.presentToday ?? 0
+                                    }
                                     icon={CalendarCheck}
                                     iconClass="bg-emerald-50 text-emerald-600"
                                 />
 
                                 <SummaryCard
                                     title="Absent Today"
-                                    value={report.summary?.absentToday ?? 0}
+                                    value={
+                                        report.summary
+                                            ?.absentToday ?? 0
+                                    }
                                     icon={CalendarX}
                                     iconClass="bg-rose-50 text-rose-600"
                                 />
@@ -735,7 +922,9 @@ const Reports = () => {
 
                             <div className="card overflow-hidden">
                                 <ReportHeader
-                                    title={`${getMonthName(filterMonth)} ${filterYear} Attendance`}
+                                    title={`${getMonthName(
+                                        filterMonth
+                                    )} ${filterYear} Attendance`}
                                     subtitle="Employee-wise monthly attendance summary"
                                 />
 
@@ -758,39 +947,97 @@ const Reports = () => {
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row) => (
-                                                    <tr key={row.employeeId}>
-                                                        <td>
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-semibold">
-                                                                    {getInitials(row.employeeName)}
+                                                report.rows.map(
+                                                    (row) => (
+                                                        <tr
+                                                            key={
+                                                                row.employeeId
+                                                            }
+                                                        >
+                                                            <td>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-semibold">
+                                                                        {getInitials(
+                                                                            row.employeeName
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <p className="font-medium text-slate-900">
+                                                                            {
+                                                                                row.employeeName
+                                                                            }
+                                                                        </p>
+
+                                                                        <p className="text-xs text-slate-400">
+                                                                            {
+                                                                                row.employeeCode
+                                                                            }
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
+                                                            </td>
 
-                                                                <div>
-                                                                    <p className="font-medium text-slate-900">
-                                                                        {row.employeeName}
-                                                                    </p>
+                                                            <td>
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </td>
 
-                                                                    <p className="text-xs text-slate-400">
-                                                                        {row.employeeCode}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </td>
+                                                            <td>
+                                                                {
+                                                                    row.workingDays
+                                                                }
+                                                            </td>
 
-                                                        <td>{row.department}</td>
-                                                        <td>{row.workingDays}</td>
-                                                        <td className="text-emerald-600 font-medium">{row.present}</td>
-                                                        <td className="text-rose-600 font-medium">{row.absent}</td>
-                                                        <td>{row.halfDay}</td>
-                                                        <td>{row.leave}</td>
-                                                        <td className="text-amber-600">{row.late}</td>
-                                                        <td>{row.earlyExit}</td>
-                                                        <td>{percentageBar(row.attendancePercent)}</td>
-                                                    </tr>
-                                                ))
+                                                            <td className="text-emerald-600 font-medium">
+                                                                {
+                                                                    row.present
+                                                                }
+                                                            </td>
+
+                                                            <td className="text-rose-600 font-medium">
+                                                                {
+                                                                    row.absent
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.halfDay
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.leave
+                                                                }
+                                                            </td>
+
+                                                            <td className="text-amber-600">
+                                                                {
+                                                                    row.late
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.earlyExit
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {percentageBar(
+                                                                    row.attendancePercent
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={10} />
+                                                <EmptyTableRow
+                                                    colSpan={10}
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -799,13 +1046,18 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 2. EMPLOYEE REPORT */}
+                    {/* =================================================
+                        2. EMPLOYEE REPORT
+                    ================================================== */}
+
                     {reportType === "employee" && (
                         <>
                             <div className="card p-5 mb-6">
                                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                                     <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                                        {getInitials(report.employee?.name)}
+                                        {getInitials(
+                                            report.employee?.name
+                                        )}
                                     </div>
 
                                     <div className="flex-1">
@@ -814,9 +1066,26 @@ const Reports = () => {
                                         </h2>
 
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
-                                            <span>{report.employee?.employeeCode}</span>
-                                            <span>{report.employee?.department}</span>
-                                            <span>{report.employee?.position}</span>
+                                            <span>
+                                                {
+                                                    report.employee
+                                                        ?.employeeCode
+                                                }
+                                            </span>
+
+                                            <span>
+                                                {
+                                                    report.employee
+                                                        ?.department
+                                                }
+                                            </span>
+
+                                            <span>
+                                                {
+                                                    report.employee
+                                                        ?.position
+                                                }
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -825,21 +1094,28 @@ const Reports = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 <SummaryCard
                                     title="Working Days"
-                                    value={report.summary?.totalWorkingDays ?? 0}
+                                    value={
+                                        report.summary
+                                            ?.totalWorkingDays ?? 0
+                                    }
                                     icon={CalendarDays}
                                     iconClass="bg-slate-100 text-slate-600"
                                 />
 
                                 <SummaryCard
                                     title="Present"
-                                    value={report.summary?.present ?? 0}
+                                    value={
+                                        report.summary?.present ?? 0
+                                    }
                                     icon={CalendarCheck}
                                     iconClass="bg-emerald-50 text-emerald-600"
                                 />
 
                                 <SummaryCard
                                     title="Absent"
-                                    value={report.summary?.absent ?? 0}
+                                    value={
+                                        report.summary?.absent ?? 0
+                                    }
                                     icon={CalendarX}
                                     iconClass="bg-rose-50 text-rose-600"
                                 />
@@ -852,6 +1128,8 @@ const Reports = () => {
                                 />
                             </div>
 
+                            {/* Monthly performance */}
+
                             <div className="card overflow-hidden mb-6">
                                 <ReportHeader
                                     title={`${filterYear} Monthly Performance`}
@@ -860,22 +1138,44 @@ const Reports = () => {
 
                                 <div className="p-5">
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {report.charts?.monthlyAttendancePercent?.map((item) => (
-                                            <div key={item.month} className="border border-slate-100 rounded-xl p-4">
-                                                <p className="text-xs text-slate-500">{getMonthName(item.month)}</p>
-                                                <p className="text-xl font-semibold text-slate-900 mt-1">
-                                                    {item.value === null ? "—" : `${item.value}%`}
-                                                </p>
-                                                {item.value !== null && percentageBar(item.value)}
-                                            </div>
-                                        ))}
+                                        {report.charts
+                                            ?.monthlyAttendancePercent
+                                            ?.map((item) => (
+                                                <div
+                                                    key={item.month}
+                                                    className="border border-slate-100 rounded-xl p-4"
+                                                >
+                                                    <p className="text-xs text-slate-500">
+                                                        {getMonthName(
+                                                            item.month
+                                                        )}
+                                                    </p>
+
+                                                    <p className="text-xl font-semibold text-slate-900 mt-1">
+                                                        {item.value ===
+                                                        null
+                                                            ? "—"
+                                                            : `${item.value}%`}
+                                                    </p>
+
+                                                    {item.value !==
+                                                        null &&
+                                                        percentageBar(
+                                                            item.value
+                                                        )}
+                                                </div>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
 
+                            {/* Daily history */}
+
                             <div className="card overflow-hidden">
                                 <ReportHeader
-                                    title={`${getMonthName(filterMonth)} Daily History`}
+                                    title={`${getMonthName(
+                                        filterMonth
+                                    )} Daily History`}
                                     subtitle="Detailed attendance history"
                                 />
 
@@ -895,21 +1195,75 @@ const Reports = () => {
                                         </thead>
 
                                         <tbody>
-                                            {report.dailyHistory?.length ? (
-                                                report.dailyHistory.map((row, index) => (
-                                                    <tr key={`${row.date}-${index}`}>
-                                                        <td>{formatDate(row.date)}</td>
-                                                        <td>{row.dayOfWeek}</td>
-                                                        <td>{formatTime(row.checkIn)}</td>
-                                                        <td>{formatTime(row.checkOut)}</td>
-                                                        <td>{formatHours(row.workHours)}</td>
-                                                        <td>{statusBadge(row.status)}</td>
-                                                        <td>{row.late ? <span className="text-amber-600 font-medium">Yes</span> : "No"}</td>
-                                                        <td>{row.earlyExit ? <span className="text-orange-600 font-medium">Yes</span> : "No"}</td>
-                                                    </tr>
-                                                ))
+                                            {report.dailyHistory
+                                                ?.length ? (
+                                                report.dailyHistory.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.date}-${index}`}
+                                                        >
+                                                            <td>
+                                                                {formatDate(
+                                                                    row.date
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.dayOfWeek
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkIn
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkOut
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatHours(
+                                                                    row.workHours
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {statusBadge(
+                                                                    row.status
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {row.late ? (
+                                                                    <span className="text-amber-600 font-medium">
+                                                                        Yes
+                                                                    </span>
+                                                                ) : (
+                                                                    "No"
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {row.earlyExit ? (
+                                                                    <span className="text-orange-600 font-medium">
+                                                                        Yes
+                                                                    </span>
+                                                                ) : (
+                                                                    "No"
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={8} />
+                                                <EmptyTableRow
+                                                    colSpan={8}
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -918,12 +1272,19 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 3. WEEKLY REPORT */}
+                    {/* =================================================
+                        3. WEEKLY REPORT
+                    ================================================== */}
+
                     {reportType === "weekly" && (
                         <div className="card overflow-hidden">
                             <ReportHeader
                                 title="Weekly Attendance"
-                                subtitle={`${formatDate(report.weekStart)} - ${formatDate(report.weekEnd)}`}
+                                subtitle={`${formatDate(
+                                    report.weekStart
+                                )} - ${formatDate(
+                                    report.weekEnd
+                                )}`}
                             />
 
                             <div className="overflow-x-auto">
@@ -932,12 +1293,38 @@ const Reports = () => {
                                         <tr>
                                             <th>Employee</th>
                                             <th>Department</th>
-                                            {report.weekDates?.map((date, index) => (
-                                                <th key={date} className="text-center">
-                                                    <div>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</div>
-                                                    <div className="text-xs font-normal text-slate-400">{new Date(date).getDate()}</div>
-                                                </th>
-                                            ))}
+
+                                            {report.weekDates?.map(
+                                                (date, index) => (
+                                                    <th
+                                                        key={date}
+                                                        className="text-center"
+                                                    >
+                                                        <div>
+                                                            {
+                                                                [
+                                                                    "Mon",
+                                                                    "Tue",
+                                                                    "Wed",
+                                                                    "Thu",
+                                                                    "Fri",
+                                                                    "Sat",
+                                                                    "Sun",
+                                                                ][
+                                                                    index
+                                                                ]
+                                                            }
+                                                        </div>
+
+                                                        <div className="text-xs font-normal text-slate-400">
+                                                            {new Date(
+                                                                date
+                                                            ).getDate()}
+                                                        </div>
+                                                    </th>
+                                                )
+                                            )}
+
                                             <th>Weekly %</th>
                                         </tr>
                                     </thead>
@@ -945,19 +1332,54 @@ const Reports = () => {
                                     <tbody>
                                         {report.rows?.length ? (
                                             report.rows.map((row) => (
-                                                <tr key={row.employeeId}>
-                                                    <td className="font-medium text-slate-900">{row.employeeName}</td>
-                                                    <td>{row.department}</td>
-                                                    {row.days?.map((status, index) => (
-                                                        <td key={index} className="text-center">
-                                                            <StatusCode status={status} />
-                                                        </td>
-                                                    ))}
-                                                    <td>{percentageBar(row.weeklyPercent)}</td>
+                                                <tr
+                                                    key={
+                                                        row.employeeId
+                                                    }
+                                                >
+                                                    <td className="font-medium text-slate-900">
+                                                        {
+                                                            row.employeeName
+                                                        }
+                                                    </td>
+
+                                                    <td>
+                                                        {
+                                                            row.department
+                                                        }
+                                                    </td>
+
+                                                    {row.days?.map(
+                                                        (
+                                                            status,
+                                                            index
+                                                        ) => (
+                                                            <td
+                                                                key={
+                                                                    index
+                                                                }
+                                                                className="text-center"
+                                                            >
+                                                                <StatusCode
+                                                                    status={
+                                                                        status
+                                                                    }
+                                                                />
+                                                            </td>
+                                                        )
+                                                    )}
+
+                                                    <td>
+                                                        {percentageBar(
+                                                            row.weeklyPercent
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))
                                         ) : (
-                                            <EmptyTableRow colSpan={10} />
+                                            <EmptyTableRow
+                                                colSpan={10}
+                                            />
                                         )}
                                     </tbody>
                                 </table>
@@ -973,21 +1395,67 @@ const Reports = () => {
                         </div>
                     )}
 
-                    {/* 4. DAILY REPORT */}
+                    {/* =================================================
+                        4. DAILY REPORT
+                    ================================================== */}
+
                     {reportType === "daily" && (
                         <>
                             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-                                <MiniStat title="Employees" value={report.stats?.totalEmployees ?? 0} />
-                                <MiniStat title="Present" value={report.stats?.present ?? 0} valueClass="text-emerald-600" />
-                                <MiniStat title="Absent" value={report.stats?.absent ?? 0} valueClass="text-rose-600" />
-                                <MiniStat title="Leave" value={report.stats?.onLeave ?? 0} valueClass="text-blue-600" />
-                                <MiniStat title="Late" value={report.stats?.late ?? 0} valueClass="text-amber-600" />
-                                <MiniStat title="Early Exit" value={report.stats?.earlyExit ?? 0} valueClass="text-orange-600" />
+                                <MiniStat
+                                    title="Employees"
+                                    value={
+                                        report.stats
+                                            ?.totalEmployees ?? 0
+                                    }
+                                />
+
+                                <MiniStat
+                                    title="Present"
+                                    value={
+                                        report.stats?.present ?? 0
+                                    }
+                                    valueClass="text-emerald-600"
+                                />
+
+                                <MiniStat
+                                    title="Absent"
+                                    value={
+                                        report.stats?.absent ?? 0
+                                    }
+                                    valueClass="text-rose-600"
+                                />
+
+                                <MiniStat
+                                    title="Leave"
+                                    value={
+                                        report.stats?.onLeave ?? 0
+                                    }
+                                    valueClass="text-blue-600"
+                                />
+
+                                <MiniStat
+                                    title="Late"
+                                    value={
+                                        report.stats?.late ?? 0
+                                    }
+                                    valueClass="text-amber-600"
+                                />
+
+                                <MiniStat
+                                    title="Early Exit"
+                                    value={
+                                        report.stats?.earlyExit ?? 0
+                                    }
+                                    valueClass="text-orange-600"
+                                />
                             </div>
 
                             <div className="card overflow-hidden">
                                 <ReportHeader
-                                    title={`Attendance - ${formatDate(report.date)}`}
+                                    title={`Attendance - ${formatDate(
+                                        report.date
+                                    )}`}
                                     subtitle="Daily employee attendance"
                                 />
 
@@ -1006,18 +1474,55 @@ const Reports = () => {
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row) => (
-                                                    <tr key={row.employeeId}>
-                                                        <td className="font-medium text-slate-900">{row.employeeName}</td>
-                                                        <td>{row.department}</td>
-                                                        <td>{formatTime(row.checkIn)}</td>
-                                                        <td>{formatTime(row.checkOut)}</td>
-                                                        <td>{formatHours(row.workHours)}</td>
-                                                        <td>{statusBadge(row.status)}</td>
-                                                    </tr>
-                                                ))
+                                                report.rows.map(
+                                                    (row) => (
+                                                        <tr
+                                                            key={
+                                                                row.employeeId
+                                                            }
+                                                        >
+                                                            <td className="font-medium text-slate-900">
+                                                                {
+                                                                    row.employeeName
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkIn
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkOut
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatHours(
+                                                                    row.workHours
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {statusBadge(
+                                                                    row.status
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={6} />
+                                                <EmptyTableRow
+                                                    colSpan={6}
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -1026,11 +1531,16 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 5. DEPARTMENT REPORT */}
+                    {/* =================================================
+                        5. DEPARTMENT REPORT
+                    ================================================== */}
+
                     {reportType === "department" && (
                         <div className="card overflow-hidden">
                             <ReportHeader
-                                title={`${getMonthName(filterMonth)} ${filterYear} Department Report`}
+                                title={`${getMonthName(
+                                    filterMonth
+                                )} ${filterYear} Department Report`}
                                 subtitle="Compare attendance across departments"
                             />
 
@@ -1052,26 +1562,72 @@ const Reports = () => {
                                     <tbody>
                                         {report.rows?.length ? (
                                             report.rows.map((row) => (
-                                                <tr key={row.department}>
+                                                <tr
+                                                    key={
+                                                        row.department
+                                                    }
+                                                >
                                                     <td>
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                                                 <Building2 className="w-4 h-4" />
                                                             </div>
-                                                            <span className="font-medium text-slate-900">{row.department}</span>
+
+                                                            <span className="font-medium text-slate-900">
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </span>
                                                         </div>
                                                     </td>
-                                                    <td>{row.employees}</td>
-                                                    <td>{row.workingDays}</td>
-                                                    <td className="text-emerald-600 font-medium">{row.present}</td>
-                                                    <td className="text-rose-600 font-medium">{row.absent}</td>
-                                                    <td>{row.leave}</td>
-                                                    <td className="text-amber-600">{row.late}</td>
-                                                    <td>{percentageBar(row.attendancePercent)}</td>
+
+                                                    <td>
+                                                        {
+                                                            row.employees
+                                                        }
+                                                    </td>
+
+                                                    <td>
+                                                        {
+                                                            row.workingDays
+                                                        }
+                                                    </td>
+
+                                                    <td className="text-emerald-600 font-medium">
+                                                        {
+                                                            row.present
+                                                        }
+                                                    </td>
+
+                                                    <td className="text-rose-600 font-medium">
+                                                        {
+                                                            row.absent
+                                                        }
+                                                    </td>
+
+                                                    <td>
+                                                        {
+                                                            row.leave
+                                                        }
+                                                    </td>
+
+                                                    <td className="text-amber-600">
+                                                        {
+                                                            row.late
+                                                        }
+                                                    </td>
+
+                                                    <td>
+                                                        {percentageBar(
+                                                            row.attendancePercent
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))
                                         ) : (
-                                            <EmptyTableRow colSpan={8} />
+                                            <EmptyTableRow
+                                                colSpan={8}
+                                            />
                                         )}
                                     </tbody>
                                 </table>
@@ -1079,7 +1635,10 @@ const Reports = () => {
                         </div>
                     )}
 
-                    {/* 6. YEARLY REPORT */}
+                    {/* =================================================
+                        6. YEARLY REPORT
+                    ================================================== */}
+
                     {reportType === "yearly" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1089,21 +1648,32 @@ const Reports = () => {
                                     icon={TrendingUp}
                                     iconClass="bg-indigo-50 text-indigo-600"
                                 />
+
                                 <SummaryCard
                                     title="Total Present"
-                                    value={report.stats?.totalPresent ?? 0}
+                                    value={
+                                        report.stats
+                                            ?.totalPresent ?? 0
+                                    }
                                     icon={CalendarCheck}
                                     iconClass="bg-emerald-50 text-emerald-600"
                                 />
+
                                 <SummaryCard
                                     title="Total Absent"
-                                    value={report.stats?.totalAbsent ?? 0}
+                                    value={
+                                        report.stats
+                                            ?.totalAbsent ?? 0
+                                    }
                                     icon={CalendarX}
                                     iconClass="bg-rose-50 text-rose-600"
                                 />
+
                                 <SummaryCard
                                     title="Total Late"
-                                    value={report.stats?.totalLate ?? 0}
+                                    value={
+                                        report.stats?.totalLate ?? 0
+                                    }
                                     icon={AlertTriangle}
                                     iconClass="bg-amber-50 text-amber-600"
                                 />
@@ -1120,36 +1690,98 @@ const Reports = () => {
                                         <thead>
                                             <tr>
                                                 <th>Employee</th>
-                                                {MONTHS.map((month) => (
-                                                    <th key={month.value} className="text-center">{month.label.slice(0, 3)}</th>
-                                                ))}
+
+                                                {MONTHS.map(
+                                                    (month) => (
+                                                        <th
+                                                            key={
+                                                                month.value
+                                                            }
+                                                            className="text-center"
+                                                        >
+                                                            {month.label.slice(
+                                                                0,
+                                                                3
+                                                            )}
+                                                        </th>
+                                                    )
+                                                )}
+
                                                 <th>Year Avg</th>
                                             </tr>
                                         </thead>
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row) => (
-                                                    <tr key={row.employeeId}>
-                                                        <td className="font-medium text-slate-900 whitespace-nowrap">{row.employeeName}</td>
-                                                        {row.monthly?.map((value, index) => (
-                                                            <td key={index} className="text-center">
-                                                                {value === null ? (
-                                                                    <span className="text-slate-300">—</span>
-                                                                ) : (
-                                                                    <span className={`font-medium ${value >= 90 ? "text-emerald-600" : value >= 75 ? "text-indigo-600" : value >= 60 ? "text-amber-600" : "text-rose-600"}`}>
-                                                                        {value}%
-                                                                    </span>
-                                                                )}
+                                                report.rows.map(
+                                                    (row) => (
+                                                        <tr
+                                                            key={
+                                                                row.employeeId
+                                                            }
+                                                        >
+                                                            <td className="font-medium text-slate-900 whitespace-nowrap">
+                                                                {
+                                                                    row.employeeName
+                                                                }
                                                             </td>
-                                                        ))}
-                                                        <td>
-                                                            <span className="font-semibold text-indigo-600">{row.yearAvg}%</span>
-                                                        </td>
-                                                    </tr>
-                                                ))
+
+                                                            {row.monthly?.map(
+                                                                (
+                                                                    value,
+                                                                    index
+                                                                ) => (
+                                                                    <td
+                                                                        key={
+                                                                            index
+                                                                        }
+                                                                        className="text-center"
+                                                                    >
+                                                                        {value ===
+                                                                        null ? (
+                                                                            <span className="text-slate-300">
+                                                                                —
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span
+                                                                                className={`font-medium ${
+                                                                                    value >=
+                                                                                    90
+                                                                                        ? "text-emerald-600"
+                                                                                        : value >=
+                                                                                            75
+                                                                                          ? "text-indigo-600"
+                                                                                          : value >=
+                                                                                              60
+                                                                                            ? "text-amber-600"
+                                                                                            : "text-rose-600"
+                                                                                }`}
+                                                                            >
+                                                                                {
+                                                                                    value
+                                                                                }
+                                                                                %
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                )
+                                                            )}
+
+                                                            <td>
+                                                                <span className="font-semibold text-indigo-600">
+                                                                    {
+                                                                        row.yearAvg
+                                                                    }
+                                                                    %
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={14} />
+                                                <EmptyTableRow
+                                                    colSpan={14}
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -1158,7 +1790,10 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 7. TREND REPORT */}
+                    {/* =================================================
+                        7. TREND REPORT
+                    ================================================== */}
+
                     {reportType === "trend" && (
                         <div className="card p-6">
                             <ReportHeader
@@ -1168,38 +1803,107 @@ const Reports = () => {
 
                             <div className="mt-6">
                                 <div className="flex items-end gap-3 h-72 border-b border-l border-slate-200 px-4">
-                                    {report.trend?.map((item) => {
-                                        const height = Math.max(4, Number(item.attendancePercent) || 0);
+                                    {report.trend?.map(
+                                        (item) => {
+                                            const height = Math.max(
+                                                4,
+                                                Number(
+                                                    item.attendancePercent
+                                                ) || 0
+                                            );
 
-                                        return (
-                                            <div key={item.month} className="flex-1 h-full flex flex-col justify-end items-center gap-2">
-                                                <span className="text-xs font-medium text-slate-600">{item.attendancePercent}%</span>
+                                            return (
                                                 <div
-                                                    className="w-full max-w-[52px] bg-indigo-500 rounded-t-lg transition-all hover:bg-indigo-600"
-                                                    style={{ height: `${height}%` }}
-                                                    title={`${getMonthName(item.month)}: ${item.attendancePercent}%`}
-                                                />
-                                                <span className="text-xs text-slate-400">{getMonthName(item.month).slice(0, 3)}</span>
-                                            </div>
-                                        );
-                                    })}
+                                                    key={
+                                                        item.month
+                                                    }
+                                                    className="flex-1 h-full flex flex-col justify-end items-center gap-2"
+                                                >
+                                                    <span className="text-xs font-medium text-slate-600">
+                                                        {
+                                                            item.attendancePercent
+                                                        }
+                                                        %
+                                                    </span>
+
+                                                    <div
+                                                        className="w-full max-w-[52px] bg-indigo-500 rounded-t-lg transition-all hover:bg-indigo-600"
+                                                        style={{
+                                                            height: `${height}%`,
+                                                        }}
+                                                        title={`${getMonthName(
+                                                            item.month
+                                                        )}: ${
+                                                            item.attendancePercent
+                                                        }%`}
+                                                    />
+
+                                                    <span className="text-xs text-slate-400">
+                                                        {getMonthName(
+                                                            item.month
+                                                        ).slice(
+                                                            0,
+                                                            3
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            );
+                                        }
+                                    )}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 8. LATE ARRIVAL REPORT */}
+                    {/* =================================================
+                        8. LATE ARRIVAL REPORT
+                    ================================================== */}
+
                     {reportType === "late" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                                <SummaryCard title="Total Late Arrivals" value={report.summary?.totalLateArrivals ?? 0} icon={AlertTriangle} iconClass="bg-amber-50 text-amber-600" />
-                                <SummaryCard title="Frequently Late" value={report.summary?.employeesFrequentlyLate ?? 0} icon={Users} iconClass="bg-rose-50 text-rose-600" />
-                                <SummaryCard title="Average Delay" value={`${report.summary?.averageDelayMinutes ?? 0} min`} icon={Clock3} iconClass="bg-indigo-50 text-indigo-600" />
-                                <SummaryCard title="Max Delay" value={`${report.summary?.maxDelayMinutes ?? 0} min`} icon={Timer} iconClass="bg-slate-100 text-slate-600" />
+                                <SummaryCard
+                                    title="Total Late Arrivals"
+                                    value={
+                                        report.summary
+                                            ?.totalLateArrivals ?? 0
+                                    }
+                                    icon={AlertTriangle}
+                                    iconClass="bg-amber-50 text-amber-600"
+                                />
+
+                                <SummaryCard
+                                    title="Frequently Late"
+                                    value={
+                                        report.summary
+                                            ?.employeesFrequentlyLate ?? 0
+                                    }
+                                    icon={Users}
+                                    iconClass="bg-rose-50 text-rose-600"
+                                />
+
+                                <SummaryCard
+                                    title="Average Delay"
+                                    value={`${report.summary?.averageDelayMinutes ?? 0} min`}
+                                    icon={Clock3}
+                                    iconClass="bg-indigo-50 text-indigo-600"
+                                />
+
+                                <SummaryCard
+                                    title="Max Delay"
+                                    value={`${report.summary?.maxDelayMinutes ?? 0} min`}
+                                    icon={Timer}
+                                    iconClass="bg-slate-100 text-slate-600"
+                                />
                             </div>
 
                             <div className="card overflow-hidden">
-                                <ReportHeader title="Late Arrivals" subtitle={`${getMonthName(filterMonth)} ${filterYear}`} />
+                                <ReportHeader
+                                    title="Late Arrivals"
+                                    subtitle={`${getMonthName(
+                                        filterMonth
+                                    )} ${filterYear}`}
+                                />
 
                                 <div className="overflow-x-auto">
                                     <table className="table-modern">
@@ -1216,22 +1920,57 @@ const Reports = () => {
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row, index) => (
-                                                    <tr key={`${row.employeeId}-${row.date}-${index}`}>
-                                                        <td className="font-medium text-slate-900">{row.employeeName}</td>
-                                                        <td>{row.department}</td>
-                                                        <td>{formatDate(row.date)}</td>
-                                                        <td>{row.expected}</td>
-                                                        <td className="text-amber-600 font-medium">{formatTime(row.checkIn)}</td>
-                                                        <td>
-                                                            <span className="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-                                                                {row.lateByMinutes} min
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                report.rows.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.employeeId}-${row.date}-${index}`}
+                                                        >
+                                                            <td className="font-medium text-slate-900">
+                                                                {
+                                                                    row.employeeName
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {formatDate(
+                                                                    row.date
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.expected
+                                                                }
+                                                            </td>
+
+                                                            <td className="text-amber-600 font-medium">
+                                                                {formatTime(
+                                                                    row.checkIn
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                <span className="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                                                                    {
+                                                                        row.lateByMinutes
+                                                                    }{" "}
+                                                                    min
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={6} message="No late arrivals found" />
+                                                <EmptyTableRow
+                                                    colSpan={6}
+                                                    message="No late arrivals found"
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -1240,16 +1979,38 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 9. EARLY EXIT REPORT */}
+                    {/* =================================================
+                        9. EARLY EXIT REPORT
+                    ================================================== */}
+
                     {reportType === "early" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                <SummaryCard title="Total Early Exits" value={report.summary?.totalEarlyExits ?? 0} icon={LogOut} iconClass="bg-orange-50 text-orange-600" />
-                                <SummaryCard title="Average Early By" value={`${report.summary?.averageEarlyByMinutes ?? 0} min`} icon={Timer} iconClass="bg-indigo-50 text-indigo-600" />
+                                <SummaryCard
+                                    title="Total Early Exits"
+                                    value={
+                                        report.summary
+                                            ?.totalEarlyExits ?? 0
+                                    }
+                                    icon={LogOut}
+                                    iconClass="bg-orange-50 text-orange-600"
+                                />
+
+                                <SummaryCard
+                                    title="Average Early By"
+                                    value={`${report.summary?.averageEarlyByMinutes ?? 0} min`}
+                                    icon={Timer}
+                                    iconClass="bg-indigo-50 text-indigo-600"
+                                />
                             </div>
 
                             <div className="card overflow-hidden">
-                                <ReportHeader title="Early Exit Report" subtitle={`${getMonthName(filterMonth)} ${filterYear}`} />
+                                <ReportHeader
+                                    title="Early Exit Report"
+                                    subtitle={`${getMonthName(
+                                        filterMonth
+                                    )} ${filterYear}`}
+                                />
 
                                 <div className="overflow-x-auto">
                                     <table className="table-modern">
@@ -1267,23 +2028,63 @@ const Reports = () => {
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row, index) => (
-                                                    <tr key={`${row.employeeId}-${row.date}-${index}`}>
-                                                        <td className="font-medium text-slate-900">{row.employeeName}</td>
-                                                        <td>{row.department}</td>
-                                                        <td>{formatDate(row.date)}</td>
-                                                        <td>{formatTime(row.checkIn)}</td>
-                                                        <td className="text-orange-600 font-medium">{formatTime(row.checkOut)}</td>
-                                                        <td>{row.expectedExit}</td>
-                                                        <td>
-                                                            <span className="inline-flex px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 text-xs font-medium">
-                                                                {row.leftEarlyMinutes} min
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                report.rows.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.employeeId}-${row.date}-${index}`}
+                                                        >
+                                                            <td className="font-medium text-slate-900">
+                                                                {
+                                                                    row.employeeName
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {formatDate(
+                                                                    row.date
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkIn
+                                                                )}
+                                                            </td>
+
+                                                            <td className="text-orange-600 font-medium">
+                                                                {formatTime(
+                                                                    row.checkOut
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.expectedExit
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                <span className="inline-flex px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 text-xs font-medium">
+                                                                    {
+                                                                        row.leftEarlyMinutes
+                                                                    }{" "}
+                                                                    min
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={7} message="No early exits found" />
+                                                <EmptyTableRow
+                                                    colSpan={7}
+                                                    message="No early exits found"
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -1292,18 +2093,61 @@ const Reports = () => {
                         </>
                     )}
 
-                    {/* 10. WORKING HOURS REPORT */}
+                    {/* =================================================
+                        10. WORKING HOURS REPORT
+                    ================================================== */}
+
                     {reportType === "hours" && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                                <SummaryCard title="Total Records" value={report.summary?.totalRecords ?? 0} icon={FileText} iconClass="bg-slate-100 text-slate-600" />
-                                <SummaryCard title="Total Working Hours" value={formatHours(report.summary?.totalWorkingHours)} icon={Clock3} iconClass="bg-indigo-50 text-indigo-600" />
-                                <SummaryCard title="Total Overtime" value={formatHours(report.summary?.totalOvertimeHours)} icon={Timer} iconClass="bg-emerald-50 text-emerald-600" />
-                                <SummaryCard title="Average Hours" value={formatHours(report.summary?.averageWorkingHours)} icon={TrendingUp} iconClass="bg-amber-50 text-amber-600" />
+                                <SummaryCard
+                                    title="Total Records"
+                                    value={
+                                        report.summary
+                                            ?.totalRecords ?? 0
+                                    }
+                                    icon={FileText}
+                                    iconClass="bg-slate-100 text-slate-600"
+                                />
+
+                                <SummaryCard
+                                    title="Total Working Hours"
+                                    value={formatHours(
+                                        report.summary
+                                            ?.totalWorkingHours
+                                    )}
+                                    icon={Clock3}
+                                    iconClass="bg-indigo-50 text-indigo-600"
+                                />
+
+                                <SummaryCard
+                                    title="Total Overtime"
+                                    value={formatHours(
+                                        report.summary
+                                            ?.totalOvertimeHours
+                                    )}
+                                    icon={Timer}
+                                    iconClass="bg-emerald-50 text-emerald-600"
+                                />
+
+                                <SummaryCard
+                                    title="Average Hours"
+                                    value={formatHours(
+                                        report.summary
+                                            ?.averageWorkingHours
+                                    )}
+                                    icon={TrendingUp}
+                                    iconClass="bg-amber-50 text-amber-600"
+                                />
                             </div>
 
                             <div className="card overflow-hidden">
-                                <ReportHeader title="Working Hours Report" subtitle={`${getMonthName(filterMonth)} ${filterYear}`} />
+                                <ReportHeader
+                                    title="Working Hours Report"
+                                    subtitle={`${getMonthName(
+                                        filterMonth
+                                    )} ${filterYear}`}
+                                />
 
                                 <div className="overflow-x-auto">
                                     <table className="table-modern">
@@ -1321,23 +2165,71 @@ const Reports = () => {
 
                                         <tbody>
                                             {report.rows?.length ? (
-                                                report.rows.map((row, index) => (
-                                                    <tr key={`${row.employeeId}-${row.date}-${index}`}>
-                                                        <td className="font-medium text-slate-900">{row.employeeName}</td>
-                                                        <td>{row.department}</td>
-                                                        <td>{formatDate(row.date)}</td>
-                                                        <td>{formatTime(row.checkIn)}</td>
-                                                        <td>{formatTime(row.checkOut)}</td>
-                                                        <td className="font-medium text-slate-700">{formatHours(row.workHours)}</td>
-                                                        <td>
-                                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${Number(row.overtime) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"}`}>
-                                                                {formatHours(row.overtime)}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                report.rows.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.employeeId}-${row.date}-${index}`}
+                                                        >
+                                                            <td className="font-medium text-slate-900">
+                                                                {
+                                                                    row.employeeName
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {
+                                                                    row.department
+                                                                }
+                                                            </td>
+
+                                                            <td>
+                                                                {formatDate(
+                                                                    row.date
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkIn
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                {formatTime(
+                                                                    row.checkOut
+                                                                )}
+                                                            </td>
+
+                                                            <td className="font-medium text-slate-700">
+                                                                {formatHours(
+                                                                    row.workHours
+                                                                )}
+                                                            </td>
+
+                                                            <td>
+                                                                <span
+                                                                    className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                                        Number(
+                                                                            row.overtime
+                                                                        ) >
+                                                                        0
+                                                                            ? "bg-emerald-50 text-emerald-700"
+                                                                            : "bg-slate-50 text-slate-500"
+                                                                    }`}
+                                                                >
+                                                                    {formatHours(
+                                                                        row.overtime
+                                                                    )}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
                                             ) : (
-                                                <EmptyTableRow colSpan={7} message="No working hours records found" />
+                                                <EmptyTableRow
+                                                    colSpan={7}
+                                                    message="No working hours records found"
+                                                />
                                             )}
                                         </tbody>
                                     </table>
@@ -1351,23 +2243,49 @@ const Reports = () => {
     );
 };
 
-const SummaryCard = ({ title, value, icon: Icon, iconClass = "" }) => {
+/*
+ * ================================================================
+ * Reusable Components
+ * ================================================================
+ */
+
+const SummaryCard = ({
+    title,
+    value,
+    icon: Icon,
+    iconClass = "",
+}) => {
     return (
-        <div className="card p-5 flex items-center justify-between card-hover">
+        <div className="card p-5 flex items-center justify-between">
             <div>
                 <p className="text-sm text-slate-500">{title}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+
+                <p className="text-2xl font-bold text-slate-900 mt-1">
+                    {value}
+                </p>
             </div>
-            <Icon className={`size-10 p-2.5 rounded-xl ${iconClass}`} />
+
+            <Icon
+                className={`size-10 p-2.5 rounded-xl ${iconClass}`}
+            />
         </div>
     );
 };
 
-const MiniStat = ({ title, value, valueClass = "text-slate-900" }) => {
+const MiniStat = ({
+    title,
+    value,
+    valueClass = "text-slate-900",
+}) => {
     return (
         <div className="card p-4">
             <p className="text-xs text-slate-500">{title}</p>
-            <p className={`text-xl font-bold mt-1 ${valueClass}`}>{value}</p>
+
+            <p
+                className={`text-xl font-bold mt-1 ${valueClass}`}
+            >
+                {value}
+            </p>
         </div>
     );
 };
@@ -1375,16 +2293,29 @@ const MiniStat = ({ title, value, valueClass = "text-slate-900" }) => {
 const ReportHeader = ({ title, subtitle }) => {
     return (
         <div className="px-5 sm:px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-900">{title}</h2>
-            {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+            <h2 className="font-semibold text-slate-900">
+                {title}
+            </h2>
+
+            {subtitle && (
+                <p className="text-xs text-slate-500 mt-1">
+                    {subtitle}
+                </p>
+            )}
         </div>
     );
 };
 
-const EmptyTableRow = ({ colSpan, message = "No data found" }) => {
+const EmptyTableRow = ({
+    colSpan,
+    message = "No data found",
+}) => {
     return (
         <tr>
-            <td colSpan={colSpan} className="text-center py-14 text-slate-400">
+            <td
+                colSpan={colSpan}
+                className="text-center py-14 text-slate-400"
+            >
                 {message}
             </td>
         </tr>
@@ -1403,7 +2334,8 @@ const StatusCode = ({ status }) => {
     return (
         <span
             className={`inline-flex items-center justify-center min-w-9 px-2 py-1 rounded-lg border text-xs font-semibold ${
-                config[status] || "bg-slate-50 text-slate-400 border-slate-100"
+                config[status] ||
+                "bg-slate-50 text-slate-400 border-slate-100"
             }`}
         >
             {status || "—"}
@@ -1415,6 +2347,7 @@ const Legend = ({ code, label }) => {
     return (
         <div className="flex items-center gap-2">
             <StatusCode status={code} />
+
             <span>{label}</span>
         </div>
     );

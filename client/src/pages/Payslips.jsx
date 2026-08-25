@@ -14,6 +14,7 @@ const Payslips = () => {
     const { user } = useAuth();
     const isAdmin = user?.role === "ADMIN";
 
+    // Filters
     const [filterEmployeeId, setFilterEmployeeId] = useState("");
     const [filterMonth, setFilterMonth] = useState("");
     const [filterYear, setFilterYear] = useState("");
@@ -54,6 +55,7 @@ const Payslips = () => {
     const availableYears = useMemo(() => {
         const years = new Set(payslips.map((p) => p.year));
         const currentYear = new Date().getFullYear();
+        // Show current year + last 10 years, regardless of existing payslip data
         for (let y = currentYear; y >= currentYear - 10; y--) {
             years.add(y);
         }
@@ -63,11 +65,10 @@ const Payslips = () => {
     if (loading) return <Loading />;
 
     return (
-        <div className="animate-fade-in-up p-6 max-w-7xl mx-auto space-y-6">
-            {/* Header with Left-to-Right Title Slide Animation */}
+        <div className="animate-fade-in p-6 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 animate-title-slide">Payslips</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">Payslips</h1>
                     <p className="text-sm text-slate-500">
                         {isAdmin
                             ? "Generate and manage employee payslips"
@@ -84,7 +85,7 @@ const Payslips = () => {
                 )}
             </div>
 
-            {/* Filter Controls */}
+            {/* Filter Controls (Available for Admin & Employees) */}
             <div className="card p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 sm:items-center">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     <Filter className="w-4 h-4 text-indigo-600" /> Filter By:

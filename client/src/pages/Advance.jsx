@@ -91,7 +91,7 @@ const Advance = () => {
             console.error("Fetch Advance Requests Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                "Failed to load advance requests"
+                    "Failed to load advance requests"
             );
         } finally {
             setLoading(false);
@@ -130,7 +130,7 @@ const Advance = () => {
             console.error("Create Advance Request Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                "Failed to submit advance request"
+                    "Failed to submit advance request"
             );
         } finally {
             setSubmitting(false);
@@ -172,7 +172,7 @@ const Advance = () => {
             console.error("Update Advance Status Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                "Failed to update advance request"
+                    "Failed to update advance request"
             );
         } finally {
             setActionLoading(false);
@@ -240,7 +240,7 @@ const Advance = () => {
             console.error("Generate Advance Voucher Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                "Failed to generate voucher"
+                    "Failed to generate voucher"
             );
         } finally {
             setGeneratingVoucher(false);
@@ -253,8 +253,9 @@ const Advance = () => {
         const value = search.toLowerCase();
 
         return requests.filter((request) => {
-            const employeeName = `${request.employee?.firstName || ""
-                } ${request.employee?.lastName || ""}`.toLowerCase();
+            const employeeName = `${
+                request.employee?.firstName || ""
+            } ${request.employee?.lastName || ""}`.toLowerCase();
 
             return (
                 employeeName.includes(value) ||
@@ -373,26 +374,30 @@ const Advance = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-6 animate-fade-in-up">
+        <div className="min-h-screen bg-slate-50 p-4 md:p-6">
             <div className="mx-auto max-w-7xl space-y-6">
-                {/* Header with Left-to-Right Title Slide Animation */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900 animate-title-slide">
-                            Salary Advance
-                        </h1>
-                        <p className="text-sm text-slate-500">
-                            {isAdmin
-                                ? "Review employee salary advance requests"
-                                : "Request and track your salary advance"}
-                        </p>
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-violet-100 p-3 text-violet-600">
+                            <WalletCards size={25} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900">
+                                Salary Advance
+                            </h1>
+                            <p className="text-sm text-slate-500">
+                                {isAdmin
+                                    ? "Review employee salary advance requests"
+                                    : "Request and track your salary advance"}
+                            </p>
+                        </div>
                     </div>
 
                     <div className="flex gap-2">
                         {isAdmin && (
                             <button
                                 onClick={exportRequests}
-                                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50"
                             >
                                 <Download size={17} />
                                 Download
@@ -402,7 +407,7 @@ const Advance = () => {
                         {!isAdmin && (
                             <button
                                 onClick={() => setShowForm(true)}
-                                className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700 cursor-pointer"
+                                className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700"
                             >
                                 <Plus size={19} />
                                 Request Advance
@@ -434,7 +439,7 @@ const Advance = () => {
                     />
                 </div>
 
-                {isAdmin && (
+                                {isAdmin && (
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                         <div className="mb-2 flex items-center gap-2">
                             <Filter size={16} className="text-slate-500" />
@@ -527,7 +532,7 @@ const Advance = () => {
                             </div>
                             <button
                                 onClick={fetchRequests}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                             >
                                 <RefreshCw size={18} />
                             </button>
@@ -635,7 +640,7 @@ const Advance = () => {
                                                             request.advanceVoucherId ? (
                                                                 <button
                                                                     onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                                                 >
                                                                     <Download size={15} />
                                                                     Download
@@ -643,7 +648,7 @@ const Advance = () => {
                                                             ) : (
                                                                 <button
                                                                     onClick={() => openVoucherForm(request)}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 cursor-pointer"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                                                                 >
                                                                     <FileSpreadsheet size={15} />
                                                                     Generate
@@ -659,7 +664,7 @@ const Advance = () => {
                                                         {request.status === "APPROVED" && request.advanceVoucherId ? (
                                                             <button
                                                                 onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                                             >
                                                                 <Download size={15} />
                                                                 Download
@@ -672,7 +677,7 @@ const Advance = () => {
                                                 <td className="px-5 py-4 text-left">
                                                     <button
                                                         onClick={() => openDetails(request)}
-                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                                     >
                                                         <Eye size={15} />
                                                         View
@@ -819,14 +824,14 @@ const Advance = () => {
                                     resetForm();
                                     setShowForm(false);
                                 }}
-                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60 cursor-pointer"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
                             >
                                 {submitting && (
                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -900,7 +905,7 @@ const Advance = () => {
                                     <button
                                         onClick={() => updateStatus("REJECTED")}
                                         disabled={actionLoading}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
+                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                                     >
                                         <XCircle size={18} />
                                         Reject
@@ -908,7 +913,7 @@ const Advance = () => {
                                     <button
                                         onClick={() => updateStatus("APPROVED")}
                                         disabled={actionLoading}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                                     >
                                         <CheckCircle2 size={18} />
                                         Approve
@@ -922,7 +927,7 @@ const Advance = () => {
                                 {selectedRequest.advanceVoucherId ? (
                                     <button
                                         onClick={() => window.open(`/print/advance-voucher/${selectedRequest.advanceVoucherId}`, "_blank")}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
                                     >
                                         <Download size={18} />
                                         Download Voucher
@@ -930,7 +935,7 @@ const Advance = () => {
                                 ) : (
                                     <button
                                         onClick={() => openVoucherForm(selectedRequest)}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 cursor-pointer"
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700"
                                     >
                                         <FileSpreadsheet size={18} />
                                         Generate Advance
@@ -985,14 +990,14 @@ const Advance = () => {
                                     setShowVoucherForm(false);
                                     setVoucherRequest(null);
                                 }}
-                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={generatingVoucher}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60 cursor-pointer"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
                             >
                                 {generatingVoucher && (
                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -1009,7 +1014,7 @@ const Advance = () => {
 
 const Modal = ({ title, subtitle, onClose, children, maxWidth = "max-w-lg" }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className={`max-h-[95vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl animate-modal-in`}>
+        <div className={`max-h-[95vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl`}>
             <div className="flex items-center justify-between border-b border-slate-100 p-5">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900">{title}</h2>
@@ -1017,7 +1022,7 @@ const Modal = ({ title, subtitle, onClose, children, maxWidth = "max-w-lg" }) =>
                 </div>
                 <button
                     onClick={onClose}
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                 >
                     <X size={20} />
                 </button>
@@ -1049,7 +1054,7 @@ const VoucherInput = ({
 );
 
 const StatCard = ({ title, value, icon }) => (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm card-hover">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center justify-between">
             <div>
                 <p className="text-xs font-medium text-slate-500">{title}</p>
@@ -1061,5 +1066,4 @@ const StatCard = ({ title, value, icon }) => (
         </div>
     </div>
 );
-
 export default Advance;
