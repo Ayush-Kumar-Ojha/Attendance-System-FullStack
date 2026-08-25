@@ -85,6 +85,8 @@ export const createEmployee = async (req, res) => {
             role,
 
             bio,
+
+            customFields,
         } = req.body;
 
         // ==============================
@@ -203,6 +205,8 @@ export const createEmployee = async (req, res) => {
                 bio: bio || "",
 
                 employmentStatus: "ACTIVE",
+
+                customFields: Array.isArray(customFields) ? customFields : [],
             });
 
             return res.status(201).json({
@@ -275,6 +279,8 @@ export const updateEmployee = async (req, res) => {
 
             bio,
             employmentStatus,
+
+            customFields,
         } = req.body;
 
         const employee = await Employee.findById(id);
@@ -400,6 +406,10 @@ export const updateEmployee = async (req, res) => {
                     bio !== undefined
                         ? bio
                         : employee.bio,
+
+                customFields: Array.isArray(customFields)
+                    ? customFields
+                    : employee.customFields,
             },
             { new: true }
         );
@@ -633,6 +643,186 @@ export const getEmployeeDirectory = async (
 
         return res.status(500).json({
             error: "Failed to fetch directory",
+        });
+    }
+};
+
+// ======================================
+// Bulk Upload Employees via Excel Sheet
+// POST /api/employees/bulk-upload
+// Column headers must match the downloaded template exactly:
+// First Name | Last Name | Phone Number | Join Date (YYYY-MM-DD) |
+// Department | Designation | Basic Salary | Allowances | Deductions |
+// Work Email | Temporary Password | System Role (EMPLOYEE/ADMIN) | Bio (Optional)
+// ======================================
+export const bulkUploadEmployees = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        const XLSX = await import("xlsx");
+
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!rawRows.length) {
+            return res.status(400).json({ error: "The uploaded sheet has no data rows" });
+        }
+
+        const normalizeKey = (k) => String(k || "").trim().toLowerCase();
+
+        const HEADER_ALIASES = {
+            "first name": "firstName",
+            "last name": "lastName",
+            "phone number": "phone",
+            "join date (yyyy-mm-dd)": "joinDate",
+            "join date": "joinDate",
+            "department": "department",
+            "designation": "position",
+            "position": "position",
+            "basic salary": "basicSalary",
+            "allowances": "allowances",
+            "deductions": "deductions",
+            "work email": "email",
+            "email": "email",
+            "temporary password": "password",
+            "password": "password",
+            "system role (employee/admin)": "role",
+            "role": "role",
+            "bio (optional)": "bio",
+            "bio": "bio",
+        };
+
+        const rows = rawRows.map((raw) => {
+            const mapped = {};
+            for (const [key, value] of Object.entries(raw)) {
+                const field = HEADER_ALIASES[normalizeKey(key)];
+                if (field) mapped[field] = value;
+            }
+            return mapped;
+        });
+
+        const anyColumnRecognized = rows.some((r) => Object.keys(r).length > 0);
+        if (!anyColumnRecognized) {
+            return res.status(400).json({
+                error:
+                    "None of the column headers in this sheet were recognized. Please use the downloaded template's headers exactly (don't rename or remove them).",
+            });
+        }
+
+        let created = 0;
+        let updated = 0;
+        const skipped = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNum = i + 2;
+
+            const firstName = String(row.firstName || "").trim();
+            const lastName = String(row.lastName || "").trim();
+            const email = String(row.email || "").trim().toLowerCase();
+            const phone = String(row.phone || "").trim();
+            const position = String(row.position || "").trim();
+            const department = String(row.department || "").trim();
+            const password = String(row.password || "").trim();
+            const roleRaw = String(row.role || "").trim().toUpperCase();
+            const bio = String(row.bio || "").trim();
+            const joinDateRaw = row.joinDate;
+            const basicSalary = Number(row.basicSalary) || 0;
+            const allowances = Number(row.allowances) || 0;
+            const deductions = Number(row.deductions) || 0;
+
+            if (!firstName && !lastName && !email) {
+                continue;
+            }
+
+            if (!firstName || !lastName || !email || !phone || !position || !department) {
+                skipped.push({ row: rowNum, reason: "Missing required field(s) (Name, Email, Phone, Designation, or Department)" });
+                continue;
+            }
+
+            const role = roleRaw === "ADMIN" ? "ADMIN" : "EMPLOYEE";
+
+            let joinDate = new Date();
+            if (joinDateRaw) {
+                const parsed = new Date(joinDateRaw);
+                if (!isNaN(parsed.getTime())) joinDate = parsed;
+            }
+
+            try {
+                const existingEmployee = await Employee.findOne({ email });
+
+                if (existingEmployee) {
+                    await Employee.findByIdAndUpdate(existingEmployee._id, {
+                        firstName,
+                        lastName,
+                        phone,
+                        position,
+                        department,
+                        basicSalary,
+                        allowances,
+                        deductions,
+                        joinDate,
+                        bio,
+                    });
+
+                    const userUpdate = { email };
+                    if (role) userUpdate.role = role;
+                    if (password) userUpdate.password = await bcrypt.hash(password, 10);
+
+                    await User.findByIdAndUpdate(existingEmployee.userId, userUpdate);
+                    updated++;
+                } else {
+                    if (!password) {
+                        skipped.push({ row: rowNum, reason: "Temporary Password required for new employee" });
+                        continue;
+                    }
+
+                    const hashedPassword = await bcrypt.hash(password, 10);
+
+                    const user = await User.create({
+                        email,
+                        password: hashedPassword,
+                        role,
+                    });
+
+                    await Employee.create({
+                        userId: user._id,
+                        firstName,
+                        lastName,
+                        email,
+                        phone,
+                        position,
+                        department,
+                        basicSalary,
+                        allowances,
+                        deductions,
+                        joinDate,
+                        bio,
+                        employmentStatus: "ACTIVE",
+                    });
+
+                    created++;
+                }
+            } catch (rowError) {
+                console.error(`Bulk upload row ${rowNum} error:`, rowError);
+                skipped.push({ row: rowNum, reason: "Failed to save (duplicate or invalid data)" });
+            }
+        }
+
+        return res.json({
+            success: true,
+            created,
+            updated,
+            skipped,
+        });
+    } catch (error) {
+        console.error("Bulk Upload Employees Error:", error);
+        return res.status(500).json({
+            error: "Failed to process the uploaded sheet",
         });
     }
 };

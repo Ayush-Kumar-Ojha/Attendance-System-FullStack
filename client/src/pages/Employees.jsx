@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, Download } from "lucide-react";
+import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 import EmployeeCard from "../components/EmployeeCard";
 import EmployeeForm from "../components/EmployeeForm";
 import AddDepartmentModal from "../components/AddDepartmentModal";
@@ -11,8 +13,8 @@ const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
-  const [editEmployee, setEditEmployee] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editEmployee, setEditEmployee] = useState(null);
   const [showAddDeptModal, setShowAddDeptModal] = useState(false);
 
   const { departments, addDepartment } = useDepartments();
@@ -44,22 +46,89 @@ const Employees = () => {
       .includes(search.toLowerCase())
   );
 
+  const exportEmployees = () => {
+    if (employees.length === 0) {
+      toast.error("No employees to export");
+      return;
+    }
+
+    const customLabels = [];
+    employees.forEach((emp) => {
+      (Array.isArray(emp.customFields) ? emp.customFields : []).forEach((f) => {
+        if (!customLabels.includes(f.label)) customLabels.push(f.label);
+      });
+    });
+
+    const rows = employees.map((emp) => {
+      const base = {
+        "Employee Code": emp.employeeCode || "",
+        "First Name": emp.firstName || "",
+        "Last Name": emp.lastName || "",
+        "Gender": emp.gender || "",
+        "Marital Status": emp.maritalStatus || "",
+        "Email": emp.email || "",
+        "Phone": emp.phone || "",
+        "Department": emp.department || "",
+        "Designation": emp.position || "",
+        "Basic Salary": emp.basicSalary ?? "",
+        "Allowances": emp.allowances ?? "",
+        "Deductions": emp.deductions ?? "",
+        "Join Date": emp.joinDate ? new Date(emp.joinDate).toLocaleDateString("en-IN") : "",
+        "Confirmation Date": emp.confirmationDate ? new Date(emp.confirmationDate).toLocaleDateString("en-IN") : "",
+        "Aadhaar Number": emp.aadharNumber || "",
+        "Bank Name": emp.bankName || "",
+        "Bank Account Number": emp.bankAccountNumber || "",
+        "UAN Number": emp.uanNumber || "",
+        "PAN Number": emp.panNumber || "",
+        "Status": emp.employmentStatus || "",
+        "System Role": emp.user?.role || "",
+      };
+
+      customLabels.forEach((label) => {
+        const match = (Array.isArray(emp.customFields) ? emp.customFields : []).find((f) => f.label === label);
+        base[label] = match ? match.value : "";
+      });
+
+      return base;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = Object.keys(rows[0]).map((k) => ({ wch: Math.max(k.length, 16) }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+
+    XLSX.writeFile(workbook, `employees_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
+    <div className="animate-fade-in-up">
+      {/* Header with Left-to-Right Title Slide Animation */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="page-title">Employees</h1>
+          <h1 className="page-title animate-title-slide">Employees</h1>
           <p className="page-subtitle">Manage your team members</p>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
-        >
-          <Plus size={16} />
-          Add Employee
-        </button>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={exportEmployees}
+            className="btn-secondary flex items-center gap-2 justify-center"
+            type="button"
+          >
+            <Download size={16} />
+            Download
+          </button>
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary flex items-center gap-2 justify-center"
+            type="button"
+          >
+            <Plus size={16} />
+            Add Employee
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter */}
@@ -130,7 +199,7 @@ const Employees = () => {
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-modal-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 pb-0">
@@ -171,7 +240,7 @@ const Employees = () => {
           onClick={() => setEditEmployee(null)}
         >
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-modal-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 pb-0">

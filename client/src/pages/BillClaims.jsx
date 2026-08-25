@@ -10,8 +10,6 @@ import {
     Eye,
     Upload,
     IndianRupee,
-    CalendarDays,
-    FileText,
     X,
     RefreshCw,
     Image as ImageIcon,
@@ -60,10 +58,7 @@ const BillClaims = () => {
 
     const [remark, setRemark] = useState("");
 
-    // ==============================
     // Voucher Generation
-    // ==============================
-
     const [voucherClaim, setVoucherClaim] = useState(null);
     const [showVoucherForm, setShowVoucherForm] = useState(false);
     const [generatingVoucher, setGeneratingVoucher] = useState(false);
@@ -152,7 +147,7 @@ const BillClaims = () => {
 
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to generate voucher"
+                "Failed to generate voucher"
             );
         } finally {
             setGeneratingVoucher(false);
@@ -181,7 +176,7 @@ const BillClaims = () => {
 
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to load bill claims"
+                "Failed to load bill claims"
             );
         } finally {
             setLoading(false);
@@ -264,7 +259,7 @@ const BillClaims = () => {
 
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to submit bill claim"
+                "Failed to submit bill claim"
             );
         } finally {
             setSubmitting(false);
@@ -312,7 +307,7 @@ const BillClaims = () => {
 
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to update claim"
+                "Failed to update claim"
             );
         } finally {
             setActionLoading(false);
@@ -325,9 +320,8 @@ const BillClaims = () => {
         const value = search.toLowerCase();
 
         return claims.filter((claim) => {
-            const employeeName = `${claim.employee?.firstName || ""} ${
-                claim.employee?.lastName || ""
-            }`.toLowerCase();
+            const employeeName = `${claim.employee?.firstName || ""} ${claim.employee?.lastName || ""
+                }`.toLowerCase();
 
             return (
                 employeeName.includes(value) ||
@@ -445,34 +439,26 @@ const BillClaims = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+        <div className="min-h-screen bg-slate-50 p-4 md:p-6 animate-fade-in-up">
             <div className="mx-auto max-w-7xl space-y-6">
-                {/* Header */}
+                {/* Header with Left-to-Right Title Slide Animation */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-xl bg-indigo-100 p-3 text-indigo-600">
-                                <Receipt size={25} />
-                            </div>
+                        <h1 className="text-2xl font-bold text-slate-900 animate-title-slide">
+                            Bill Claims
+                        </h1>
 
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-900">
-                                    Bill Claims
-                                </h1>
-
-                                <p className="text-sm text-slate-500">
-                                    {isAdmin
-                                        ? "Review and manage employee expense claims"
-                                        : "Submit and track your expense reimbursements"}
-                                </p>
-                            </div>
-                        </div>
+                        <p className="text-sm text-slate-500">
+                            {isAdmin
+                                ? "Review and manage employee expense claims"
+                                : "Submit and track your expense reimbursements"}
+                        </p>
                     </div>
 
                     {!isAdmin && (
                         <button
                             onClick={() => setShowForm(true)}
-                            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-indigo-700 cursor-pointer"
                         >
                             <Plus size={19} />
                             Submit Bill Claim
@@ -482,7 +468,7 @@ const BillClaims = () => {
                     {isAdmin && (
                         <button
                             onClick={exportClaims}
-                            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50"
+                            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                         >
                             <Download size={17} />
                             Download
@@ -519,18 +505,18 @@ const BillClaims = () => {
 
                 {/* Admin Filters */}
                 {isAdmin && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-4 flex items-center gap-2">
-                            <Filter size={18} className="text-slate-500" />
-                            <h2 className="font-semibold text-slate-900">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                        <div className="mb-2 flex items-center gap-2">
+                            <Filter size={16} className="text-slate-500" />
+                            <h2 className="text-sm font-semibold text-slate-900">
                                 Filters
                             </h2>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
                             <div className="relative md:col-span-1">
                                 <Search
-                                    size={17}
+                                    size={16}
                                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                                 />
 
@@ -540,7 +526,7 @@ const BillClaims = () => {
                                         setSearch(e.target.value)
                                     }
                                     placeholder="Search employee..."
-                                    className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                    className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -549,7 +535,7 @@ const BillClaims = () => {
                                 onChange={(e) =>
                                     setStatusFilter(e.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
                                 <option value="">All Status</option>
                                 <option value="PENDING">Pending</option>
@@ -566,7 +552,7 @@ const BillClaims = () => {
                                 onChange={(e) =>
                                     setMonthFilter(e.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
                                 <option value="">All Months</option>
                                 {Array.from(
@@ -595,7 +581,7 @@ const BillClaims = () => {
                                 onChange={(e) =>
                                     setYearFilter(e.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
                                 {Array.from(
                                     { length: 6 },
@@ -619,7 +605,7 @@ const BillClaims = () => {
                     </div>
                 )}
 
-                {/* Claims */}
+                {/* Claims Table */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-100 px-5 py-4">
                         <div className="flex items-center justify-between">
@@ -638,7 +624,7 @@ const BillClaims = () => {
 
                             <button
                                 onClick={fetchClaims}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                             >
                                 <RefreshCw size={18} />
                             </button>
@@ -803,7 +789,7 @@ const BillClaims = () => {
                                                                                 "_blank"
                                                                             )
                                                                         }
-                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
                                                                     >
                                                                         <Download size={15} />
                                                                         Download
@@ -813,7 +799,7 @@ const BillClaims = () => {
                                                                         onClick={() =>
                                                                             openVoucherForm(claim)
                                                                         }
-                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 cursor-pointer"
                                                                     >
                                                                         <FileSpreadsheet size={15} />
                                                                         Generate
@@ -835,7 +821,7 @@ const BillClaims = () => {
                                                                             "_blank"
                                                                         )
                                                                     }
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
                                                                 >
                                                                     <Download size={15} />
                                                                     Download
@@ -855,7 +841,7 @@ const BillClaims = () => {
                                                                     claim
                                                                 )
                                                             }
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
                                                         >
                                                             <Eye
                                                                 size={15}
@@ -995,7 +981,7 @@ const BillClaims = () => {
             {/* Create Modal */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="max-h-[95vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                    <div className="max-h-[95vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl animate-modal-in">
                         <div className="flex items-center justify-between border-b border-slate-100 p-5">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">
@@ -1013,7 +999,7 @@ const BillClaims = () => {
                                     resetForm();
                                     setShowForm(false);
                                 }}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                             >
                                 <X size={20} />
                             </button>
@@ -1149,7 +1135,7 @@ const BillClaims = () => {
                                         resetForm();
                                         setShowForm(false);
                                     }}
-                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                                 >
                                     Cancel
                                 </button>
@@ -1157,7 +1143,7 @@ const BillClaims = () => {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                                 >
                                     {submitting && (
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -1176,7 +1162,7 @@ const BillClaims = () => {
             {/* Details Modal */}
             {showDetails && selectedClaim && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                    <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl animate-modal-in">
                         <div className="flex items-center justify-between border-b border-slate-100 p-5">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">
@@ -1195,7 +1181,7 @@ const BillClaims = () => {
                                 onClick={() =>
                                     setShowDetails(false)
                                 }
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                             >
                                 <X size={20} />
                             </button>
@@ -1314,7 +1300,7 @@ const BillClaims = () => {
 
                             {isAdmin &&
                                 selectedClaim.status ===
-                                    "PENDING" && (
+                                "PENDING" && (
                                     <div className="border-t border-slate-100 pt-5">
                                         <label className="mb-2 block text-sm font-semibold text-slate-700">
                                             Admin Remark
@@ -1342,7 +1328,7 @@ const BillClaims = () => {
                                                 disabled={
                                                     actionLoading
                                                 }
-                                                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
                                             >
                                                 <XCircle
                                                     size={18}
@@ -1359,7 +1345,7 @@ const BillClaims = () => {
                                                 disabled={
                                                     actionLoading
                                                 }
-                                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
                                             >
                                                 <CheckCircle2
                                                     size={18}
@@ -1381,7 +1367,7 @@ const BillClaims = () => {
                                                         "_blank"
                                                     )
                                                 }
-                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
+                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 cursor-pointer"
                                             >
                                                 <Download size={18} />
                                                 Download Voucher
@@ -1391,7 +1377,7 @@ const BillClaims = () => {
                                                 onClick={() =>
                                                     openVoucherForm(selectedClaim)
                                                 }
-                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700"
+                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 cursor-pointer"
                                             >
                                                 <FileSpreadsheet size={18} />
                                                 Generate Bill Amount
@@ -1407,7 +1393,7 @@ const BillClaims = () => {
             {/* Generate Bill Voucher Modal */}
             {showVoucherForm && voucherClaim && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                    <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl animate-modal-in">
                         <div className="flex items-center justify-between border-b border-slate-100 p-5">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">
@@ -1423,7 +1409,7 @@ const BillClaims = () => {
                                     setShowVoucherForm(false);
                                     setVoucherClaim(null);
                                 }}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                             >
                                 <X size={20} />
                             </button>
@@ -1583,7 +1569,7 @@ const BillClaims = () => {
                                         setShowVoucherForm(false);
                                         setVoucherClaim(null);
                                     }}
-                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                                 >
                                     Cancel
                                 </button>
@@ -1591,7 +1577,7 @@ const BillClaims = () => {
                                 <button
                                     type="submit"
                                     disabled={generatingVoucher}
-                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 cursor-pointer"
                                 >
                                     {generatingVoucher && (
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -1609,16 +1595,16 @@ const BillClaims = () => {
 
 const StatCard = ({ title, value, icon }) => {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm card-hover">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-sm text-slate-500">{title}</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">
+                    <p className="text-xs font-medium text-slate-500">{title}</p>
+                    <p className="mt-0.5 text-xl font-bold text-slate-900">
                         {value}
                     </p>
                 </div>
 
-                <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
+                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
                     {icon}
                 </div>
             </div>

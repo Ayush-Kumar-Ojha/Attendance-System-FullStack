@@ -91,7 +91,7 @@ const Advance = () => {
             console.error("Fetch Advance Requests Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to load advance requests"
+                "Failed to load advance requests"
             );
         } finally {
             setLoading(false);
@@ -130,7 +130,7 @@ const Advance = () => {
             console.error("Create Advance Request Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to submit advance request"
+                "Failed to submit advance request"
             );
         } finally {
             setSubmitting(false);
@@ -172,7 +172,7 @@ const Advance = () => {
             console.error("Update Advance Status Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to update advance request"
+                "Failed to update advance request"
             );
         } finally {
             setActionLoading(false);
@@ -240,7 +240,7 @@ const Advance = () => {
             console.error("Generate Advance Voucher Error:", error);
             toast.error(
                 error.response?.data?.error ||
-                    "Failed to generate voucher"
+                "Failed to generate voucher"
             );
         } finally {
             setGeneratingVoucher(false);
@@ -253,9 +253,8 @@ const Advance = () => {
         const value = search.toLowerCase();
 
         return requests.filter((request) => {
-            const employeeName = `${
-                request.employee?.firstName || ""
-            } ${request.employee?.lastName || ""}`.toLowerCase();
+            const employeeName = `${request.employee?.firstName || ""
+                } ${request.employee?.lastName || ""}`.toLowerCase();
 
             return (
                 employeeName.includes(value) ||
@@ -374,30 +373,26 @@ const Advance = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+        <div className="min-h-screen bg-slate-50 p-4 md:p-6 animate-fade-in-up">
             <div className="mx-auto max-w-7xl space-y-6">
+                {/* Header with Left-to-Right Title Slide Animation */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-violet-100 p-3 text-violet-600">
-                            <WalletCards size={25} />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-900">
-                                Salary Advance
-                            </h1>
-                            <p className="text-sm text-slate-500">
-                                {isAdmin
-                                    ? "Review employee salary advance requests"
-                                    : "Request and track your salary advance"}
-                            </p>
-                        </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 animate-title-slide">
+                            Salary Advance
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                            {isAdmin
+                                ? "Review employee salary advance requests"
+                                : "Request and track your salary advance"}
+                        </p>
                     </div>
 
                     <div className="flex gap-2">
                         {isAdmin && (
                             <button
                                 onClick={exportRequests}
-                                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50"
+                                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                                 <Download size={17} />
                                 Download
@@ -407,7 +402,7 @@ const Advance = () => {
                         {!isAdmin && (
                             <button
                                 onClick={() => setShowForm(true)}
-                                className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700"
+                                className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-violet-700 cursor-pointer"
                             >
                                 <Plus size={19} />
                                 Request Advance
@@ -440,18 +435,18 @@ const Advance = () => {
                 </div>
 
                 {isAdmin && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-4 flex items-center gap-2">
-                            <Filter size={18} className="text-slate-500" />
-                            <h2 className="font-semibold text-slate-900">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                        <div className="mb-2 flex items-center gap-2">
+                            <Filter size={16} className="text-slate-500" />
+                            <h2 className="text-sm font-semibold text-slate-900">
                                 Filters
                             </h2>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
                             <div className="relative">
                                 <Search
-                                    size={17}
+                                    size={16}
                                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                                 />
                                 <input
@@ -460,7 +455,7 @@ const Advance = () => {
                                         setSearch(event.target.value)
                                     }
                                     placeholder="Search employee..."
-                                    className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                                    className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                                 />
                             </div>
 
@@ -469,7 +464,7 @@ const Advance = () => {
                                 onChange={(event) =>
                                     setStatusFilter(event.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-violet-500"
                             >
                                 <option value="">All Status</option>
                                 <option value="PENDING">Pending</option>
@@ -482,7 +477,7 @@ const Advance = () => {
                                 onChange={(event) =>
                                     setMonthFilter(event.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-violet-500"
                             >
                                 <option value="">All Months</option>
                                 {Array.from({ length: 12 }, (_, index) => (
@@ -502,7 +497,7 @@ const Advance = () => {
                                 onChange={(event) =>
                                     setYearFilter(event.target.value)
                                 }
-                                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-violet-500"
                             >
                                 {Array.from({ length: 6 }, (_, index) => {
                                     const year =
@@ -532,7 +527,7 @@ const Advance = () => {
                             </div>
                             <button
                                 onClick={fetchRequests}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                             >
                                 <RefreshCw size={18} />
                             </button>
@@ -640,7 +635,7 @@ const Advance = () => {
                                                             request.advanceVoucherId ? (
                                                                 <button
                                                                     onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
                                                                 >
                                                                     <Download size={15} />
                                                                     Download
@@ -648,7 +643,7 @@ const Advance = () => {
                                                             ) : (
                                                                 <button
                                                                     onClick={() => openVoucherForm(request)}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 cursor-pointer"
                                                                 >
                                                                     <FileSpreadsheet size={15} />
                                                                     Generate
@@ -664,7 +659,7 @@ const Advance = () => {
                                                         {request.status === "APPROVED" && request.advanceVoucherId ? (
                                                             <button
                                                                 onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
                                                             >
                                                                 <Download size={15} />
                                                                 Download
@@ -677,7 +672,7 @@ const Advance = () => {
                                                 <td className="px-5 py-4 text-left">
                                                     <button
                                                         onClick={() => openDetails(request)}
-                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
                                                     >
                                                         <Eye size={15} />
                                                         View
@@ -824,14 +819,14 @@ const Advance = () => {
                                     resetForm();
                                     setShowForm(false);
                                 }}
-                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60 cursor-pointer"
                             >
                                 {submitting && (
                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -905,7 +900,7 @@ const Advance = () => {
                                     <button
                                         onClick={() => updateStatus("REJECTED")}
                                         disabled={actionLoading}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 cursor-pointer"
                                     >
                                         <XCircle size={18} />
                                         Reject
@@ -913,7 +908,7 @@ const Advance = () => {
                                     <button
                                         onClick={() => updateStatus("APPROVED")}
                                         disabled={actionLoading}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
                                     >
                                         <CheckCircle2 size={18} />
                                         Approve
@@ -927,7 +922,7 @@ const Advance = () => {
                                 {selectedRequest.advanceVoucherId ? (
                                     <button
                                         onClick={() => window.open(`/print/advance-voucher/${selectedRequest.advanceVoucherId}`, "_blank")}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 cursor-pointer"
                                     >
                                         <Download size={18} />
                                         Download Voucher
@@ -935,7 +930,7 @@ const Advance = () => {
                                 ) : (
                                     <button
                                         onClick={() => openVoucherForm(selectedRequest)}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700"
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 cursor-pointer"
                                     >
                                         <FileSpreadsheet size={18} />
                                         Generate Advance
@@ -990,14 +985,14 @@ const Advance = () => {
                                     setShowVoucherForm(false);
                                     setVoucherRequest(null);
                                 }}
-                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={generatingVoucher}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60 cursor-pointer"
                             >
                                 {generatingVoucher && (
                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -1014,7 +1009,7 @@ const Advance = () => {
 
 const Modal = ({ title, subtitle, onClose, children, maxWidth = "max-w-lg" }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className={`max-h-[95vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl`}>
+        <div className={`max-h-[95vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl animate-modal-in`}>
             <div className="flex items-center justify-between border-b border-slate-100 p-5">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900">{title}</h2>
@@ -1022,7 +1017,7 @@ const Modal = ({ title, subtitle, onClose, children, maxWidth = "max-w-lg" }) =>
                 </div>
                 <button
                     onClick={onClose}
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"
                 >
                     <X size={20} />
                 </button>
@@ -1054,13 +1049,13 @@ const VoucherInput = ({
 );
 
 const StatCard = ({ title, value, icon }) => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm card-hover">
         <div className="flex items-center justify-between">
             <div>
-                <p className="text-sm text-slate-500">{title}</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+                <p className="text-xs font-medium text-slate-500">{title}</p>
+                <p className="mt-0.5 text-xl font-bold text-slate-900">{value}</p>
             </div>
-            <div className="rounded-xl bg-violet-50 p-3 text-violet-600">
+            <div className="rounded-lg bg-violet-50 p-2 text-violet-600">
                 {icon}
             </div>
         </div>

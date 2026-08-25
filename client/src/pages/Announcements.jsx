@@ -88,10 +88,11 @@ const Announcements = () => {
     if (loading) return <Loading />;
 
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in-up">
+            {/* Header with Left-to-Right Title Slide Animation */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <div>
-                    <h1 className="page-title">Announcements</h1>
+                    <h1 className="page-title animate-title-slide">Announcements</h1>
                     <p className="page-subtitle">
                         {isAdmin
                             ? "Post updates and news for your team"
@@ -102,7 +103,7 @@ const Announcements = () => {
                 {isAdmin && (
                     <button
                         onClick={openCreateModal}
-                        className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
+                        className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer"
                     >
                         <Plus className="w-4 h-4" />
                         New Announcement
@@ -118,7 +119,7 @@ const Announcements = () => {
             ) : (
                 <div className="space-y-4">
                     {announcements.map((a) => (
-                        <div key={a._id || a.id} className="card p-5 sm:p-6 relative overflow-hidden">
+                        <div key={a._id || a.id} className="card card-hover p-5 sm:p-6 relative overflow-hidden">
                             <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500/70" />
 
                             <div className="flex items-start justify-between gap-4">
@@ -140,14 +141,14 @@ const Announcements = () => {
                                     <div className="flex gap-1.5 shrink-0">
                                         <button
                                             onClick={() => openEditModal(a)}
-                                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"
+                                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
                                         >
                                             <Pencil className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(a._id || a.id)}
                                             disabled={deletingId === (a._id || a.id)}
-                                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-rose-600 transition-colors"
+                                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                                         >
                                             {deletingId === (a._id || a.id) ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -170,7 +171,7 @@ const Announcements = () => {
                     onClick={() => setShowModal(false)}
                 >
                     <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in"
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-in"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between p-6 pb-0">
@@ -179,7 +180,7 @@ const Announcements = () => {
                             </h2>
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -217,14 +218,14 @@ const Announcements = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="btn-secondary flex-1"
+                                    className="btn-secondary flex-1 cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={saving}
-                                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                                    className="btn-primary flex-1 flex items-center justify-center gap-2 cursor-pointer"
                                 >
                                     {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                                     {editingAnnouncement ? "Update" : "Post"}

@@ -119,11 +119,34 @@ export const getLeaves = async (req, res) => {
 
         if (isAdmin) {
 
-            const status = req.query.status;
+            const { status, employeeId, month, year } = req.query;
 
-            const where = status
-                ? { status }
-                : {};
+            const where = {};
+
+            if (status) {
+                where.status = status;
+            }
+
+            if (employeeId) {
+                where.employeeId = employeeId;
+            }
+
+            if (month && year) {
+                const monthNum = Number(month);
+                const yearNum = Number(year);
+
+                const monthStart = new Date(yearNum, monthNum - 1, 1);
+                const monthEnd = new Date(yearNum, monthNum, 0, 23, 59, 59);
+
+                where.startDate = { $gte: monthStart, $lte: monthEnd };
+            } else if (year) {
+                const yearNum = Number(year);
+
+                where.startDate = {
+                    $gte: new Date(yearNum, 0, 1),
+                    $lte: new Date(yearNum, 11, 31, 23, 59, 59),
+                };
+            }
 
 
             const leaves = await LeaveApplication

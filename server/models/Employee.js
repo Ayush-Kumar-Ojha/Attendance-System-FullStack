@@ -186,6 +186,21 @@ const employeeSchema = new mongoose.Schema(
             default: [],
         },
 
+                // ==============================
+        // Admin-defined custom fields, grouped by form section
+        // ==============================
+
+        customFields: {
+            type: [
+                {
+                    section: { type: String, required: true },
+                    label: { type: String, required: true },
+                    value: { type: String, default: "" },
+                },
+            ],
+            default: [],
+        },
+
         isDeleted: {
             type: Boolean,
             default: false,

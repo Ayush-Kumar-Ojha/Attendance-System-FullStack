@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDepartments } from "../hooks/useDepartments";
-import { Loader2Icon } from "lucide-react";
+import { Loader2Icon, Plus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+
+const genFieldId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const EmployeeForm = ({
     initialData,
@@ -19,6 +21,57 @@ const EmployeeForm = ({
     const isEditMode = !!initialData;
 
     const optional = " (Optional)";
+
+    // ==========================================
+    // Custom fields (per section)
+    // ==========================================
+
+    const [customFields, setCustomFields] = useState(
+        () =>
+            (initialData?.customFields || []).map((f) => ({
+                id: genFieldId(),
+                section: f.section,
+                label: f.label,
+                value: f.value || "",
+            }))
+    );
+
+    const [addingFieldFor, setAddingFieldFor] = useState(null); // section key or null
+    const [newFieldLabel, setNewFieldLabel] = useState("");
+
+    const fieldsForSection = (section) =>
+        customFields.filter((f) => f.section === section);
+
+    const startAddField = (section) => {
+        setAddingFieldFor(section);
+        setNewFieldLabel("");
+    };
+
+    const confirmAddField = (section) => {
+        const label = newFieldLabel.trim();
+        if (!label) {
+            toast.error("Enter a field name");
+            return;
+        }
+
+        setCustomFields((prev) => [
+            ...prev,
+            { id: genFieldId(), section, label, value: "" },
+        ]);
+
+        setAddingFieldFor(null);
+        setNewFieldLabel("");
+    };
+
+    const updateCustomFieldValue = (id, value) => {
+        setCustomFields((prev) =>
+            prev.map((f) => (f.id === id ? { ...f, value } : f))
+        );
+    };
+
+    const removeCustomField = (id) => {
+        setCustomFields((prev) => prev.filter((f) => f.id !== id));
+    };
 
     // ==========================================
     // Convert stored firstName + lastName
@@ -91,6 +144,14 @@ const EmployeeForm = ({
             delete data.password;
         }
 
+        // ==========================================
+        // Attach custom fields
+        // ==========================================
+
+        data.customFields = customFields.map(
+            ({ section, label, value }) => ({ section, label, value })
+        );
+
         try {
             const url = isEditMode
                 ? `/employees/${initialData.id}`
@@ -128,6 +189,81 @@ const EmployeeForm = ({
             setLoading(false);
         }
     };
+
+    // ==========================================
+    // Reusable "Add Field" row for a section
+    // ==========================================
+
+    const AddFieldRow = ({ section }) => (
+        <div className="sm:col-span-2">
+            {addingFieldFor === section ? (
+                <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                        <label className="block mb-2">
+                            New Field Name
+                        </label>
+
+                        <input
+                            value={newFieldLabel}
+                            onChange={(e) => setNewFieldLabel(e.target.value)}
+                            placeholder="e.g. Blood Group"
+                            autoFocus
+                        />
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => confirmAddField(section)}
+                        className="btn-primary shrink-0"
+                    >
+                        Add
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setAddingFieldFor(null)}
+                        className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 shrink-0"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => startAddField(section)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                    <Plus className="w-4 h-4" />
+                    Add Field
+                </button>
+            )}
+        </div>
+    );
+
+    const CustomFieldInputs = ({ section }) =>
+        fieldsForSection(section).map((field) => (
+            <div key={field.id}>
+                <label className="flex items-center justify-between mb-2">
+                    <span>{field.label}</span>
+
+                    <button
+                        type="button"
+                        onClick={() => removeCustomField(field.id)}
+                        className="text-slate-300 hover:text-rose-500"
+                        title="Remove field"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </label>
+
+                <input
+                    value={field.value}
+                    onChange={(e) =>
+                        updateCustomFieldValue(field.id, e.target.value)
+                    }
+                />
+            </div>
+        ));
 
     return (
         <form
@@ -372,6 +508,11 @@ const EmployeeForm = ({
 
                     </div>
 
+                    {/* Custom fields */}
+
+                    <CustomFieldInputs section="personal" />
+                    <AddFieldRow section="personal" />
+
                 </div>
             </div>
 
@@ -460,6 +601,11 @@ const EmployeeForm = ({
                             }
                         />
                     </div>
+
+                    {/* Custom fields */}
+
+                    <CustomFieldInputs section="bank" />
+                    <AddFieldRow section="bank" />
 
                 </div>
             </div>
@@ -740,6 +886,11 @@ const EmployeeForm = ({
 
                     )}
 
+                    {/* Custom fields */}
+
+                    <CustomFieldInputs section="employment" />
+                    <AddFieldRow section="employment" />
+
                 </div>
 
             </div>
@@ -825,6 +976,11 @@ const EmployeeForm = ({
                         </select>
 
                     </div>
+
+                    {/* Custom fields */}
+
+                    <CustomFieldInputs section="account" />
+                    <AddFieldRow section="account" />
 
                 </div>
 

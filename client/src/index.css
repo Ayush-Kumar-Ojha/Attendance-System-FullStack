@@ -2,35 +2,35 @@
 @import "tailwindcss";
 
 * {
-    font-family: "Outfit", "Inter";
+    font-family: "Outfit", "Inter", sans-serif;
 }
 
 @layer utilities {
     /* Card styles */
     .card {
-        @apply bg-white rounded-lg border border-slate-200/70;
+        @apply bg-white rounded-xl border border-slate-200/70 shadow-xs transition-all duration-300;
     }
     .card-hover {
-        @apply hover:-translate-y-0.5 transition-all duration-300;
+        @apply hover:-translate-y-1 hover:shadow-md hover:border-slate-300 transition-all duration-300;
     }
 
     /* Button styles */
     .btn-primary {
-        @apply bg-linear-to-r from-indigo-600 to-indigo-500 text-white px-5 py-2.5 rounded-md text-sm
-            hover:from-indigo-700 hover:to-indigo-600 transition-all duration-200 shadow-md shadow-indigo-500/25
-            active:scale-[0.98];
+        @apply bg-gradient-to-r from-indigo-600 to-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm font-semibold
+            hover:from-indigo-700 hover:to-indigo-600 transition-all duration-200 shadow-md shadow-indigo-500/20
+            active:scale-[0.97] cursor-pointer;
     }
     .btn-secondary {
-        @apply bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-md text-sm
-            hover:bg-slate-50 hover:border-slate-300 transition-all duration-200;
+        @apply bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-lg text-sm font-medium
+            hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 active:scale-[0.97] cursor-pointer;
     }
 
     /* Input, Select, Textarea styles */
     input,
     select,
     textarea {
-        @apply w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-md
-            focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400
+        @apply w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl
+            focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500
             transition-all duration-200 text-sm placeholder:text-slate-400;
     }
 
@@ -48,7 +48,7 @@
         @apply divide-y divide-slate-100;
     }
     .table-modern tbody tr {
-        @apply hover:bg-slate-50/50 transition-colors duration-150;
+        @apply hover:bg-slate-50/70 transition-colors duration-150;
     }
     .table-modern tbody td {
         @apply px-6 py-4;
@@ -56,7 +56,7 @@
 
     /* Badge styles */
     .badge {
-        @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs;
+        @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
     }
     .badge-success {
         @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10;
@@ -73,21 +73,28 @@
         @apply mb-8;
     }
     .page-title {
-        @apply text-2xl font-medium text-slate-900 tracking-tight;
+        @apply text-2xl font-bold text-slate-900 tracking-tight;
     }
     .page-subtitle {
         @apply text-slate-500 text-sm mt-1;
     }
 
-    /* Animations */
+    /* Animation Classes */
     .animate-fade-in {
-        animation: fadeIn 0.4s ease-out;
+        animation: fadeIn 0.35s ease-out forwards;
     }
     .animate-slide-up {
-        animation: slideUp 0.4s ease-out;
+        animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-modal-in {
+        animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 }
 
+/* Keyframe Definitions */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -108,9 +115,49 @@
     }
 }
 
-/* Custom scrollbar */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes modalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Standalone Left-to-Right Title Animation (Slow & Elegant) */
+@keyframes titleSlideFromLeft {
+    0% {
+        opacity: 0;
+        transform: translateX(-160px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-title-slide {
+    display: inline-block !important;
+    animation: titleSlideFromLeft 1s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
 }
 ::-webkit-scrollbar-track {
     @apply bg-transparent;

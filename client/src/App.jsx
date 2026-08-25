@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./pages/Layout";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
+import EmployeeDetails from "./pages/EmployeeDetails";
 import Attendance from "./pages/Attendance";
 import Leave from "./pages/Leave";
 import Settings from "./pages/Settings";
@@ -33,16 +34,17 @@ const App = () => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* Standalone print / document pages — no sidebar, no dashboard chrome */}
+        {/* Standalone print / document pages — no sidebar */}
         <Route path="/print/payslips/:id" element={<PrintPayslip />} />
         <Route path="/print/bill-voucher/:id" element={<PrintBillVoucher />} />
         <Route path="/print/advance-voucher/:id" element={<PrintAdvanceVoucher />} />
-        <Route path="/gate-pass" element={<GatePass />} />
 
+        {/* Main pages wrapped inside Layout (with Sidebar) */}
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/walls" element={<Walls />} />
           <Route path="/employees" element={<Employees />} />
+          <Route path="/employees/:id" element={<EmployeeDetails />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/leave" element={<Leave />} />
           <Route path="payslip" element={<Payslips />} />
@@ -52,6 +54,7 @@ const App = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/bill-claims" element={<BillClaims />} />
           <Route path="/advance" element={<Advance />} />
+          <Route path="/gate-pass" element={<GatePass />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

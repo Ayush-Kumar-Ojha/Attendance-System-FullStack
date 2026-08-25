@@ -5,13 +5,43 @@ import {
     FileText,
     CalendarDays,
     Send,
+    AlertTriangle,
 } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
 
-const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
+const MONTHLY_PAID_LEAVE_LIMIT = 3; // matches server/controllers/leaveController.js
+
+// Same day-count logic as the backend (HALF_DAY = 0.5, else inclusive day span)
+const getLeaveDays = (leave) => {
+    if (leave.type === "HALF_DAY") return 0.5;
+    const start = new Date(leave.startDate);
+    const end = new Date(leave.endDate);
+    const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+};
+
+// Sum of already-APPROVED leave days in the same month/year as `referenceDate`
+const getApprovedDaysInMonth = (leaves, referenceDate) => {
+    const refMonth = referenceDate.getMonth();
+    const refYear = referenceDate.getFullYear();
+
+    return leaves
+        .filter((leave) => leave.status === "APPROVED")
+        .filter((leave) => {
+            const d = new Date(leave.startDate);
+            return d.getMonth() === refMonth && d.getFullYear() === refYear;
+        })
+        .reduce((sum, leave) => sum + getLeaveDays(leave), 0);
+};
+
+const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
     const [loading, setLoading] = useState(false);
     const [leaveType, setLeaveType] = useState("SICK");
+
+    const [showLimitWarning, setShowLimitWarning] = useState(false);
+    const [pendingData, setPendingData] = useState(null);
+    const [alreadyTakenDays, setAlreadyTakenDays] = useState(0);
 
     const today = new Date();
     const tomorrow = new Date(today);
@@ -20,16 +50,8 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
 
     const isHalfDay = leaveType === "HALF_DAY";
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true)
-        const formData = new FormData(e.currentTarget)
-        const data = Object.fromEntries(formData.entries())
-
-        // For half day, force start and end date to be the same
-        if (isHalfDay) {
-            data.endDate = data.startDate;
-        }
+    const submitLeave = async (data) => {
+        setLoading(true);
 
         try {
             await api.post('/leave', data)
@@ -39,6 +61,35 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
             toast.error(err.response?.data?.error || err?.message)
         }
         finally { setLoading(false) }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.currentTarget)
+        const data = Object.fromEntries(formData.entries())
+
+        // For half day, force start and end date to be the same
+        if (isHalfDay) {
+            data.endDate = data.startDate;
+        }
+
+        const startDate = new Date(data.startDate);
+        const takenDays = getApprovedDaysInMonth(leaves, startDate);
+
+        if (takenDays >= MONTHLY_PAID_LEAVE_LIMIT) {
+            setAlreadyTakenDays(takenDays);
+            setPendingData(data);
+            setShowLimitWarning(true);
+            return;
+        }
+
+        await submitLeave(data);
+    };
+
+    const confirmProceedAnyway = () => {
+        setShowLimitWarning(false);
+        if (pendingData) submitLeave(pendingData);
     };
 
     if (!open) return null;
@@ -191,6 +242,58 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
                     </div>
                 </form>
             </div>
+
+            {/* Monthly leave limit reminder */}
+            {showLimitWarning && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+                    onClick={() => setShowLimitWarning(false)}
+                >
+                    <div
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="p-2 rounded-full bg-amber-50 shrink-0">
+                                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                            </div>
+
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    Monthly leave limit reached
+                                </h3>
+
+                                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                                    You've already taken <strong>{alreadyTakenDays}</strong> approved leave day
+                                    {alreadyTakenDays === 1 ? "" : "s"} this month, which covers your paid leave allowance.
+                                    Any leave beyond {MONTHLY_PAID_LEAVE_LIMIT} days in a month is treated as{" "}
+                                    <strong>unpaid leave</strong>. Do you still want to submit this request?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setShowLimitWarning(false)}
+                                type="button"
+                                className="btn-secondary flex-1"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                onClick={confirmProceedAnyway}
+                                disabled={loading}
+                                type="button"
+                                className="btn-primary flex-1 flex items-center justify-center gap-2"
+                            >
+                                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {loading ? "Submitting..." : "Proceed Anyway"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
