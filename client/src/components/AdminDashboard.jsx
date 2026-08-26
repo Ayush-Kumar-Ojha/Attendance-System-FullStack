@@ -1,17 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
     UsersIcon,
     CalendarIcon,
     Building2Icon,
     FileTextIcon,
+    FileText,
+    FileX,
     ClockIcon,
     LogOutIcon,
     UserXIcon,
     X,
     Search,
     ChevronRight,
-    UserCheck,
+    FolderOpen,
+    Download,
+    Loader2,
 } from "lucide-react";
 import { useDepartments } from "../hooks/useDepartments";
 import api from "../api/axios";
@@ -39,7 +44,13 @@ const AttendanceDonut = ({ percent }) => {
 const AdminDashboard = ({ data }) => {
     const navigate = useNavigate();
     const { departments } = useDepartments();
-    const [activeModal, setActiveModal] = useState(null); // "lateCheckIns" | "earlyCheckOuts" | "notCheckedIn" | null
+    const [activeModal, setActiveModal] = useState(null);
+
+    // Employee Documents Viewer Modal State
+    const [showDocsModal, setShowDocsModal] = useState(false);
+    const [selectedEmpId, setSelectedEmpId] = useState("");
+    const [selectedEmpDocs, setSelectedEmpDocs] = useState([]);
+    const [loadingDocs, setLoadingDocs] = useState(false);
 
     // Quick Employee Search State
     const [searchTerm, setSearchTerm] = useState("");
@@ -59,6 +70,24 @@ const AdminDashboard = ({ data }) => {
         };
         fetchEmployees();
     }, []);
+
+    // Fetch documents when Admin selects an employee in the modal
+    const fetchEmployeeDocs = async (empId) => {
+        if (!empId) {
+            setSelectedEmpDocs([]);
+            return;
+        }
+        setLoadingDocs(true);
+        try {
+            const res = await api.get(`/employees/${empId}/documents`);
+            setSelectedEmpDocs(res.data?.documents || []);
+        } catch (err) {
+            console.error("Failed to load employee documents", err);
+            setSelectedEmpDocs([]);
+        } finally {
+            setLoadingDocs(false);
+        }
+    };
 
     // Filter employees by search term
     const searchResults = useMemo(() => {
@@ -100,6 +129,7 @@ const AdminDashboard = ({ data }) => {
         { key: "lateCheckIns", icon: ClockIcon, value: data.lateCheckIns ?? 0, names: data.lateCheckInEmployees, label: "Late Check-ins", description: "Checked in late today", color: "amber" },
         { key: "earlyCheckOuts", icon: LogOutIcon, value: data.earlyCheckOuts ?? 0, names: data.earlyCheckOutEmployees, label: "Early Check-outs", description: "Left before full hours", color: "rose" },
         { key: "notCheckedIn", icon: UserXIcon, value: data.notCheckedInYet ?? 0, names: data.notCheckedInEmployees, label: "Not Checked In Yet", description: "No activity today", color: "slate" },
+        { key: "weekendHolidayWork", icon: CalendarIcon, value: data.weekendHolidayWorkCount ?? 0, names: data.weekendHolidayWorkEmployees, label: "Weekend / Holiday Work", description: "Worked extra / comp off", color: "amber" },
     ];
 
     const colorMap = {
@@ -112,12 +142,10 @@ const AdminDashboard = ({ data }) => {
 
     return (
         <div className="animate-fade-in-up space-y-6">
-            {/* Header with Left-to-Right Title Slide Animation & Quick Search Bar */}
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="page-header">
-                    <h1 className="page-title animate-title-slide">
-                        Dashboard
-                    </h1>
+                    <h1 className="page-title animate-title-slide">Dashboard</h1>
                     <p className="page-subtitle">Welcome back, Admin - here's your overview</p>
                 </div>
 
@@ -148,7 +176,7 @@ const AdminDashboard = ({ data }) => {
 
                     {/* Autocomplete Dropdown */}
                     {isSearching && searchTerm.trim() && (
-                        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl animate-modal-in">
+                        <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl animate-modal-in">
                             {searchResults.length === 0 ? (
                                 <div className="p-4 text-center text-xs text-slate-400">
                                     No employee found matching "{searchTerm}"
@@ -201,7 +229,18 @@ const AdminDashboard = ({ data }) => {
                 })}
             </div>
 
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Today's Snapshot</h2>
+            <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-700">Today's Snapshot</h2>
+                
+                {/* Employee Documents Quick Action Button */}
+                <button
+                    onClick={() => setShowDocsModal(true)}
+                    className="flex items-center gap-2 rounded-xl bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition border border-indigo-200"
+                >
+                    <FolderOpen size={15} />
+                    Employee Documents
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                 <div className="card card-hover p-5 sm:p-6 flex items-center gap-5 relative overflow-hidden">
@@ -235,12 +274,22 @@ const AdminDashboard = ({ data }) => {
                 })}
             </div>
 
-            {activeStat && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setActiveModal(null)}>
-                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            {/* Portal Modal Overlay for Snapshot Lists */}
+            {activeStat && createPortal(
+                <div 
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md" 
+                    onClick={() => setActiveModal(null)}
+                >
+                    <div 
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-modal-in" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between p-6 pb-0">
                             <h2 className="text-lg font-semibold text-slate-800">{activeStat.label}</h2>
-                            <button onClick={() => setActiveModal(null)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
+                            <button 
+                                onClick={() => setActiveModal(null)} 
+                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                            >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -248,7 +297,7 @@ const AdminDashboard = ({ data }) => {
                             {(!activeStat.names || activeStat.names.length === 0) ? (
                                 <p className="text-center text-slate-400 py-6">No one to show</p>
                             ) : (
-                                <ul className="divide-y divide-slate-100">
+                                <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
                                     {activeStat.names.map((name, i) => (
                                         <li key={i} className="py-3 text-sm font-medium text-slate-900">{name}</li>
                                     ))}
@@ -256,7 +305,112 @@ const AdminDashboard = ({ data }) => {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Portal Modal Overlay for Employee Documents Viewer */}
+            {showDocsModal && createPortal(
+                <div 
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md" 
+                    onClick={() => setShowDocsModal(false)}
+                >
+                    <div 
+                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-modal-in space-y-4" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700">
+                                    <FolderOpen size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-slate-900">Employee Documents</h2>
+                                    <p className="text-xs text-slate-500">Select an employee to download their uploaded files</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowDocsModal(false)} 
+                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Select Employee Dropdown */}
+                        <div>
+                            <label className="block mb-1.5 text-xs font-semibold text-slate-700">
+                                Select Employee *
+                            </label>
+                            <select
+                                value={selectedEmpId}
+                                onChange={(e) => {
+                                    setSelectedEmpId(e.target.value);
+                                    fetchEmployeeDocs(e.target.value);
+                                }}
+                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-indigo-500"
+                            >
+                                <option value="">-- Choose an Employee --</option>
+                                {employees.map((emp) => (
+                                    <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                                        {emp.firstName} {emp.lastName} ({emp.employeeCode})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Documents List */}
+                        {selectedEmpId ? (
+                            <div className="pt-2">
+                                {loadingDocs ? (
+                                    <div className="flex items-center justify-center gap-2 text-xs text-slate-500 py-8">
+                                        <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                        <span>Fetching employee documents...</span>
+                                    </div>
+                                ) : !selectedEmpDocs || selectedEmpDocs.length === 0 ? (
+                                    <div className="text-center py-8 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/70">
+                                        <FileX size={32} className="mx-auto text-slate-300 mb-2" />
+                                        <p className="text-sm font-semibold text-slate-700">No attachments found</p>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            This employee has not uploaded or attached any documents yet.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                                        {selectedEmpDocs.map((doc) => (
+                                            <div key={doc._id || doc.name} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
+                                                        <FileText size={16} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-slate-800 truncate">{doc.name}</p>
+                                                        <p className="text-[11px] text-slate-400 truncate">{doc.fileName}</p>
+                                                    </div>
+                                                </div>
+
+                                                <a
+                                                    href={doc.fileUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition shrink-0"
+                                                >
+                                                    <Download size={14} />
+                                                    Download
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                Pick an employee from the dropdown above to view their documents.
+                            </div>
+                        )}
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

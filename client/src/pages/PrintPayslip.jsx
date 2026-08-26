@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import Loading from '../components/Loading';
 import { format } from "date-fns";
@@ -57,7 +57,7 @@ const PrintPayslip = () => {
 
     const fmt = (val) => `₹${Number(val || 0).toLocaleString()}`;
 
-    // Calculated fields with smart fallbacks if backend didn't store breakdown
+    // Standard Breakdown
     const basic = Number(payslip.basicSalary || 0);
     const hra = payslip.hra !== undefined && payslip.hra !== null && payslip.hra !== 0
         ? Number(payslip.hra)
@@ -66,15 +66,24 @@ const PrintPayslip = () => {
     const siteAllowance = Number(payslip.siteAllowance || 0);
     const conveyance = Number(payslip.conveyance || 0);
 
-    const grossEarnings = payslip.grossSalary || (basic + hra + specialAllowance + siteAllowance + conveyance);
+    // Custom Fields
+    const customFields = Array.isArray(payslip.customFields) ? payslip.customFields : [];
+    const customEarnings = customFields.filter((cf) => cf.type === "EARNING");
+    const customDeductions = customFields.filter((cf) => cf.type === "DEDUCTION");
 
-    const pfEmployee = payslip.pfEmployeeContribution !== undefined && payslip.pfEmployeeContribution !== null && payslip.pfEmployeeContribution !== 0
+    const customEarningsSum = customEarnings.reduce((acc, cf) => acc + Number(cf.value || 0), 0);
+    const customDeductionsSum = customDeductions.reduce((acc, cf) => acc + Number(cf.value || 0), 0);
+
+    const grossEarnings = payslip.grossSalary || (basic + hra + specialAllowance + siteAllowance + conveyance + customEarningsSum);
+
+    // PF Employee default 1800
+    const pfEmployee = payslip.pfEmployeeContribution !== undefined && payslip.pfEmployeeContribution !== null
         ? Number(payslip.pfEmployeeContribution)
-        : basic * 0.12;
+        : 1800;
     const professionalTax = Number(payslip.professionalTax || 0);
     const medicalEmployee = Number(payslip.medicalInsuranceEmployee || 0);
 
-    const totalDeductions = pfEmployee + professionalTax + medicalEmployee;
+    const totalDeductions = payslip.deductions || (pfEmployee + professionalTax + medicalEmployee + customDeductionsSum);
     const netPayable = payslip.netSalary && payslip.netSalary !== basic ? Number(payslip.netSalary) : (grossEarnings - totalDeductions);
 
     const designation = payslip.employee?.designation || payslip.employee?.position || 'Staff';
@@ -101,16 +110,16 @@ const PrintPayslip = () => {
         { label: "HRA", value: hra },
         { label: "Conveyance", value: conveyance },
         { label: "Special Allowance", value: specialAllowance + siteAllowance },
+        ...customEarnings.map((cf) => ({ label: cf.label, value: Number(cf.value || 0) })),
     ];
 
     const deductionsRows = [
         { label: "PF (Employee)", value: pfEmployee },
         { label: "Professional Tax", value: professionalTax },
         { label: "Health Insurance", value: medicalEmployee },
+        ...customDeductions.map((cf) => ({ label: cf.label, value: Number(cf.value || 0) })),
     ];
 
-    // Rows for the two-column Employee Pay Summary grid:
-    // each entry is [label, value, label, value]
     const summaryRows = [
         ["Employee Code", employeeCode, "Employee Name", `${payslip.employee?.firstName || ''} ${payslip.employee?.lastName || ''}`.trim()],
         ["Date of Joining", dateOfJoining, "Designation", designation],
@@ -122,7 +131,6 @@ const PrintPayslip = () => {
 
     return (
         <div className="max-w-3xl mx-auto p-8 bg-white animate-fade-in my-6 print:my-0">
-
             {/* Logo */}
             <div className="flex justify-center mb-6">
                 <img src={logo} alt="Wehark Solutions" className="h-10" />
@@ -147,20 +155,20 @@ const PrintPayslip = () => {
                         const borderB = isLastRow ? "" : "border-b border-slate-300";
 
                         return (
-                            <>
-                                <div key={`l1-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
+                            <Fragment key={idx}>
+                                <div className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
                                     {label1}
                                 </div>
-                                <div key={`v1-${idx}`} className={`border-r ${borderB} px-3 py-2 text-slate-700`}>
+                                <div className={`border-r ${borderB} px-3 py-2 text-slate-700`}>
                                     {value1}
                                 </div>
-                                <div key={`l2-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
+                                <div className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
                                     {label2}
                                 </div>
-                                <div key={`v2-${idx}`} className={`${borderB} px-3 py-2 text-slate-700`}>
+                                <div className={`${borderB} px-3 py-2 text-slate-700`}>
                                     {value2}
                                 </div>
-                            </>
+                            </Fragment>
                         );
                     })}
                 </div>
@@ -178,8 +186,8 @@ const PrintPayslip = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {earningsRows.map((row) => (
-                                <tr key={row.label} className="border-b border-slate-300">
+                            {earningsRows.map((row, index) => (
+                                <tr key={index} className="border-b border-slate-300">
                                     <td className="px-3 py-2 text-slate-700">{row.label}</td>
                                     <td className="px-3 py-2 text-right text-slate-900">{Number(row.value).toLocaleString()}</td>
                                 </tr>
@@ -202,8 +210,8 @@ const PrintPayslip = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {deductionsRows.map((row) => (
-                                <tr key={row.label} className="border-b border-slate-300">
+                            {deductionsRows.map((row, index) => (
+                                <tr key={index} className="border-b border-slate-300">
                                     <td className="px-3 py-2 text-slate-700">{row.label}</td>
                                     <td className="px-3 py-2 text-right text-slate-900">{Number(row.value).toLocaleString()}</td>
                                 </tr>

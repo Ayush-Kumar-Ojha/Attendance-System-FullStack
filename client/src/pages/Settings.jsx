@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react";
-import { Lock, MapPin, Plus, Trash2, Crosshair, Building2 } from "lucide-react";
+import {
+  Lock,
+  MapPin,
+  Plus,
+  Trash2,
+  Crosshair,
+  Building2,
+  FileText,
+  Upload,
+  Download,
+  FolderOpen,
+} from "lucide-react";
 import Loading from "../components/Loading";
 import ProfileForm from "../components/ProfileForm";
 import ChangePasswordModal from "../components/ChangePasswordModal";
@@ -29,6 +40,17 @@ const Settings = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // Attached Documents State
+  const [docName, setDocName] = useState("");
+  const [docFile, setDocFile] = useState(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Admin Employee Documents Explorer State
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [selectedEmpId, setSelectedEmpId] = useState("");
+  const [selectedEmpDocs, setSelectedEmpDocs] = useState([]);
+  const [loadingEmpDocs, setLoadingEmpDocs] = useState(false);
 
   // Admin Office Locations State
   const [offices, setOffices] = useState(() => {
@@ -70,7 +92,72 @@ const Settings = () => {
     fetchProfile();
   }, [user]);
 
-  // Save Offices to LocalStorage
+  // Load employee list for Admin documents explorer
+  useEffect(() => {
+    if (isAdmin) {
+      api.get("/employees")
+        .then((res) => {
+          const list = Array.isArray(res.data) ? res.data : [];
+          setAllEmployees(list.filter((e) => !e.isDeleted));
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [isAdmin]);
+
+  // Admin: Fetch selected employee's documents
+  const fetchEmployeeDocs = async (empId) => {
+    if (!empId) {
+      setSelectedEmpDocs([]);
+      return;
+    }
+    setLoadingEmpDocs(true);
+    try {
+      const res = await api.get(`/employees/${empId}/documents`);
+      setSelectedEmpDocs(res.data?.documents || []);
+    } catch (err) {
+      toast.error("Failed to load documents for employee");
+    } finally {
+      setLoadingEmpDocs(false);
+    }
+  };
+
+  const handleUploadDocument = async (e) => {
+    e.preventDefault();
+    if (!docName.trim() || !docFile) {
+      toast.error("Please provide a document title and file");
+      return;
+    }
+
+    setUploadingDoc(true);
+    const formData = new FormData();
+    formData.append("documentName", docName.trim());
+    formData.append("cv", docFile); // Using "cv" matches Multer's allowed upload field
+
+    try {
+      await api.post("/profile", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Document attached successfully!");
+      setDocName("");
+      setDocFile(null);
+      fetchProfile();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to upload document");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await api.delete(`/profile/documents/${docId}`);
+      toast.success("Document removed");
+      fetchProfile();
+    } catch (err) {
+      toast.error("Failed to remove document");
+    }
+  };
+
   const saveOffices = (updatedOffices) => {
     setOffices(updatedOffices);
     localStorage.setItem("OFFICE_LOCATIONS", JSON.stringify(updatedOffices));
@@ -78,7 +165,6 @@ const Settings = () => {
 
   const handleAddOffice = (e) => {
     e.preventDefault();
-
     if (!newOffice.name || !newOffice.latitude || !newOffice.longitude) {
       toast.error("Please provide Name, Latitude, and Longitude");
       return;
@@ -106,7 +192,6 @@ const Settings = () => {
       toast.error("At least one office location must remain active");
       return;
     }
-
     const updated = offices.filter((o) => o.id !== id);
     saveOffices(updated);
     toast.success("Office location removed");
@@ -141,13 +226,184 @@ const Settings = () => {
   if (loading) return <Loading />;
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in space-y-8 pb-12">
       <div className="page-header">
         <h1 className="page-title">Settings</h1>
-        <p className="page-subtitle">Manage your account and preferences</p>
+        <p className="page-subtitle">Manage your account, documents, and preferences</p>
       </div>
 
       {profile && <ProfileForm initialData={profile} onSuccess={fetchProfile} />}
+
+      {/* MULTIPLE ATTACHED DOCUMENTS SECTION */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+          <div className="rounded-xl bg-indigo-100 p-2.5 text-indigo-600">
+            <FileText size={22} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              My Attached Documents
+            </h2>
+            <p className="text-xs text-slate-500">
+              Upload multiple official documents (Aadhaar, PAN, Certificates, Resumes, Passports)
+            </p>
+          </div>
+        </div>
+
+        {/* Upload Form */}
+        <form onSubmit={handleUploadDocument} className="mb-6 rounded-xl bg-slate-50 p-4 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              Document Name / Title *
+            </label>
+            <input
+              type="text"
+              value={docName}
+              onChange={(e) => setDocName(e.target.value)}
+              placeholder="e.g. Aadhaar Card / Degree Certificate"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              Select File *
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setDocFile(e.target.files[0])}
+              className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={uploadingDoc}
+            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            <Upload size={16} />
+            {uploadingDoc ? "Uploading..." : "Attach Document"}
+          </button>
+        </form>
+
+        {/* List of Attached Documents */}
+        {(!profile?.documents || profile.documents.length === 0) ? (
+          <p className="text-center text-xs text-slate-400 py-4">No extra documents attached yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {profile.documents.map((doc) => (
+              <div key={doc._id || doc.name} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
+                    <FileText size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{doc.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{doc.fileName}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
+                    title="Download document"
+                  >
+                    <Download size={16} />
+                  </a>
+                  <button
+                    onClick={() => handleDeleteDocument(doc._id)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition"
+                    title="Delete document"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ADMIN: EMPLOYEE DOCUMENTS EXPLORER */}
+      {isAdmin && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+            <div className="rounded-xl bg-indigo-100 p-2.5 text-indigo-600">
+              <FolderOpen size={22} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Employee Documents Explorer (Admin)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Select any employee to view and download all their uploaded documents.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-6 max-w-md">
+            <label className="block mb-2 text-xs font-semibold text-slate-700">
+              Select Employee
+            </label>
+            <select
+              value={selectedEmpId}
+              onChange={(e) => {
+                setSelectedEmpId(e.target.value);
+                fetchEmployeeDocs(e.target.value);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-indigo-500"
+            >
+              <option value="">-- Choose an Employee --</option>
+              {allEmployees.map((emp) => (
+                <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                  {emp.firstName} {emp.lastName} ({emp.employeeCode})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedEmpId && (
+            <div>
+              {loadingEmpDocs ? (
+                <p className="text-xs text-slate-400">Loading documents...</p>
+              ) : selectedEmpDocs.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4">No documents uploaded by this employee.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedEmpDocs.map((doc) => (
+                    <div key={doc._id || doc.name} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
+                          <FileText size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{doc.name}</p>
+                          <p className="text-[11px] text-slate-400 truncate">{doc.fileName}</p>
+                        </div>
+                      </div>
+
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                      >
+                        <Download size={14} />
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ADMIN: OFFICE LOCATIONS & GEOFENCING SECTION */}
       {isAdmin && (

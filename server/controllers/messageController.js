@@ -34,7 +34,9 @@ const getPersonInfo = async (userId) => {
 // ======================================
 export const getConversations = async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = (req.user?._id || req.user?.id || req.session?.userId)?.toString();
+        const userRole = req.user?.role || req.session?.role;
+        const isAdmin = userRole === "ADMIN";
 
         const conversations = await Conversation.find({
             participants: userId,
@@ -42,44 +44,46 @@ export const getConversations = async (req, res) => {
             .sort({ lastMessageAt: -1 })
             .lean();
 
-        const result = await Promise.all(
+        let result = await Promise.all(
             conversations.map(async (conversation) => {
                 const otherId = conversation.participants.find(
-                    (participant) =>
-                        participant.toString() !== userId
+                    (participant) => participant.toString() !== userId
                 );
 
                 if (!otherId) return null;
 
                 const otherPerson = await getPersonInfo(otherId);
 
-                const unreadCount =
-                    await Message.countDocuments({
-                        conversationId: conversation._id,
-                        senderId: { $ne: userId },
-                        readBy: { $ne: userId },
-                    });
+                const unreadCount = await Message.countDocuments({
+                    conversationId: conversation._id,
+                    senderId: { $ne: userId },
+                    readBy: { $ne: userId },
+                });
 
                 return {
                     id: conversation._id.toString(),
                     otherPerson,
-                    lastMessageText:
-                        conversation.lastMessageText || "",
+                    lastMessageText: conversation.lastMessageText || "",
                     lastMessageAt: conversation.lastMessageAt,
                     unreadCount,
                 };
             })
         );
 
+        result = result.filter(Boolean);
+
+        // Employees can ONLY view conversations with Admins
+        if (!isAdmin) {
+            result = result.filter(
+                (conv) => conv.otherPerson && conv.otherPerson.role === "ADMIN"
+            );
+        }
+
         return res.json({
-            data: result.filter(Boolean),
+            data: result,
         });
     } catch (error) {
-        console.error(
-            "Get Conversations Error:",
-            error
-        );
-
+        console.error("Get Conversations Error:", error);
         return res.status(500).json({
             error: "Failed to fetch conversations",
         });
@@ -91,7 +95,9 @@ export const getConversations = async (req, res) => {
 // ======================================
 export const getOrCreateConversation = async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = (req.user?._id || req.user?.id || req.session?.userId)?.toString();
+        const userRole = req.user?.role || req.session?.role;
+        const isAdmin = userRole === "ADMIN";
         const { otherUserId } = req.body;
 
         if (!otherUserId) {
@@ -104,6 +110,16 @@ export const getOrCreateConversation = async (req, res) => {
             return res.status(400).json({
                 error: "Cannot create conversation with yourself",
             });
+        }
+
+        // Non-admin employees are blocked from messaging other non-admin employees
+        if (!isAdmin) {
+            const targetUser = await User.findById(otherUserId).lean();
+            if (!targetUser || targetUser.role !== "ADMIN") {
+                return res.status(403).json({
+                    error: "Employees can only chat with Admins",
+                });
+            }
         }
 
         let conversation = await Conversation.findOne({
@@ -126,11 +142,7 @@ export const getOrCreateConversation = async (req, res) => {
             otherPerson,
         });
     } catch (error) {
-        console.error(
-            "Get Or Create Conversation Error:",
-            error
-        );
-
+        console.error("Get Or Create Conversation Error:", error);
         return res.status(500).json({
             error: "Failed to start conversation",
         });
@@ -142,17 +154,14 @@ export const getOrCreateConversation = async (req, res) => {
 // ======================================
 export const getMessages = async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = (req.user?._id || req.user?.id || req.session?.userId)?.toString();
 
-        const conversation = await Conversation.findById(
-            req.params.id
-        );
+        const conversation = await Conversation.findById(req.params.id);
 
         if (
             !conversation ||
             !conversation.participants.some(
-                (participant) =>
-                    participant.toString() === userId
+                (participant) => participant.toString() === userId
             )
         ) {
             return res.status(403).json({
@@ -189,7 +198,6 @@ export const getMessages = async (req, res) => {
         });
     } catch (error) {
         console.error("Get Messages Error:", error);
-
         return res.status(500).json({
             error: "Failed to fetch messages",
         });
@@ -201,7 +209,7 @@ export const getMessages = async (req, res) => {
 // ======================================
 export const sendMessage = async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = (req.user?._id || req.user?.id || req.session?.userId)?.toString();
         const { text } = req.body;
 
         if (!text || !text.trim()) {
@@ -210,15 +218,12 @@ export const sendMessage = async (req, res) => {
             });
         }
 
-        const conversation = await Conversation.findById(
-            req.params.id
-        );
+        const conversation = await Conversation.findById(req.params.id);
 
         if (
             !conversation ||
             !conversation.participants.some(
-                (participant) =>
-                    participant.toString() === userId
+                (participant) => participant.toString() === userId
             )
         ) {
             return res.status(403).json({
@@ -248,7 +253,6 @@ export const sendMessage = async (req, res) => {
         });
     } catch (error) {
         console.error("Send Message Error:", error);
-
         return res.status(500).json({
             error: "Failed to send message",
         });

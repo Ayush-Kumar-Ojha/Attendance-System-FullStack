@@ -146,7 +146,6 @@ const employeeSchema = new mongoose.Schema(
             default: null,
         },
 
-        // Existing special date
         anniversaryDate: {
             type: Date,
             default: null,
@@ -186,16 +185,54 @@ const employeeSchema = new mongoose.Schema(
             default: [],
         },
 
-                // ==============================
-        // Admin-defined custom fields, grouped by form section
+        // ==============================
+        // Multiple Attached Documents
+        // ==============================
+
+        documents: {
+            type: [
+                {
+                    name: { type: String, required: true },
+                    fileUrl: { type: String, required: true },
+                    fileName: { type: String, required: true },
+                    uploadedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
+
+        // ==============================
+        // Custom fields added inside standard sections
         // ==============================
 
         customFields: {
             type: [
                 {
-                    section: { type: String, required: true },
+                    section: { type: String, default: "personal" },
                     label: { type: String, required: true },
                     value: { type: String, default: "" },
+                },
+            ],
+            default: [],
+        },
+
+        // ==============================
+        // Admin-defined custom sections
+        // ==============================
+
+        customSections: {
+            type: [
+                {
+                    title: { type: String, required: true },
+                    fields: {
+                        type: [
+                            {
+                                label: { type: String, required: true },
+                                value: { type: String, default: "" },
+                            },
+                        ],
+                        default: [],
+                    },
                 },
             ],
             default: [],

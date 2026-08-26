@@ -6,13 +6,13 @@ import {
     CalendarDays,
     Send,
     AlertTriangle,
+    Clock,
 } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
 
-const MONTHLY_PAID_LEAVE_LIMIT = 3; // matches server/controllers/leaveController.js
+const MONTHLY_PAID_LEAVE_LIMIT = 3;
 
-// Same day-count logic as the backend (HALF_DAY = 0.5, else inclusive day span)
 const getLeaveDays = (leave) => {
     if (leave.type === "HALF_DAY") return 0.5;
     const start = new Date(leave.startDate);
@@ -21,7 +21,6 @@ const getLeaveDays = (leave) => {
     return diffDays;
 };
 
-// Sum of already-APPROVED leave days in the same month/year as `referenceDate`
 const getApprovedDaysInMonth = (leaves, referenceDate) => {
     const refMonth = referenceDate.getMonth();
     const refYear = referenceDate.getFullYear();
@@ -49,35 +48,42 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
     const minDate = tomorrow.toISOString().split("T")[0];
 
     const isHalfDay = leaveType === "HALF_DAY";
+    const isCompensatory = leaveType === "COMPENSATORY";
 
     const submitLeave = async (data) => {
         setLoading(true);
 
         try {
-            await api.post('/leave', data)
+            await api.post("/leave", data);
+            toast.success("Leave application submitted!");
             onSuccess();
             onClose();
         } catch (err) {
-            toast.error(err.response?.data?.error || err?.message)
+            toast.error(err.response?.data?.error || err?.message);
+        } finally {
+            setLoading(false);
         }
-        finally { setLoading(false) }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const formData = new FormData(e.currentTarget)
-        const data = Object.fromEntries(formData.entries())
+        const formData = new FormData(e.currentTarget);
+        const data = Object.fromEntries(formData.entries());
 
-        // For half day, force start and end date to be the same
-        if (isHalfDay) {
+        if (isHalfDay || isCompensatory) {
             data.endDate = data.startDate;
+        }
+
+        if (isCompensatory && !data.workedDate) {
+            toast.error("Please select the date on which you worked extra");
+            return;
         }
 
         const startDate = new Date(data.startDate);
         const takenDays = getApprovedDaysInMonth(leaves, startDate);
 
-        if (takenDays >= MONTHLY_PAID_LEAVE_LIMIT) {
+        if (!isCompensatory && takenDays >= MONTHLY_PAID_LEAVE_LIMIT) {
             setAlreadyTakenDays(takenDays);
             setPendingData(data);
             setShowLimitWarning(true);
@@ -96,11 +102,11 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-xs"
             onClick={onClose}
         >
             <div
-                className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in"
+                className="relative bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg animate-fade-in"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-6 pb-0">
@@ -108,7 +114,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         <h2 className="text-lg font-semibold text-slate-800">
                             Apply for Leave
                         </h2>
-
                         <p className="text-sm text-slate-400 mt-0.5">
                             Submit your leave request for approval
                         </p>
@@ -140,6 +145,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                             <option value="ANNUAL">Annual Leave</option>
                             <option value="MENSTRUAL">Menstrual Leave</option>
                             <option value="HALF_DAY">Half Day Leave</option>
+                            <option value="COMPENSATORY">Compensation Leave (Comp Off)</option>
                         </select>
                     </div>
 
@@ -156,14 +162,34 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         </div>
                     )}
 
+                    {/* Compensatory Leave Worked Date Picker */}
+                    {isCompensatory && (
+                        <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-3">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-900">
+                                <Clock className="w-4 h-4 text-indigo-600" />
+                                Date Worked Extra (Weekend / Holiday)
+                            </div>
+                            <input
+                                type="date"
+                                name="workedDate"
+                                required
+                                max={new Date().toISOString().split("T")[0]}
+                                className="w-full text-sm bg-white"
+                            />
+                            <p className="text-[11px] text-indigo-600">
+                                Select the Sunday, weekend, or holiday date you worked extra.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Duration */}
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                             <CalendarDays className="w-4 h-4 text-slate-400" />
-                            {isHalfDay ? "Date" : "Duration"}
+                            {isHalfDay || isCompensatory ? "Requested Leave Date" : "Duration"}
                         </label>
 
-                        {isHalfDay ? (
+                        {isHalfDay || isCompensatory ? (
                             <input
                                 type="date"
                                 name="startDate"
@@ -176,7 +202,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                                     <span className="block text-xs text-slate-400 mb-1">
                                         From
                                     </span>
-
                                     <input
                                         type="date"
                                         name="startDate"
@@ -189,7 +214,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                                     <span className="block text-xs text-slate-400 mb-1">
                                         To
                                     </span>
-
                                     <input
                                         type="date"
                                         name="endDate"
@@ -212,7 +236,11 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                             required
                             rows={3}
                             className="resize-none"
-                            placeholder="Briefly describe why you need this leave..."
+                            placeholder={
+                                isCompensatory
+                                    ? "Explain why you worked on the weekend/holiday..."
+                                    : "Briefly describe why you need this leave..."
+                            }
                         ></textarea>
                     </div>
 
@@ -236,7 +264,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                             ) : (
                                 <Send className="w-4 h-4" />
                             )}
-
                             {loading ? "Submitting..." : "Submit"}
                         </button>
                     </div>
@@ -246,11 +273,11 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
             {/* Monthly leave limit reminder */}
             {showLimitWarning && (
                 <div
-                    className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+                    className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/20"
                     onClick={() => setShowLimitWarning(false)}
                 >
                     <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in"
+                        className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-start gap-3 mb-4">
@@ -262,7 +289,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                                 <h3 className="text-base font-semibold text-slate-900">
                                     Monthly leave limit reached
                                 </h3>
-
                                 <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
                                     You've already taken <strong>{alreadyTakenDays}</strong> approved leave day
                                     {alreadyTakenDays === 1 ? "" : "s"} this month, which covers your paid leave allowance.

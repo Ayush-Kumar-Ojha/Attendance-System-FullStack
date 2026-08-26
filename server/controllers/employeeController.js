@@ -25,15 +25,16 @@ export const getEmployees = async (req, res) => {
 
         const result = employees.map((emp) => ({
             ...emp,
-
             id: emp._id.toString(),
-
             user: emp.userId
                 ? {
                     email: emp.userId.email,
                     role: emp.userId.role,
                 }
                 : null,
+            customFields: emp.customFields || [],
+            customSections: emp.customSections || [],
+            documents: emp.documents || [],
         }));
 
         return res.json(result);
@@ -47,6 +48,79 @@ export const getEmployees = async (req, res) => {
 };
 
 // ======================================
+// Get Employee By ID
+// GET /api/employees/:id
+// ======================================
+export const getEmployeeById = async (req, res) => {
+    try {
+        const employee = await Employee.findById(req.params.id)
+            .populate("userId", "email role")
+            .lean();
+
+        if (!employee || employee.isDeleted) {
+            return res.status(404).json({
+                error: "Employee not found",
+            });
+        }
+
+        return res.json({
+            ...employee,
+            id: employee._id.toString(),
+            user: employee.userId
+                ? {
+                    email: employee.userId.email,
+                    role: employee.userId.role,
+                }
+                : null,
+            customFields: employee.customFields || [],
+            customSections: employee.customSections || [],
+            documents: employee.documents || [],
+        });
+    } catch (error) {
+        console.error("Get Employee By ID Error:", error);
+
+        return res.status(500).json({
+            error: "Failed to fetch employee",
+        });
+    }
+};
+
+// ======================================
+// Get Documents for a specific employee (Admin view)
+// GET /api/employees/:id/documents
+// ======================================
+export const getEmployeeDocuments = async (req, res) => {
+    try {
+        const employee = await Employee.findById(req.params.id).lean();
+
+        if (!employee) {
+            return res.status(404).json({ error: "Employee not found" });
+        }
+
+        const docs = [...(employee.documents || [])];
+
+        // Include Resume/CV if present
+        if (employee.cvUrl) {
+            docs.unshift({
+                _id: "cv-resume",
+                name: "Resume / CV",
+                fileUrl: employee.cvUrl,
+                fileName: employee.cvFileName || "Resume.pdf",
+                uploadedAt: employee.updatedAt || employee.createdAt,
+            });
+        }
+
+        return res.json({
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            documents: docs,
+        });
+    } catch (error) {
+        console.error("Get Employee Documents Error:", error);
+        return res.status(500).json({ error: "Failed to fetch employee documents" });
+    }
+};
+
+// ======================================
 // Create Employee
 // POST /api/employees
 // ======================================
@@ -54,44 +128,31 @@ export const createEmployee = async (req, res) => {
     try {
         const {
             employeeCode,
-
             firstName,
             lastName,
-
             email,
             phone,
-
             gender,
             maritalStatus,
             aadharNumber,
-
             bankName,
             bankAccountNumber,
             uanNumber,
             panNumber,
-
             dateOfBirth,
             joinDate,
             confirmationDate,
-
             position,
             department,
-
             basicSalary,
             allowances,
             deductions,
-
             password,
             role,
-
             bio,
-
             customFields,
+            customSections,
         } = req.body;
-
-        // ==============================
-        // Validate required fields
-        // ==============================
 
         if (
             !employeeCode ||
@@ -114,10 +175,6 @@ export const createEmployee = async (req, res) => {
             });
         }
 
-        // ==============================
-        // Check Employee Code
-        // ==============================
-
         const existingEmployeeCode = await Employee.findOne({
             employeeCode: employeeCode.trim(),
         });
@@ -127,10 +184,6 @@ export const createEmployee = async (req, res) => {
                 error: "Employee code already exists",
             });
         }
-
-        // ==============================
-        // Check Email
-        // ==============================
 
         const existingUser = await User.findOne({
             email: email.trim().toLowerCase(),
@@ -142,15 +195,7 @@ export const createEmployee = async (req, res) => {
             });
         }
 
-        // ==============================
-        // Hash Password
-        // ==============================
-
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        // ==============================
-        // Create User
-        // ==============================
 
         const user = await User.create({
             email: email.trim().toLowerCase(),
@@ -159,54 +204,32 @@ export const createEmployee = async (req, res) => {
         });
 
         try {
-            // ==============================
-            // Create Employee
-            // ==============================
-
             const employee = await Employee.create({
                 userId: user._id,
-
                 employeeCode: employeeCode.trim(),
-
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
-
                 email: email.trim().toLowerCase(),
                 phone: phone.trim(),
-
                 gender,
                 maritalStatus: maritalStatus || null,
-
                 aadharNumber: aadharNumber.trim(),
-
                 bankName: bankName.trim(),
                 bankAccountNumber: bankAccountNumber.trim(),
                 uanNumber: uanNumber.trim(),
                 panNumber: panNumber.trim().toUpperCase(),
-
-                dateOfBirth: dateOfBirth
-                    ? new Date(dateOfBirth)
-                    : null,
-
+                dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
                 joinDate: new Date(joinDate),
-
-                confirmationDate: confirmationDate
-                    ? new Date(confirmationDate)
-                    : null,
-
+                confirmationDate: confirmationDate ? new Date(confirmationDate) : null,
                 position: position.trim(),
-
                 department: department || "Engineering",
-
                 basicSalary: Number(basicSalary) || 0,
                 allowances: Number(allowances) || 0,
                 deductions: Number(deductions) || 0,
-
                 bio: bio || "",
-
                 employmentStatus: "ACTIVE",
-
                 customFields: Array.isArray(customFields) ? customFields : [],
+                customSections: Array.isArray(customSections) ? customSections : [],
             });
 
             return res.status(201).json({
@@ -215,11 +238,7 @@ export const createEmployee = async (req, res) => {
                 employee,
             });
         } catch (employeeError) {
-            // If Employee creation fails,
-            // remove the User that was already created.
-
             await User.findByIdAndDelete(user._id);
-
             throw employeeError;
         }
     } catch (error) {
@@ -247,40 +266,31 @@ export const updateEmployee = async (req, res) => {
 
         const {
             employeeCode,
-
             firstName,
             lastName,
-
             email,
             phone,
-
             gender,
             maritalStatus,
             aadharNumber,
-
             bankName,
             bankAccountNumber,
             uanNumber,
             panNumber,
-
             dateOfBirth,
             joinDate,
             confirmationDate,
-
             position,
             department,
-
             basicSalary,
             allowances,
             deductions,
-
             password,
             role,
-
             bio,
             employmentStatus,
-
             customFields,
+            customSections,
         } = req.body;
 
         const employee = await Employee.findById(id);
@@ -290,10 +300,6 @@ export const updateEmployee = async (req, res) => {
                 error: "Employee not found",
             });
         }
-
-        // ==============================
-        // Check Employee Code
-        // ==============================
 
         if (employeeCode) {
             const existingCode = await Employee.findOne({
@@ -308,143 +314,50 @@ export const updateEmployee = async (req, res) => {
             }
         }
 
-        // ==============================
-        // Update Employee
-        // ==============================
-
-        await Employee.findByIdAndUpdate(
+        const updatedEmployee = await Employee.findByIdAndUpdate(
             id,
             {
-                employeeCode:
-                    employeeCode?.trim() ||
-                    employee.employeeCode,
-
-                firstName:
-                    firstName?.trim() ||
-                    employee.firstName,
-
-                lastName:
-                    lastName?.trim() ||
-                    employee.lastName,
-
-                email:
-                    email?.trim().toLowerCase() ||
-                    employee.email,
-
-                phone:
-                    phone?.trim() ||
-                    employee.phone,
-
-                gender:
-                    gender || employee.gender,
-
-                maritalStatus:
-                    maritalStatus || employee.maritalStatus,
-
-                aadharNumber:
-                    aadharNumber !== undefined && aadharNumber !== ""
-                        ? aadharNumber.trim()
-                        : employee.aadharNumber,
-
-                bankName:
-                    bankName !== undefined && bankName !== ""
-                        ? bankName.trim()
-                        : employee.bankName,
-
-                bankAccountNumber:
-                    bankAccountNumber !== undefined && bankAccountNumber !== ""
-                        ? bankAccountNumber.trim()
-                        : employee.bankAccountNumber,
-
-                uanNumber:
-                    uanNumber !== undefined && uanNumber !== ""
-                        ? uanNumber.trim()
-                        : employee.uanNumber,
-
-                panNumber:
-                    panNumber !== undefined && panNumber !== ""
-                        ? panNumber.trim().toUpperCase()
-                        : employee.panNumber,
-
-                dateOfBirth:
-                    dateOfBirth
-                        ? new Date(dateOfBirth)
-                        : employee.dateOfBirth,
-
-                joinDate:
-                    joinDate
-                        ? new Date(joinDate)
-                        : employee.joinDate,
-
-                confirmationDate:
-                    confirmationDate
-                        ? new Date(confirmationDate)
-                        : employee.confirmationDate,
-
-                position:
-                    position?.trim() ||
-                    employee.position,
-
-                department:
-                    department ||
-                    employee.department,
-
-                basicSalary:
-                    Number(basicSalary) || 0,
-
-                allowances:
-                    Number(allowances) || 0,
-
-                deductions:
-                    Number(deductions) || 0,
-
-                employmentStatus:
-                    employmentStatus ||
-                    employee.employmentStatus,
-
-                bio:
-                    bio !== undefined
-                        ? bio
-                        : employee.bio,
-
-                customFields: Array.isArray(customFields)
-                    ? customFields
-                    : employee.customFields,
+                employeeCode: employeeCode?.trim() || employee.employeeCode,
+                firstName: firstName?.trim() || employee.firstName,
+                lastName: lastName?.trim() || employee.lastName,
+                email: email?.trim().toLowerCase() || employee.email,
+                phone: phone?.trim() || employee.phone,
+                gender: gender || employee.gender,
+                maritalStatus: maritalStatus || employee.maritalStatus,
+                aadharNumber: aadharNumber !== undefined && aadharNumber !== "" ? aadharNumber.trim() : employee.aadharNumber,
+                bankName: bankName !== undefined && bankName !== "" ? bankName.trim() : employee.bankName,
+                bankAccountNumber: bankAccountNumber !== undefined && bankAccountNumber !== "" ? bankAccountNumber.trim() : employee.bankAccountNumber,
+                uanNumber: uanNumber !== undefined && uanNumber !== "" ? uanNumber.trim() : employee.uanNumber,
+                panNumber: panNumber !== undefined && panNumber !== "" ? panNumber.trim().toUpperCase() : employee.panNumber,
+                dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : employee.dateOfBirth,
+                joinDate: joinDate ? new Date(joinDate) : employee.joinDate,
+                confirmationDate: confirmationDate ? new Date(confirmationDate) : employee.confirmationDate,
+                position: position?.trim() || employee.position,
+                department: department || employee.department,
+                basicSalary: Number(basicSalary) || 0,
+                allowances: Number(allowances) || 0,
+                deductions: Number(deductions) || 0,
+                employmentStatus: employmentStatus || employee.employmentStatus,
+                bio: bio !== undefined ? bio : employee.bio,
+                customFields: Array.isArray(customFields) ? customFields : employee.customFields,
+                customSections: Array.isArray(customSections) ? customSections : employee.customSections,
             },
             { new: true }
         );
 
-        // ==============================
-        // Update User
-        // ==============================
-
         const userUpdate = {};
-
-        if (email) {
-            userUpdate.email = email.trim().toLowerCase();
-        }
-
-        if (role) {
-            userUpdate.role = role;
-        }
-
-        if (password) {
-            userUpdate.password = await bcrypt.hash(
-                password,
-                10
-            );
-        }
+        if (email) userUpdate.email = email.trim().toLowerCase();
+        if (role) userUpdate.role = role;
+        if (password) userUpdate.password = await bcrypt.hash(password, 10);
 
         if (Object.keys(userUpdate).length > 0) {
-            await User.findByIdAndUpdate(
-                employee.userId,
-                userUpdate
-            );
+            await User.findByIdAndUpdate(employee.userId, userUpdate);
         }
 
         return res.json({
             success: true,
             message: "Employee updated successfully",
+            employee: updatedEmployee,
         });
     } catch (error) {
         console.error("Update Employee Error:", error);
@@ -468,7 +381,6 @@ export const updateEmployee = async (req, res) => {
 export const deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-
         const employee = await Employee.findById(id);
 
         if (!employee) {
@@ -479,7 +391,6 @@ export const deleteEmployee = async (req, res) => {
 
         employee.isDeleted = true;
         employee.employmentStatus = "INACTIVE";
-
         await employee.save();
 
         return res.json({
@@ -499,14 +410,9 @@ export const deleteEmployee = async (req, res) => {
 // Get Public Employee Profile
 // GET /api/employees/:id/profile
 // ======================================
-export const getEmployeePublicProfile = async (
-    req,
-    res
-) => {
+export const getEmployeePublicProfile = async (req, res) => {
     try {
-        const employee = await Employee.findById(
-            req.params.id
-        ).lean();
+        const employee = await Employee.findById(req.params.id).lean();
 
         if (!employee) {
             return res.status(404).json({
@@ -516,26 +422,17 @@ export const getEmployeePublicProfile = async (
 
         return res.json({
             id: employee._id.toString(),
-
             employeeCode: employee.employeeCode,
-
             firstName: employee.firstName,
             lastName: employee.lastName,
-
             position: employee.position,
             department: employee.department,
-
             bio: employee.bio,
-
             image: employee.image || null,
-
             skills: employee.skills || [],
         });
     } catch (error) {
-        console.error(
-            "Get Employee Public Profile Error:",
-            error
-        );
+        console.error("Get Employee Public Profile Error:", error);
 
         return res.status(500).json({
             error: "Failed to fetch profile",
@@ -544,91 +441,51 @@ export const getEmployeePublicProfile = async (
 };
 
 // ======================================
-// Get Employee + Admin Directory
+// Get Employee Directory
 // GET /api/employees/directory
 // ======================================
-export const getEmployeeDirectory = async (
-    req,
-    res
-) => {
+export const getEmployeeDirectory = async (req, res) => {
     try {
-        const currentUserId = req.session.userId;
+        const currentUserId = (req.user?._id || req.user?.id || req.session?.userId)?.toString();
+        const userRole = req.user?.role || req.session?.role;
+        const isAdmin = userRole === "ADMIN";
 
-        // ==============================
-        // Employees
-        // ==============================
+        const admins = await User.find({ role: "ADMIN" })
+            .select("email image")
+            .lean();
+
+        const adminDirectory = admins
+            .filter((admin) => admin._id.toString() !== currentUserId)
+            .map((admin) => ({
+                userId: admin._id.toString(),
+                name: "Admin",
+                department: "Administration",
+                position: "Administrator",
+                image: admin.image || null,
+                role: "ADMIN",
+            }));
+
+        if (!isAdmin) {
+            return res.json(adminDirectory);
+        }
 
         const employees = await Employee.find({
             isDeleted: { $ne: true },
             employmentStatus: "ACTIVE",
         })
-            .select(
-                "employeeCode firstName lastName department image userId position"
-            )
+            .select("employeeCode firstName lastName department image userId position")
             .lean();
 
         const employeeDirectory = employees
-            .filter(
-                (employee) =>
-                    employee.userId &&
-                    employee.userId.toString() !==
-                    currentUserId
-            )
+            .filter((employee) => employee.userId && employee.userId.toString() !== currentUserId)
             .map((employee) => ({
-                userId:
-                    employee.userId.toString(),
-
-                employeeCode:
-                    employee.employeeCode,
-
+                userId: employee.userId.toString(),
+                employeeCode: employee.employeeCode,
                 name: `${employee.firstName} ${employee.lastName}`,
-
-                department:
-                    employee.department ||
-                    "Not specified",
-
-                position:
-                    employee.position ||
-                    "Employee",
-
-                image:
-                    employee.image || null,
-
+                department: employee.department || "Not specified",
+                position: employee.position || "Employee",
+                image: employee.image || null,
                 role: "EMPLOYEE",
-            }));
-
-        // ==============================
-        // Admins
-        // ==============================
-
-        const admins = await User.find({
-            role: "ADMIN",
-        })
-            .select("email image")
-            .lean();
-
-        const adminDirectory = admins
-            .filter(
-                (admin) =>
-                    admin._id.toString() !==
-                    currentUserId
-            )
-            .map((admin) => ({
-                userId:
-                    admin._id.toString(),
-
-                name: "Admin",
-
-                department:
-                    "Administration",
-
-                position:
-                    "Administrator",
-
-                image:
-                    admin.image || null,
-
-                role: "ADMIN",
             }));
 
         return res.json([
@@ -636,10 +493,7 @@ export const getEmployeeDirectory = async (
             ...employeeDirectory,
         ]);
     } catch (error) {
-        console.error(
-            "Get Employee Directory Error:",
-            error
-        );
+        console.error("Get Employee Directory Error:", error);
 
         return res.status(500).json({
             error: "Failed to fetch directory",
@@ -648,12 +502,78 @@ export const getEmployeeDirectory = async (
 };
 
 // ======================================
+// Export All Employees to Excel Data
+// GET /api/employees/export
+// ======================================
+export const exportEmployees = async (req, res) => {
+    try {
+        const employees = await Employee.find({ isDeleted: { $ne: true } })
+            .populate("userId", "email role")
+            .lean();
+
+        const exportData = employees.map((emp) => {
+            const row = {
+                "Employee Code": emp.employeeCode,
+                "First Name": emp.firstName,
+                "Last Name": emp.lastName,
+                "Work Email": emp.email,
+                "Phone Number": emp.phone,
+                "Gender": emp.gender,
+                "Marital Status": emp.maritalStatus || "-",
+                "Designation": emp.position,
+                "Department": emp.department,
+                "Basic Salary": emp.basicSalary,
+                "Allowances": emp.allowances,
+                "Deductions": emp.deductions,
+                "Bank Name": emp.bankName,
+                "Account Number": emp.bankAccountNumber,
+                "UAN Number": emp.uanNumber,
+                "PAN Number": emp.panNumber,
+                "Aadhaar Number": emp.aadharNumber,
+                "Joining Date": emp.joinDate ? new Date(emp.joinDate).toISOString().split("T")[0] : "-",
+                "Status": emp.employmentStatus,
+            };
+
+            // Include custom fields
+            (emp.customFields || []).forEach((cf) => {
+                if (cf.label) {
+                    row[`[Custom Field] ${cf.label}`] = cf.value || "";
+                }
+            });
+
+            // Include custom sections
+            (emp.customSections || []).forEach((cs) => {
+                (cs.fields || []).forEach((field) => {
+                    if (field.label) {
+                        row[`[${cs.title}] ${field.label}`] = field.value || "";
+                    }
+                });
+            });
+
+            return row;
+        });
+
+        const XLSX = await import("xlsx");
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+
+        const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", "attachment; filename=Employees_Export.xlsx");
+        return res.send(buffer);
+    } catch (error) {
+        console.error("Export Employees Error:", error);
+
+        return res.status(500).json({
+            error: "Failed to export employees",
+        });
+    }
+};
+
+// ======================================
 // Bulk Upload Employees via Excel Sheet
-// POST /api/employees/bulk-upload
-// Column headers must match the downloaded template exactly:
-// First Name | Last Name | Phone Number | Join Date (YYYY-MM-DD) |
-// Department | Designation | Basic Salary | Allowances | Deductions |
-// Work Email | Temporary Password | System Role (EMPLOYEE/ADMIN) | Bio (Optional)
 // ======================================
 export const bulkUploadEmployees = async (req, res) => {
     try {
@@ -821,6 +741,7 @@ export const bulkUploadEmployees = async (req, res) => {
         });
     } catch (error) {
         console.error("Bulk Upload Employees Error:", error);
+
         return res.status(500).json({
             error: "Failed to process the uploaded sheet",
         });

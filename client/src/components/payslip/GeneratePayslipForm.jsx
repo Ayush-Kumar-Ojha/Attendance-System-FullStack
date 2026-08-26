@@ -11,6 +11,7 @@ import {
     ShieldCheck,
     AlertTriangle,
     CheckCircle2,
+    Trash2,
 } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
@@ -143,13 +144,18 @@ const GeneratePayslipForm = ({
     const [siteAllowance, setSiteAllowance] = useState("0");
     const [conveyance, setConveyance] = useState("0");
 
+    // PF Employer Defaults to 1800 (Editable)
+    const [pfEmployer, setPfEmployer] = useState("1800");
     const [compInsurance, setCompInsurance] = useState("0");
-    const [medicalInsuranceEmployer, setMedicalInsuranceEmployer] =
-        useState("0");
+    const [medicalInsuranceEmployer, setMedicalInsuranceEmployer] = useState("0");
 
+    // PF Employee Defaults to 1800 (Editable)
+    const [pfEmployee, setPfEmployee] = useState("1800");
     const [professionalTax, setProfessionalTax] = useState("0");
-    const [medicalInsuranceEmployee, setMedicalInsuranceEmployee] =
-        useState("0");
+    const [medicalInsuranceEmployee, setMedicalInsuranceEmployee] = useState("0");
+
+    // Dynamic Custom Fields State
+    const [customFields, setCustomFields] = useState([]);
 
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [hasPreviousData, setHasPreviousData] = useState(false);
@@ -214,10 +220,13 @@ const GeneratePayslipForm = ({
             setSpecialAllowance("0");
             setSiteAllowance("0");
             setConveyance("0");
+            setPfEmployer("1800");
             setCompInsurance("0");
             setMedicalInsuranceEmployer("0");
+            setPfEmployee("1800");
             setProfessionalTax("0");
             setMedicalInsuranceEmployee("0");
+            setCustomFields([]);
 
             return;
         }
@@ -242,12 +251,24 @@ const GeneratePayslipForm = ({
             String(previous.conveyance ?? 0)
         );
 
+        setPfEmployer(
+            previous.pfEmployerContribution !== undefined
+                ? String(previous.pfEmployerContribution)
+                : "1800"
+        );
+
         setCompInsurance(
             String(previous.compensationInsurance ?? 0)
         );
 
         setMedicalInsuranceEmployer(
             String(previous.medicalInsuranceEmployer ?? 0)
+        );
+
+        setPfEmployee(
+            previous.pfEmployeeContribution !== undefined
+                ? String(previous.pfEmployeeContribution)
+                : "1800"
         );
 
         setProfessionalTax(
@@ -257,6 +278,36 @@ const GeneratePayslipForm = ({
         setMedicalInsuranceEmployee(
             String(previous.medicalInsuranceEmployee ?? 0)
         );
+
+        if (Array.isArray(previous.customFields)) {
+            setCustomFields(
+                previous.customFields.map((cf) => ({
+                    label: cf.label,
+                    value: String(cf.value),
+                    type: cf.type || "EARNING",
+                }))
+            );
+        } else {
+            setCustomFields([]);
+        }
+    };
+
+    /* =====================================================
+       Custom Fields Handlers
+    ===================================================== */
+
+    const addCustomField = (type = "EARNING") => {
+        setCustomFields([...customFields, { label: "", value: "0", type }]);
+    };
+
+    const updateCustomField = (index, key, value) => {
+        const updated = [...customFields];
+        updated[index][key] = value;
+        setCustomFields(updated);
+    };
+
+    const removeCustomField = (index) => {
+        setCustomFields(customFields.filter((_, i) => i !== index));
     };
 
     /* =====================================================
@@ -271,14 +322,23 @@ const GeneratePayslipForm = ({
     const site = parseFloat(siteAllowance) || 0;
     const conveyanceValue = parseFloat(conveyance) || 0;
 
+    const customEarningsTotal = customFields
+        .filter((cf) => cf.type === "EARNING")
+        .reduce((sum, cf) => sum + (parseFloat(cf.value) || 0), 0);
+
+    const customDeductionsTotal = customFields
+        .filter((cf) => cf.type === "DEDUCTION")
+        .reduce((sum, cf) => sum + (parseFloat(cf.value) || 0), 0);
+
     const grossSalary =
         basic +
         hra +
         special +
         site +
-        conveyanceValue;
+        conveyanceValue +
+        customEarningsTotal;
 
-    const pfEmployer = basic * 0.12;
+    const pfEmployerValue = parseFloat(pfEmployer) || 1800;
 
     const compensationInsurance =
         parseFloat(compInsurance) || 0;
@@ -288,11 +348,11 @@ const GeneratePayslipForm = ({
 
     const ctc =
         grossSalary +
-        pfEmployer +
+        pfEmployerValue +
         compensationInsurance +
         employerMedicalInsurance;
 
-    const pfEmployee = basic * 0.12;
+    const pfEmployeeValue = parseFloat(pfEmployee) || 1800;
 
     const professionalTaxValue =
         parseFloat(professionalTax) || 0;
@@ -301,15 +361,17 @@ const GeneratePayslipForm = ({
         parseFloat(medicalInsuranceEmployee) || 0;
 
     const totalDeductions =
-        pfEmployee +
+        pfEmployeeValue +
         professionalTaxValue +
-        employeeMedicalInsurance;
+        employeeMedicalInsurance +
+        customDeductionsTotal;
 
     const totalAllowances =
         hra +
         special +
         site +
-        conveyanceValue;
+        conveyanceValue +
+        customEarningsTotal;
 
     const netSalary =
         grossSalary - totalDeductions;
@@ -327,11 +389,15 @@ const GeneratePayslipForm = ({
         setSiteAllowance("0");
         setConveyance("0");
 
+        setPfEmployer("1800");
         setCompInsurance("0");
         setMedicalInsuranceEmployer("0");
 
+        setPfEmployee("1800");
         setProfessionalTax("0");
         setMedicalInsuranceEmployee("0");
+
+        setCustomFields([]);
 
         setHasPreviousData(false);
         setShowConfirmation(false);
@@ -351,10 +417,6 @@ const GeneratePayslipForm = ({
         setEmployeeSearch("");
         setShowDropdown(false);
 
-        /*
-         * Automatically load latest payslip data
-         * for this employee.
-         */
         autofillFromPreviousPayslip(id);
     };
 
@@ -375,15 +437,19 @@ const GeneratePayslipForm = ({
             return;
         }
 
-        /*
-         * Do NOT immediately generate.
-         * First show confirmation.
-         */
         setShowConfirmation(true);
     };
 
     const confirmGenerate = async () => {
         setLoading(true);
+
+        const formattedCustomFields = customFields
+            .filter((cf) => cf.label.trim() !== "")
+            .map((cf) => ({
+                label: cf.label.trim(),
+                value: parseFloat(cf.value) || 0,
+                type: cf.type || "EARNING",
+            }));
 
         const data = {
             employeeId,
@@ -400,7 +466,7 @@ const GeneratePayslipForm = ({
             allowances: totalAllowances,
             grossSalary,
 
-            pfEmployerContribution: pfEmployer,
+            pfEmployerContribution: pfEmployerValue,
 
             compensationInsurance,
             medicalInsuranceEmployer:
@@ -408,7 +474,7 @@ const GeneratePayslipForm = ({
 
             ctc,
 
-            pfEmployeeContribution: pfEmployee,
+            pfEmployeeContribution: pfEmployeeValue,
 
             professionalTax:
                 professionalTaxValue,
@@ -419,6 +485,8 @@ const GeneratePayslipForm = ({
             deductions: totalDeductions,
 
             netSalary,
+
+            customFields: formattedCustomFields,
         };
 
         try {
@@ -778,21 +846,15 @@ const GeneratePayslipForm = ({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                                            PF Employer Contribution
-                                        </label>
-
-                                        <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700">
-                                            ₹
-                                            {pfEmployer.toLocaleString(
-                                                "en-IN",
-                                                {
-                                                    maximumFractionDigits: 0,
-                                                }
-                                            )}
-                                        </div>
-                                    </div>
+                                    {/* Editable PF Employer Contribution */}
+                                    <Field
+                                        label="PF Employer Contribution"
+                                        value={pfEmployer}
+                                        onChange={(e) =>
+                                            setPfEmployer(e.target.value)
+                                        }
+                                        prefix="₹"
+                                    />
 
                                     <Field
                                         label="Compensation Insurance"
@@ -843,21 +905,15 @@ const GeneratePayslipForm = ({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                                            PF Employee Contribution
-                                        </label>
-
-                                        <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700">
-                                            ₹
-                                            {pfEmployee.toLocaleString(
-                                                "en-IN",
-                                                {
-                                                    maximumFractionDigits: 0,
-                                                }
-                                            )}
-                                        </div>
-                                    </div>
+                                    {/* Editable PF Employee Contribution */}
+                                    <Field
+                                        label="PF Employee Contribution"
+                                        value={pfEmployee}
+                                        onChange={(e) =>
+                                            setPfEmployee(e.target.value)
+                                        }
+                                        prefix="₹"
+                                    />
 
                                     <Field
                                         label="Professional Tax"
@@ -891,6 +947,125 @@ const GeneratePayslipForm = ({
                                     />
 
                                 </div>
+
+                            </div>
+
+                            {/* =================================================
+                                CUSTOM PAYSLIP FIELDS (EARNINGS & DEDUCTIONS)
+                            ================================================= */}
+
+                            <div className="border border-slate-200 rounded-xl p-5">
+
+                                <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+
+                                    <div>
+                                        <h4 className="text-sm font-bold text-slate-900">
+                                            Custom Payslip Fields
+                                        </h4>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Add custom earnings or deductions to the payslip.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => addCustomField("EARNING")}
+                                            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-semibold flex items-center gap-1 border border-indigo-200"
+                                        >
+                                            <Plus size={14} /> + Earning
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => addCustomField("DEDUCTION")}
+                                            className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold flex items-center gap-1 border border-rose-200"
+                                        >
+                                            <Plus size={14} /> + Deduction
+                                        </button>
+                                    </div>
+
+                                </div>
+
+                                {customFields.length === 0 ? (
+                                    <p className="text-center text-xs text-slate-400 py-3">
+                                        No custom fields added yet. Click above to add a custom earning or deduction.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {customFields.map((cf, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200"
+                                            >
+                                                <div className="flex-1">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Field Name (e.g. Bonus, Performance Allowance)"
+                                                        value={cf.label}
+                                                        onChange={(e) =>
+                                                            updateCustomField(
+                                                                index,
+                                                                "label",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-full text-xs font-semibold bg-white border border-slate-300 rounded-md px-2.5 py-1.5 outline-none focus:border-indigo-500"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="w-28">
+                                                    <select
+                                                        value={cf.type}
+                                                        onChange={(e) =>
+                                                            updateCustomField(
+                                                                index,
+                                                                "type",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-full text-xs bg-white border border-slate-300 rounded-md px-2 py-1.5 outline-none"
+                                                    >
+                                                        <option value="EARNING">
+                                                            Earning (+)
+                                                        </option>
+                                                        <option value="DEDUCTION">
+                                                            Deduction (-)
+                                                        </option>
+                                                    </select>
+                                                </div>
+
+                                                <div className="w-32 relative">
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                                                        ₹
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        value={cf.value}
+                                                        onChange={(e) =>
+                                                            updateCustomField(
+                                                                index,
+                                                                "value",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                        className="w-full text-xs font-semibold pl-6 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-md outline-none focus:border-indigo-500"
+                                                    />
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeCustomField(index)
+                                                    }
+                                                    className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 
                             </div>
 
