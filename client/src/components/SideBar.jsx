@@ -46,7 +46,6 @@ const SideBar = () => {
       });
   }, []);
 
-  // Close mobile sidebar whenever route changes
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
@@ -90,28 +89,18 @@ const SideBar = () => {
       icon: DollarSignIcon,
     },
 
-    // =========================
-    // NEW - BILL CLAIMS
-    // =========================
     {
       name: "Bill Claims",
       href: "/bill-claims",
       icon: ReceiptTextIcon,
     },
 
-    // =========================
-    // NEW - ADVANCE REQUESTS
-    // =========================
     {
       name: "Advance",
       href: "/advance",
       icon: HandCoinsIcon,
     },
 
-    // =========================
-    // NEW - GATE PASS
-    // Visible to both Admin and Employee
-    // =========================
     {
       name: "Gate Pass",
       href: "/gate-pass",
@@ -124,7 +113,10 @@ const SideBar = () => {
       icon: MegaphoneIcon,
     },
 
-    {
+    // ============================================
+    // SPECIAL DATES — VISIBLE ONLY TO ADMIN PORTAL
+    // ============================================
+    role === "ADMIN" && {
       name: "Special Dates",
       href: "/special-dates",
       icon: GiftIcon,
@@ -150,9 +142,6 @@ const SideBar = () => {
 
   const sidebarContent = (
     <>
-      {/* =========================
-          BRAND HEADER
-      ========================= */}
       <div className="px-5 pt-6 pb-5 border-b border-white/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -169,7 +158,6 @@ const SideBar = () => {
             </div>
           </div>
 
-          {/* Mobile close */}
           <button
             onClick={() => setMobileOpen(false)}
             className="lg:hidden text-slate-400 hover:text-white p-1"
@@ -179,9 +167,6 @@ const SideBar = () => {
         </div>
       </div>
 
-      {/* =========================
-          USER PROFILE
-      ========================= */}
       {userName && (
         <div className="mx-3 mt-4 mb-1 p-3 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-3">
@@ -204,18 +189,12 @@ const SideBar = () => {
         </div>
       )}
 
-      {/* =========================
-          SECTION LABEL
-      ========================= */}
       <div className="px-5 pt-5 pb-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           Navigation
         </p>
       </div>
 
-      {/* =========================
-          NAVIGATION
-      ========================= */}
       <div className="flex-1 px-3 space-y-1 overflow-y-auto">
         {loading ? (
           <div className="px-3 py-3 flex items-center gap-2 text-slate-500">
@@ -239,7 +218,6 @@ const SideBar = () => {
                     : "text-slate-300 hover:bg-white/5"
                 }`}
               >
-                {/* Active indicator */}
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
                 )}
@@ -265,9 +243,6 @@ const SideBar = () => {
         )}
       </div>
 
-      {/* =========================
-          LOGOUT
-      ========================= */}
       <div className="p-3 border-t border-white/6">
         <button
           onClick={handleLogout}
@@ -285,9 +260,6 @@ const SideBar = () => {
 
   return (
     <>
-      {/* =========================
-          MOBILE HAMBURGER
-      ========================= */}
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden print:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 text-white rounded-lg shadow-lg border border-white/10"
@@ -295,9 +267,6 @@ const SideBar = () => {
         <MenuIcon size={20} />
       </button>
 
-      {/* =========================
-          MOBILE OVERLAY
-      ========================= */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
@@ -305,16 +274,10 @@ const SideBar = () => {
         />
       )}
 
-      {/* =========================
-          DESKTOP SIDEBAR
-      ========================= */}
       <aside className="hidden lg:flex flex-col h-full w-[260px] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white shrink-0 border-r border-white/10">
         {sidebarContent}
       </aside>
 
-      {/* =========================
-          MOBILE SIDEBAR
-      ========================= */}
       <aside
         className={`lg:hidden fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white z-50 flex flex-col transform transition-transform duration-300 ${
           mobileOpen

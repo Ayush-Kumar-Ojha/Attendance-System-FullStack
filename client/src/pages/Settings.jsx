@@ -149,12 +149,35 @@ const Settings = () => {
   };
 
   const handleDeleteDocument = async (docId) => {
+    if (!docId) {
+      toast.error("Invalid document");
+      return;
+    }
+
     try {
       await api.delete(`/profile/documents/${docId}`);
-      toast.success("Document removed");
-      fetchProfile();
-    } catch (err) {
-      toast.error("Failed to remove document");
+
+      // Remove document immediately from profile state
+      setProfile((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          documents: (prev.documents || []).filter(
+            (doc) => String(doc._id) !== String(docId)
+          ),
+        };
+      });
+
+      toast.success("Document removed successfully");
+    } catch (error) {
+      console.error("Delete document error:", error);
+
+      toast.error(
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to remove document"
+      );
     }
   };
 
@@ -316,6 +339,7 @@ const Settings = () => {
                     <Download size={16} />
                   </a>
                   <button
+                    type="button"
                     onClick={() => handleDeleteDocument(doc._id)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition"
                     title="Delete document"

@@ -8,6 +8,7 @@ import {
     updateBillClaimStatus,
     generateBillVoucher,
     getBillVoucherById,
+    markTrackingStep,
 } from "../controllers/billClaimController.js";
 
 const router = Router();
@@ -44,6 +45,14 @@ router.post(
     protect,
     protectAdmin,
     generateBillVoucher
+);
+
+// Admin manually marks a tracking chain step as done
+router.patch(
+    "/:id/tracking/:step",
+    protect,
+    protectAdmin,
+    markTrackingStep
 );
 
 // Get a generated voucher (for the print page)

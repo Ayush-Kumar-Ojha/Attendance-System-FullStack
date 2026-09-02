@@ -5,10 +5,18 @@ import Employee from "../models/Employee.js";
 const EMPLOYEE_SELECT_FIELDS =
     "employeeCode firstName lastName department position image email phone joinDate panNumber uanNumber bankName bankAccountNumber";
 
+// Helper to safely extract user ID and role from JWT auth (req.user) or session (req.session)
+const getUserId = (req) =>
+    req.user?._id || req.user?.id || req.user?.userId || req.session?.userId;
+
+const getUserRole = (req) =>
+    (req.user?.role || req.session?.role || "").toUpperCase();
+
 // Employee/Admin - Get claims
 export const getBillClaims = async (req, res) => {
     try {
-        const isAdmin = req.session.role === "ADMIN";
+        const isAdmin = getUserRole(req) === "ADMIN";
+        const userId = getUserId(req);
 
         const {
             employeeId,
@@ -22,13 +30,17 @@ export const getBillClaims = async (req, res) => {
         // Employee can only see own claims
         if (!isAdmin) {
             const employee = await Employee.findOne({
-                userId: req.session.userId,
+                $or: [
+                    { userId },
+                    { _id: userId },
+                    ...(req.user?.email ? [{ email: req.user.email }] : []),
+                ],
                 isDeleted: { $ne: true },
             });
 
             if (!employee) {
                 return res.status(404).json({
-                    error: "Employee not found",
+                    error: "Employee profile not found",
                 });
             }
 
@@ -73,10 +85,11 @@ export const getBillClaims = async (req, res) => {
             ...claim,
             id: claim._id.toString(),
             employee: claim.employeeId,
-            employeeId: claim.employeeId?._id?.toString(),
+            employeeId: claim.employeeId?._id?.toString() || claim.employeeId,
         }));
 
         return res.json({
+            success: true,
             data,
         });
     } catch (error) {
@@ -88,15 +101,14 @@ export const getBillClaims = async (req, res) => {
     }
 };
 
-
 // Employee - Create claim
 export const createBillClaim = async (req, res) => {
     try {
         const { amount, reason } = req.body;
 
-        if (!amount) {
+        if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
             return res.status(400).json({
-                error: "Expense amount is required",
+                error: "Expense amount must be a valid positive number",
             });
         }
 
@@ -106,22 +118,42 @@ export const createBillClaim = async (req, res) => {
             });
         }
 
+        const userId = getUserId(req);
+
+        if (!userId) {
+            return res.status(401).json({
+                error: "User authentication failed. Please login again.",
+            });
+        }
+
         const employee = await Employee.findOne({
-            userId: req.session.userId,
+            $or: [
+                { userId },
+                { _id: userId },
+                ...(req.user?.email ? [{ email: req.user.email }] : []),
+            ],
             isDeleted: { $ne: true },
         });
 
         if (!employee) {
             return res.status(404).json({
-                error: "Employee not found",
+                error: "Employee profile not found for logged-in user",
+            });
+        }
+
+        const imagePath = req.file.path || req.file.secure_url || req.file.url || "";
+
+        if (!imagePath) {
+            return res.status(400).json({
+                error: "Failed to process uploaded bill image",
             });
         }
 
         const claim = await BillClaim.create({
             employeeId: employee._id,
             amount: Number(amount),
-            reason: reason || "",
-            billImage: req.file.path,
+            reason: reason ? String(reason).trim() : "",
+            billImage: imagePath,
         });
 
         const populated = await claim.populate(
@@ -129,19 +161,25 @@ export const createBillClaim = async (req, res) => {
             EMPLOYEE_SELECT_FIELDS
         );
 
+        const claimObj = populated.toObject();
+
         return res.status(201).json({
             success: true,
-            data: populated,
+            data: {
+                ...claimObj,
+                id: claimObj._id.toString(),
+                employee: claimObj.employeeId,
+                employeeId: claimObj.employeeId?._id?.toString() || claimObj.employeeId,
+            },
         });
     } catch (error) {
         console.error("Create Bill Claim Error:", error);
 
         return res.status(500).json({
-            error: "Failed to submit bill claim",
+            error: error.message || "Failed to submit bill claim",
         });
     }
 };
-
 
 // Admin - Approve / Reject
 export const updateBillClaimStatus = async (req, res) => {
@@ -162,10 +200,27 @@ export const updateBillClaimStatus = async (req, res) => {
             });
         }
 
+        const userId = getUserId(req);
+
         claim.status = status;
         claim.adminRemark = adminRemark || "";
         claim.reviewedAt = new Date();
-        claim.reviewedBy = req.session.userId;
+        claim.reviewedBy = userId || null;
+
+        if (status === "APPROVED" && claim.trackingChain?.length) {
+            const now = new Date();
+
+            claim.trackingChain.forEach((step) => {
+                if (
+                    (step.step === "UNDER_REVIEW" || step.step === "APPROVED") &&
+                    step.status !== "DONE"
+                ) {
+                    step.status = "DONE";
+                    step.completedAt = now;
+                    step.completedBy = userId || null;
+                }
+            });
+        }
 
         await claim.save();
 
@@ -183,10 +238,69 @@ export const updateBillClaimStatus = async (req, res) => {
     }
 };
 
-// ======================================
-// Admin - Generate a printable Bill Voucher for a claim
-// POST /api/bill-claims/:id/generate-voucher
-// ======================================
+// Admin - Manually mark tracking step as done
+export const markTrackingStep = async (req, res) => {
+    try {
+        const { id, step } = req.params;
+        const { notes } = req.body;
+
+        const claim = await BillClaim.findById(id);
+
+        if (!claim) {
+            return res.status(404).json({
+                error: "Bill claim not found",
+            });
+        }
+
+        const stepIndex = claim.trackingChain.findIndex(
+            (s) => s.step === step
+        );
+
+        if (stepIndex === -1) {
+            return res.status(400).json({
+                error: "Invalid tracking step",
+            });
+        }
+
+        if (claim.trackingChain[stepIndex].status === "DONE") {
+            return res.status(400).json({
+                error: "This step is already marked done",
+            });
+        }
+
+        const previousIncomplete = claim.trackingChain
+            .slice(0, stepIndex)
+            .some((s) => s.status !== "DONE");
+
+        if (previousIncomplete) {
+            return res.status(400).json({
+                error: "Complete the previous steps first",
+            });
+        }
+
+        const userId = getUserId(req);
+
+        claim.trackingChain[stepIndex].status = "DONE";
+        claim.trackingChain[stepIndex].completedAt = new Date();
+        claim.trackingChain[stepIndex].completedBy = userId || null;
+        claim.trackingChain[stepIndex].notes = notes || "";
+
+        await claim.save();
+
+        return res.json({
+            success: true,
+            data: claim.trackingChain,
+        });
+    } catch (error) {
+        console.error("Mark Tracking Step Error:", error);
+
+        return res.status(500).json({
+            error: "Failed to update tracking step",
+        });
+    }
+};
+
+// Admin - Generate printable voucher
 export const generateBillVoucher = async (req, res) => {
     try {
         const claim = await BillClaim.findById(req.params.id).populate(
@@ -217,9 +331,16 @@ export const generateBillVoucher = async (req, res) => {
             reason,
         } = req.body;
 
+        const userId = getUserId(req);
+
+        const depName = typeof department === "object"
+            ? (department?.department_name || department?.name || "")
+            : (department || (typeof emp.department === "object" ? (emp.department?.department_name || emp.department?.name || "") : (emp.department || "")));
+
         const voucher = await BillVoucher.create({
             billClaimId: claim._id,
-            employeeId: emp._id,
+            employeeId: emp._id || claim.employeeId,
+            referenceId: claim.referenceId || "",
 
             employeeCode: employeeCode || emp.employeeCode || "",
             employeeName:
@@ -231,7 +352,7 @@ export const generateBillVoucher = async (req, res) => {
                 ? new Date(joinDate)
                 : emp.joinDate || null,
             designation: designation || emp.position || "",
-            department: department || emp.department || "",
+            department: depName,
             panNumber: panNumber || emp.panNumber || "",
             uanNumber: uanNumber || emp.uanNumber || "",
             bankName: bankName || emp.bankName || "",
@@ -241,8 +362,11 @@ export const generateBillVoucher = async (req, res) => {
             amount: Number(amount) || claim.amount,
             reason: reason !== undefined ? reason : claim.reason,
 
-            generatedBy: req.session.userId,
+            generatedBy: userId || null,
         });
+
+        claim.billVoucherId = voucher._id;
+        await claim.save();
 
         return res.status(201).json({
             success: true,
@@ -260,10 +384,7 @@ export const generateBillVoucher = async (req, res) => {
     }
 };
 
-// ======================================
-// Get a Bill Voucher by ID (for print page)
-// GET /api/bill-claims/vouchers/:voucherId
-// ======================================
+// Get voucher by ID
 export const getBillVoucherById = async (req, res) => {
     try {
         const voucher = await BillVoucher.findById(
@@ -277,6 +398,11 @@ export const getBillVoucherById = async (req, res) => {
         }
 
         return res.json({
+            success: true,
+            data: {
+                ...voucher,
+                id: voucher._id.toString(),
+            },
             ...voucher,
             id: voucher._id.toString(),
         });

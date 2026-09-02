@@ -145,6 +145,7 @@ const Advance = () => {
 
     const updateStatus = async (status) => {
         if (!selectedRequest) return;
+        const reqId = selectedRequest.id || selectedRequest._id;
 
         if (status === "REJECTED" && !remark.trim()) {
             toast.error("Please enter a reason for rejection");
@@ -153,7 +154,7 @@ const Advance = () => {
 
         try {
             setActionLoading(true);
-            await api.put(`/advances/${selectedRequest.id}/status`, {
+            await api.put(`/advances/${reqId}/status`, {
                 status,
                 adminRemark: remark,
             });
@@ -179,6 +180,36 @@ const Advance = () => {
         }
     };
 
+    // Admin - Mark Tracking Step Completed
+    const handleMarkStepDone = async (reqId, stepKey) => {
+        try {
+            setActionLoading(true);
+            const response = await api.patch(
+                `/advances/${reqId}/tracking/${stepKey}`,
+                {}
+            );
+
+            toast.success("Tracking step marked as completed");
+
+            if (selectedRequest && (selectedRequest.id === reqId || selectedRequest._id === reqId)) {
+                setSelectedRequest((prev) => ({
+                    ...prev,
+                    trackingChain: response.data?.data || prev.trackingChain,
+                }));
+            }
+
+            await fetchRequests();
+        } catch (error) {
+            console.error("Mark Advance Tracking Step Error:", error);
+            toast.error(
+                error.response?.data?.error ||
+                    "Failed to update tracking step"
+            );
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const openVoucherForm = (request) => {
         const employee = request.employee || {};
 
@@ -190,7 +221,10 @@ const Advance = () => {
             phone: employee.phone || "",
             joinDate: formatDateInput(employee.joinDate),
             designation: employee.position || "",
-            department: employee.department || "",
+            department:
+                typeof employee.department === "object"
+                    ? employee.department?.department_name || employee.department?.name || ""
+                    : employee.department || "",
             panNumber: employee.panNumber || "",
             uanNumber: employee.uanNumber || "",
             bankName: employee.bankName || "",
@@ -213,16 +247,17 @@ const Advance = () => {
     const handleGenerateVoucher = async (event) => {
         event.preventDefault();
         if (!voucherRequest) return;
+        const reqId = voucherRequest.id || voucherRequest._id;
 
         try {
             setGeneratingVoucher(true);
 
             const response = await api.post(
-                `/advances/${voucherRequest.id}/generate-voucher`,
+                `/advances/${reqId}/generate-voucher`,
                 voucherFields
             );
 
-            const voucherId = response.data?.data?.id;
+            const voucherId = response.data?.data?.id || response.data?.data?._id;
 
             toast.success("Advance voucher generated");
             setShowVoucherForm(false);
@@ -247,6 +282,20 @@ const Advance = () => {
         }
     };
 
+    const openVoucher = (voucherId) => {
+        const id = typeof voucherId === "object" ? (voucherId._id || voucherId.id) : voucherId;
+
+        if (!id) {
+            toast.error("Voucher is not available");
+            return;
+        }
+
+        window.open(
+            `/print/advance-voucher/${id}`,
+            "_blank"
+        );
+    };
+
     const filteredRequests = useMemo(() => {
         if (!search.trim()) return requests;
 
@@ -260,7 +309,8 @@ const Advance = () => {
             return (
                 employeeName.includes(value) ||
                 request.reason?.toLowerCase().includes(value) ||
-                request.status?.toLowerCase().includes(value)
+                request.status?.toLowerCase().includes(value) ||
+                request.referenceId?.toLowerCase().includes(value)
             );
         });
     }, [requests, search]);
@@ -316,6 +366,7 @@ const Advance = () => {
         }
 
         const rows = filteredRequests.map((request) => ({
+            "Reference ID": request.referenceId || "",
             "Employee Code": request.employee?.employeeCode || "",
             "Employee Name": `${request.employee?.firstName || ""} ${request.employee?.lastName || ""}`.trim(),
             Designation: request.employee?.position || "",
@@ -439,7 +490,7 @@ const Advance = () => {
                     />
                 </div>
 
-                                {isAdmin && (
+                {isAdmin && (
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                         <div className="mb-2 flex items-center gap-2">
                             <Filter size={16} className="text-slate-500" />
@@ -459,7 +510,7 @@ const Advance = () => {
                                     onChange={(event) =>
                                         setSearch(event.target.value)
                                     }
-                                    placeholder="Search employee..."
+                                    placeholder="Search employee or ref..."
                                     className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                                 />
                             </div>
@@ -504,6 +555,7 @@ const Advance = () => {
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-violet-500"
                             >
+                                <option value="">All Years</option>
                                 {Array.from({ length: 6 }, (_, index) => {
                                     const year =
                                         currentDate.getFullYear() - index;
@@ -569,6 +621,7 @@ const Advance = () => {
                                 <table className="w-full">
                                     <thead className="bg-slate-50">
                                         <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th className="px-5 py-4">Ref ID</th>
                                             {isAdmin && (
                                                 <th className="px-5 py-4">
                                                     Employee
@@ -578,16 +631,9 @@ const Advance = () => {
                                             <th className="px-5 py-4">Amount</th>
                                             <th className="px-5 py-4">Reason</th>
                                             <th className="px-5 py-4">Status</th>
-                                            {isAdmin && (
-                                                <th className="px-5 py-4 text-left">
-                                                    Generate Advance
-                                                </th>
-                                            )}
-                                            {!isAdmin && (
-                                                <th className="px-5 py-4 text-left">
-                                                    Download Voucher
-                                                </th>
-                                            )}
+                                            <th className="px-5 py-4 text-left">
+                                                Voucher
+                                            </th>
                                             <th className="px-5 py-4 text-left">
                                                 Action
                                             </th>
@@ -596,9 +642,12 @@ const Advance = () => {
                                     <tbody className="divide-y divide-slate-100">
                                         {filteredRequests.map((request) => (
                                             <tr
-                                                key={request.id}
+                                                key={request.id || request._id}
                                                 className="transition hover:bg-slate-50"
                                             >
+                                                <td className="px-5 py-4 text-xs font-mono font-semibold text-violet-600">
+                                                    {request.referenceId || "—"}
+                                                </td>
                                                 {isAdmin && (
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-3">
@@ -634,46 +683,27 @@ const Advance = () => {
                                                         {request.status}
                                                     </span>
                                                 </td>
-                                                {isAdmin && (
-                                                    <td className="px-5 py-4 text-left">
-                                                        {request.status === "APPROVED" ? (
-                                                            request.advanceVoucherId ? (
-                                                                <button
-                                                                    onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                                                                >
-                                                                    <Download size={15} />
-                                                                    Download
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => openVoucherForm(request)}
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                                                                >
-                                                                    <FileSpreadsheet size={15} />
-                                                                    Generate
-                                                                </button>
-                                                            )
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400">&mdash;</span>
-                                                        )}
-                                                    </td>
-                                                )}
-                                                {!isAdmin && (
-                                                    <td className="px-5 py-4 text-left">
-                                                        {request.status === "APPROVED" && request.advanceVoucherId ? (
-                                                            <button
-                                                                onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                                                            >
-                                                                <Download size={15} />
-                                                                Download
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400">&mdash;</span>
-                                                        )}
-                                                    </td>
-                                                )}
+                                                <td className="px-5 py-4 text-left">
+                                                    {request.status === "APPROVED" && request.advanceVoucherId ? (
+                                                        <button
+                                                            onClick={() => openVoucher(request.advanceVoucherId)}
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                        >
+                                                            <Download size={15} />
+                                                            Download
+                                                        </button>
+                                                    ) : isAdmin && request.status === "APPROVED" ? (
+                                                        <button
+                                                            onClick={() => openVoucherForm(request)}
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                                                        >
+                                                            <FileSpreadsheet size={15} />
+                                                            Generate
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400">&mdash;</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-5 py-4 text-left">
                                                     <button
                                                         onClick={() => openDetails(request)}
@@ -691,9 +721,14 @@ const Advance = () => {
 
                             <div className="divide-y divide-slate-100 md:hidden">
                                 {filteredRequests.map((request) => (
-                                    <div key={request.id} className="p-4">
+                                    <div key={request.id || request._id} className="p-4">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
+                                                {request.referenceId && (
+                                                    <span className="mb-1 block text-xs font-mono font-semibold text-violet-600">
+                                                        {request.referenceId}
+                                                    </span>
+                                                )}
                                                 {isAdmin && (
                                                     <p className="font-semibold text-slate-800">
                                                         {request.employee?.firstName} {request.employee?.lastName}
@@ -725,33 +760,23 @@ const Advance = () => {
                                             </button>
                                         </div>
 
-                                        {isAdmin && request.status === "APPROVED" && (
-                                            request.advanceVoucherId ? (
-                                                <button
-                                                    onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
-                                                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
-                                                >
-                                                    <Download size={15} />
-                                                    Download Voucher
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => openVoucherForm(request)}
-                                                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
-                                                >
-                                                    <FileSpreadsheet size={15} />
-                                                    Generate Advance
-                                                </button>
-                                            )
-                                        )}
-
-                                        {!isAdmin && request.status === "APPROVED" && request.advanceVoucherId && (
+                                        {request.status === "APPROVED" && request.advanceVoucherId && (
                                             <button
-                                                onClick={() => window.open(`/print/advance-voucher/${request.advanceVoucherId}`, "_blank")}
+                                                onClick={() => openVoucher(request.advanceVoucherId)}
                                                 className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
                                             >
                                                 <Download size={15} />
-                                                Download
+                                                Download Voucher
+                                            </button>
+                                        )}
+
+                                        {isAdmin && request.status === "APPROVED" && !request.advanceVoucherId && (
+                                            <button
+                                                onClick={() => openVoucherForm(request)}
+                                                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
+                                            >
+                                                <FileSpreadsheet size={15} />
+                                                Generate Advance
                                             </button>
                                         )}
 
@@ -848,6 +873,7 @@ const Advance = () => {
                     title="Advance Request"
                     subtitle={`Submitted on ${formatDate(selectedRequest.createdAt)}`}
                     onClose={() => setShowDetails(false)}
+                    maxWidth="max-w-2xl"
                 >
                     <div className="space-y-5 p-5">
                         {isAdmin && (
@@ -861,6 +887,12 @@ const Advance = () => {
                                 <p className="text-sm text-slate-500">
                                     {selectedRequest.employee?.position}
                                 </p>
+
+                                {selectedRequest.referenceId && (
+                                    <p className="mt-2 text-xs font-mono font-semibold text-violet-600">
+                                        Reference: {selectedRequest.referenceId}
+                                    </p>
+                                )}
                             </div>
                         )}
 
@@ -874,6 +906,110 @@ const Advance = () => {
                                 {selectedRequest.status}
                             </span>
                         </div>
+
+                        {/* =========================================================
+                            PAYMENT PROGRESS TRACKER
+                        ========================================================= */}
+
+                        {selectedRequest.trackingChain && selectedRequest.trackingChain.length > 0 && (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                                <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                                    <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                        <Clock3 size={16} className="text-violet-600" />
+                                        Payment Progress Tracker
+                                    </h3>
+
+                                    {selectedRequest.referenceId && (
+                                        <span className="rounded-md bg-violet-100 px-2.5 py-1 font-mono text-xs font-bold text-violet-700">
+                                            {selectedRequest.referenceId}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="relative space-y-4 before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
+                                    {selectedRequest.trackingChain.map((stepItem, index) => {
+                                        const isDone = stepItem.status === "DONE";
+                                        const isPreviousDone =
+                                            index === 0 ||
+                                            selectedRequest.trackingChain[index - 1]?.status === "DONE";
+
+                                        const canMarkDone =
+                                            isAdmin && !isDone && isPreviousDone;
+
+                                        return (
+                                            <div
+                                                key={stepItem.step}
+                                                className="relative flex items-start gap-3.5 pl-1"
+                                            >
+                                                <div
+                                                    className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition ${
+                                                        isDone
+                                                            ? "bg-emerald-600 text-white ring-4 ring-emerald-50"
+                                                            : canMarkDone
+                                                            ? "bg-violet-600 text-white ring-4 ring-violet-50 animate-pulse"
+                                                            : "bg-slate-200 text-slate-500"
+                                                    }`}
+                                                >
+                                                    {isDone ? (
+                                                        <CheckCircle2 size={15} />
+                                                    ) : (
+                                                        index + 1
+                                                    )}
+                                                </div>
+
+                                                <div className="min-w-0 flex-1 pt-0.5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <p
+                                                            className={`text-sm font-semibold ${
+                                                                isDone
+                                                                    ? "text-emerald-900"
+                                                                    : canMarkDone
+                                                                    ? "text-violet-900"
+                                                                    : "text-slate-600"
+                                                            }`}
+                                                        >
+                                                            {stepItem.label}
+                                                        </p>
+
+                                                        {isDone && stepItem.completedAt && (
+                                                            <span className="text-xs text-slate-500">
+                                                                {formatDate(
+                                                                    stepItem.completedAt
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {stepItem.notes && (
+                                                        <p className="mt-1 text-xs italic text-slate-500">
+                                                            "{stepItem.notes}"
+                                                        </p>
+                                                    )}
+
+                                                    {canMarkDone && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleMarkStepDone(
+                                                                    selectedRequest.id ||
+                                                                        selectedRequest._id,
+                                                                    stepItem.step
+                                                                )
+                                                            }
+                                                            disabled={actionLoading}
+                                                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
+                                                        >
+                                                            <CheckCircle2 size={13} />
+                                                            Mark "{stepItem.label}" Completed
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                             <p className="mb-2 text-sm font-semibold text-slate-700">Reason</p>
@@ -922,17 +1058,17 @@ const Advance = () => {
                             </div>
                         )}
 
-                        {isAdmin && selectedRequest.status === "APPROVED" && (
+                        {selectedRequest.status === "APPROVED" && (
                             <div className="border-t border-slate-100 pt-5">
                                 {selectedRequest.advanceVoucherId ? (
                                     <button
-                                        onClick={() => window.open(`/print/advance-voucher/${selectedRequest.advanceVoucherId}`, "_blank")}
+                                        onClick={() => openVoucher(selectedRequest.advanceVoucherId)}
                                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
                                     >
                                         <Download size={18} />
                                         Download Voucher
                                     </button>
-                                ) : (
+                                ) : isAdmin ? (
                                     <button
                                         onClick={() => openVoucherForm(selectedRequest)}
                                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700"
@@ -940,7 +1076,7 @@ const Advance = () => {
                                         <FileSpreadsheet size={18} />
                                         Generate Advance
                                     </button>
-                                )}
+                                ) : null}
                             </div>
                         )}
                     </div>
@@ -1066,4 +1202,5 @@ const StatCard = ({ title, value, icon }) => (
         </div>
     </div>
 );
+
 export default Advance;

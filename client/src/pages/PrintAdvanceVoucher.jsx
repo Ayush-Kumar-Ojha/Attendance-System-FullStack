@@ -1,130 +1,443 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import Loading from '../components/Loading';
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
-import api from '../api/axios';
-import logo from '../assets/logo.jpg';
+import { ArrowLeft, Printer } from "lucide-react";
+import Loading from "../components/Loading";
+import api from "../api/axios";
+import logo from "../assets/logo.jpg";
 
 const PrintAdvanceVoucher = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
+
     const [voucher, setVoucher] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get(`/advances/vouchers/${id}`)
-           .then((res) => setVoucher(res.data))
-           .catch(console.error)
-           .finally(() => setLoading(false));
+        let mounted = true;
+
+        const fetchVoucher = async () => {
+            try {
+                setLoading(true);
+
+                const response = await api.get(
+                    `/advances/vouchers/${id}`
+                );
+
+                if (mounted) {
+                    setVoucher(response.data?.data || response.data);
+                }
+            } catch (error) {
+                console.error("Fetch Advance Voucher Error:", error);
+
+                if (mounted) {
+                    setVoucher(null);
+                }
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        if (id) {
+            fetchVoucher();
+        } else {
+            setLoading(false);
+        }
+
+        return () => {
+            mounted = false;
+        };
     }, [id]);
 
-    if (loading) return <Loading />;
-    if (!voucher) return <p className='text-center py-12 text-slate-400'>Voucher not found</p>;
+    const formatDate = (value, pattern = "d MMM yyyy") => {
+        if (!value) return "N/A";
 
-    const fmt = (val) => `₹${Number(val || 0).toLocaleString()}`;
+        try {
+            const date = new Date(value);
 
-    const dateOfJoining = voucher.joinDate
-        ? format(new Date(voucher.joinDate), "d/M/yyyy")
-        : 'N/A';
+            if (Number.isNaN(date.getTime())) {
+                return "N/A";
+            }
 
-    const generatedOn = voucher.createdAt
-        ? format(new Date(voucher.createdAt), "d MMM yyyy")
-        : '';
+            return format(date, pattern);
+        } catch {
+            return "N/A";
+        }
+    };
+
+    const formatCurrency = (value) => {
+        const amount = Number(value || 0);
+
+        return `₹${amount.toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    if (loading) {
+        return <Loading />;
+    }
+
+    if (!voucher) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+                <div className="rounded-2xl bg-white p-8 text-center shadow-lg">
+                    <h2 className="text-lg font-bold text-slate-800">
+                        Voucher not found
+                    </h2>
+
+                    <p className="mt-2 text-sm text-slate-500">
+                        The requested salary advance voucher could not
+                        be found.
+                    </p>
+
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 print:hidden"
+                    >
+                        <ArrowLeft size={16} />
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const dateOfJoining = formatDate(
+        voucher.joinDate,
+        "d/M/yyyy"
+    );
+
+    const generatedOn = formatDate(
+        voucher.createdAt,
+        "d MMM yyyy"
+    );
+
+    const voucherId = voucher._id || voucher.id || "";
 
     const summaryRows = [
-        ["Employee Code", voucher.employeeCode || 'N/A', "Employee Name", voucher.employeeName || 'N/A'],
-        ["Email ID", voucher.email || 'N/A', "Phone No", voucher.phone || 'N/A'],
-        ["Date of Joining", dateOfJoining, "Designation", voucher.designation || 'N/A'],
-        ["Department", voucher.department || 'N/A', "Bank Name", voucher.bankName || 'N/A'],
-        ["Bank A/C Number", voucher.bankAccountNumber || 'N/A', "UAN", voucher.uanNumber || 'N/A'],
-        ["PAN", voucher.panNumber || 'N/A', "", ""],
+        [
+            "Employee Code",
+            voucher.employeeCode || "N/A",
+            "Employee Name",
+            voucher.employeeName || "N/A",
+        ],
+        [
+            "Email ID",
+            voucher.email || "N/A",
+            "Phone No",
+            voucher.phone || "N/A",
+        ],
+        [
+            "Date of Joining",
+            dateOfJoining,
+            "Designation",
+            voucher.designation || "N/A",
+        ],
+        [
+            "Department",
+            voucher.department || "N/A",
+            "Bank Name",
+            voucher.bankName || "N/A",
+        ],
+        [
+            "Bank A/C Number",
+            voucher.bankAccountNumber || "N/A",
+            "UAN",
+            voucher.uanNumber || "N/A",
+        ],
+        [
+            "PAN",
+            voucher.panNumber || "N/A",
+            "",
+            "",
+        ],
     ];
 
     return (
-        <div className="max-w-3xl mx-auto p-8 bg-white animate-fade-in my-6 print:my-0">
+        <>
+            {/* Print-only document styling */}
+            <style>
+                {`
+                    @media print {
+                        @page {
+                            size: A4;
+                            margin: 12mm;
+                        }
 
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-                <img src={logo} alt="Wehark Solutions" className="h-10" />
-            </div>
+                        body {
+                            background: white !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
 
-            {/* Title Bar */}
-            <div className="border border-slate-800 bg-slate-100 py-2.5 text-center mb-0">
-                <h1 className="text-lg font-bold text-indigo-900 uppercase tracking-wide">
-                    Salary Advance Voucher
-                </h1>
-                {generatedOn && (
-                    <p className="text-xs text-slate-500 mt-0.5">Generated on {generatedOn}</p>
-                )}
-            </div>
+                        .print-document {
+                            width: 100% !important;
+                            max-width: none !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                        }
 
-            {/* Employee Summary */}
-            <div className="border border-t-0 border-slate-800">
-                <div className="bg-slate-200 border-b border-slate-800 px-3 py-1.5">
-                    <h2 className="font-bold text-slate-800 text-sm">Employee Details</h2>
+                        .print-hidden {
+                            display: none !important;
+                        }
+                    }
+                `}
+            </style>
+
+            <div className="min-h-screen bg-slate-100 px-4 py-6 print:bg-white print:p-0">
+                {/* Top actions */}
+                <div className="mx-auto mb-4 flex max-w-3xl items-center justify-between print-hidden">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    >
+                        <ArrowLeft size={16} />
+                        Back
+                    </button>
+
+                    <button
+                        onClick={handlePrint}
+                        className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
+                    >
+                        <Printer size={17} />
+                        Print Voucher
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-4 text-sm">
-                    {summaryRows.map(([label1, value1, label2, value2], idx) => {
-                        const isLastRow = idx === summaryRows.length - 1;
-                        const borderB = isLastRow ? "" : "border-b border-slate-300";
+                {/* Voucher */}
+                <div className="print-document mx-auto max-w-3xl bg-white p-8 shadow-xl print:p-0 print:shadow-none">
+                    {/* Header */}
+                    <div className="border-b-2 border-violet-900 pb-5">
+                        <div className="flex items-center justify-between gap-6">
+                            {/* Logo */}
+                            <div>
+                                <img
+                                    src={logo}
+                                    alt="Wehark Solutions"
+                                    className="h-12 w-auto object-contain"
+                                />
+                            </div>
 
-                        return (
-                            <>
-                                <div key={`l1-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
-                                    {label1}
-                                </div>
-                                <div key={`v1-${idx}`} className={`border-r ${borderB} px-3 py-2 text-slate-700`}>
-                                    {value1}
-                                </div>
-                                <div key={`l2-${idx}`} className={`border-r ${borderB} px-3 py-2 font-semibold text-slate-800 bg-slate-50`}>
-                                    {label2}
-                                </div>
-                                <div key={`v2-${idx}`} className={`${borderB} px-3 py-2 text-slate-700`}>
-                                    {value2}
-                                </div>
-                            </>
-                        );
-                    })}
+                            {/* Company document information */}
+                            <div className="text-right">
+                                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                                    Finance Department
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Salary Advance Voucher
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Title */}
+                    <div className="mt-5 border border-slate-800 bg-slate-100 px-4 py-3 text-center">
+                        <h1 className="text-lg font-bold uppercase tracking-wide text-violet-900">
+                            Salary Advance Voucher
+                        </h1>
+
+                        <div className="mt-1 flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-slate-500">
+                            {generatedOn && (
+                                <span>
+                                    Generated on:{" "}
+                                    <strong className="text-slate-700">
+                                        {generatedOn}
+                                    </strong>
+                                </span>
+                            )}
+
+                            {voucherId && (
+                                <span>
+                                    Voucher ID:{" "}
+                                    <strong className="text-slate-700">
+                                        {voucherId}
+                                    </strong>
+                                </span>
+                            )}
+
+                            {voucher.referenceId && (
+                                <span>
+                                    Advance Ref:{" "}
+                                    <strong className="text-slate-700">
+                                        {voucher.referenceId}
+                                    </strong>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Employee Details */}
+                    <div className="border border-t-0 border-slate-800">
+                        <div className="border-b border-slate-800 bg-slate-200 px-3 py-2">
+                            <h2 className="text-sm font-bold text-slate-800">
+                                Employee Details
+                            </h2>
+                        </div>
+
+                        <div className="grid grid-cols-4 text-sm">
+                            {summaryRows.map(
+                                (
+                                    [
+                                        label1,
+                                        value1,
+                                        label2,
+                                        value2,
+                                    ],
+                                    index
+                                ) => {
+                                    const isLastRow =
+                                        index ===
+                                        summaryRows.length - 1;
+
+                                    const borderBottom =
+                                        !isLastRow
+                                            ? "border-b border-slate-300"
+                                            : "";
+
+                                    return (
+                                        <div
+                                            key={`summary-row-${index}`}
+                                            className="contents"
+                                        >
+                                            <div
+                                                className={`border-r border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800 ${borderBottom}`}
+                                            >
+                                                {label1}
+                                            </div>
+
+                                            <div
+                                                className={`border-r border-slate-300 px-3 py-2 text-slate-700 ${borderBottom}`}
+                                            >
+                                                {value1}
+                                            </div>
+
+                                            <div
+                                                className={`border-r border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800 ${borderBottom}`}
+                                            >
+                                                {label2}
+                                            </div>
+
+                                            <div
+                                                className={`px-3 py-2 text-slate-700 ${borderBottom}`}
+                                            >
+                                                {value2}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Advance Request Details */}
+                    <div className="border border-t-0 border-slate-800">
+                        <div className="border-b border-slate-800 bg-slate-200 px-3 py-2">
+                            <h2 className="text-sm font-bold text-slate-800">
+                                Advance Request Details
+                            </h2>
+                        </div>
+
+                        <div className="grid grid-cols-2 text-sm">
+                            <div className="border-b border-r border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">
+                                Reason
+                            </div>
+
+                            <div className="border-b border-slate-300 px-3 py-2 text-slate-700">
+                                {voucher.reason || "N/A"}
+                            </div>
+
+                            <div className="border-r border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">
+                                Advance Amount
+                            </div>
+
+                            <div className="px-3 py-2 font-semibold text-slate-700">
+                                {formatCurrency(voucher.amount)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Amount Payable */}
+                    <div className="border border-t-0 border-slate-800 bg-violet-50 px-4 py-5 text-center">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                            Amount Payable
+                        </p>
+
+                        <p className="mt-1 text-xl font-bold text-slate-900">
+                            {formatCurrency(voucher.amount)} /-
+                        </p>
+                    </div>
+
+                    {/* Payment Information */}
+                    <div className="mt-5 border border-slate-300">
+                        <div className="border-b border-slate-300 bg-slate-100 px-3 py-2">
+                            <h2 className="text-sm font-bold text-slate-800">
+                                Payment Information
+                            </h2>
+                        </div>
+
+                        <div className="grid grid-cols-2 text-sm">
+                            <div className="border-b border-r border-slate-300 px-3 py-2 font-semibold text-slate-700">
+                                Bank Name
+                            </div>
+
+                            <div className="border-b border-slate-300 px-3 py-2 text-slate-700">
+                                {voucher.bankName || "N/A"}
+                            </div>
+
+                            <div className="border-r border-slate-300 px-3 py-2 font-semibold text-slate-700">
+                                Bank Account Number
+                            </div>
+
+                            <div className="px-3 py-2 text-slate-700">
+                                {voucher.bankAccountNumber || "N/A"}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Declaration */}
+                    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs leading-5 text-slate-600">
+                            This voucher has been generated through the
+                            employee management system based on the
+                            approved salary advance request.
+                        </p>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-8 border-t border-slate-200 pt-4 text-center">
+                        <p className="text-xs font-medium text-slate-500">
+                            This is a system generated voucher and does not
+                            require a signature.
+                        </p>
+
+                        <p className="mt-1 text-[10px] text-slate-400">
+                            Computer generated document • Salary Advance
+                        </p>
+                    </div>
+
+                    {/* Print button */}
+                    <div className="mt-8 text-center print-hidden">
+                        <button
+                            onClick={handlePrint}
+                            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-violet-700"
+                        >
+                            <Printer size={18} />
+                            Print Voucher
+                        </button>
+                    </div>
                 </div>
             </div>
-
-            {/* Advance Details */}
-            <div className="border border-t-0 border-slate-800">
-                <div className="bg-slate-200 border-b border-slate-800 px-3 py-1.5">
-                    <h2 className="font-bold text-slate-800 text-sm">Advance Details</h2>
-                </div>
-
-                <div className="grid grid-cols-2 text-sm">
-                    <div className="border-b border-r border-slate-300 px-3 py-2 font-semibold text-slate-800 bg-slate-50">Reason</div>
-                    <div className="border-b border-slate-300 px-3 py-2 text-slate-700">{voucher.reason || 'N/A'}</div>
-
-                    <div className="border-r border-slate-300 px-3 py-2 font-semibold text-slate-800 bg-slate-50">Advance Amount</div>
-                    <div className="px-3 py-2 text-slate-700 font-semibold">{fmt(voucher.amount)}</div>
-                </div>
-            </div>
-
-            {/* Net Payable */}
-            <div className="border border-t-0 border-slate-800 bg-amber-50 py-4 text-center">
-                <p className="font-bold text-slate-900 text-base">
-                    AMOUNT PAYABLE: {fmt(voucher.amount)} /-
-                </p>
-            </div>
-
-            {/* Footer */}
-            <p className="text-center text-xs text-slate-400 mt-6 border-t border-slate-200 pt-4">
-                This is a system generated voucher and does not require a signature.
-            </p>
-
-            {/* Print Button */}
-            <div className='text-center print:hidden mt-8'>
-                <button
-                    className='px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg shadow hover:bg-indigo-700 transition-colors'
-                    onClick={() => window.print()}
-                >
-                    Print Voucher
-                </button>
-            </div>
-        </div>
+        </>
     );
 };
 

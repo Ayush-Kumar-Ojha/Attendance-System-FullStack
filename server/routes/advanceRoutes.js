@@ -7,6 +7,7 @@ import {
     updateAdvanceStatus,
     generateAdvanceVoucher,
     getAdvanceVoucherById,
+    markAdvanceTrackingStep,
 } from "../controllers/advanceController.js";
 
 const router = Router();
@@ -24,6 +25,14 @@ router.put(
     protect,
     protectAdmin,
     updateAdvanceStatus
+);
+
+// Admin manually marks a tracking chain step as done
+router.patch(
+    "/:id/tracking/:step",
+    protect,
+    protectAdmin,
+    markAdvanceTrackingStep
 );
 
 // Admin generates a printable voucher for an advance request

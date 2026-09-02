@@ -1,48 +1,225 @@
 import * as XLSX from "xlsx";
 
-// Column headers must match exactly what the backend bulk-upload
-// parser expects (see employeeController.js -> bulkUploadEmployees)
-export const TEMPLATE_HEADERS = [
-    "First Name",
-    "Last Name",
+export const EMPLOYEE_COLUMNS = [
+    "Name",
+    "Father's Name",
+    "Gender",
+    "Blood Group",
+    "Date of Birth",
+    "Date of Joining",
+    "Birth Place",
+    "Nationality",
+    "Mother Tongue",
+    "Language",
     "Phone Number",
-    "Join Date (YYYY-MM-DD)",
+    "Passport Number",
+    "Identification Mark",
+    "Manpower Type",
+    "Vendor Code",
+    "Marital Status",
+    "Number of Children",
+
+    "Safety Issued Or Not",
+    "Shoe Size",
+    "Shoe Issue Date",
+    "Safety Helmet",
+    "Helmet Color",
+    "Helmet Issue Date",
+    "Jacket",
+    "Jacket Size",
+    "Jacket Issue Date",
+    "Eye Protection Equipment",
+
+    "Permanent Address Line 1",
+    "Permanent Address Line 2",
+    "Permanent City",
+    "Permanent Country",
+    "Permanent State",
+    "Permanent Pin Code",
+
+    "Present Address Line 1",
+    "Present Address Line 2",
+    "Present City",
+    "Village",
+    "Present Country",
+    "Present State",
+    "Present Pin Code",
+
+    "Mobile Number",
+
+    "Emergency Contact Person Name",
+    "Emergency Contact Person Relation",
+    "Emergency Contact Person Address",
+    "Emergency Mobile Number",
+
+    "Qualification",
+    "Specialization",
+    "College / School Name",
+    "Board / University Name",
+    "Year of Passing",
+
+    "Resume",
+    "Appointment Letter",
+    "Degree Certificate",
+    "KYC Document",
+    "Medical Certificate",
+    "Previous Employment Appointment Letter",
+    "Previous Employment Relevant Experience Letter",
+    "Police Verification",
+
+    "Bank Account Number",
+    "Bank Account Name",
+    "Bank Account Type",
+    "IFSC Code",
+    "Bank Name",
+    "Branch Name",
+    "UAN Number",
+    "PF Number",
+    "ESI Number",
+
+    // Existing system fields required by your EMS
+    "Employee Code",
+    "Employee Email ID",
     "Department",
     "Designation",
     "Basic Salary",
-    "Allowances",
+    "Allowance",
     "Deductions",
-    "Work Email",
     "Temporary Password",
-    "System Role (EMPLOYEE/ADMIN)",
-    "Bio (Optional)",
+    "System Role",
+
+    "Anniversary Date",
+    "Confirmation Date",
+    "Aadhaar Number",
+    "PAN Number",
+    "Bio",
 ];
 
 const EXAMPLE_ROW = [
-    "John",
-    "Doe",
+    "Rahul Sharma",
+    "Ramesh Sharma",
+    "MALE",
+    "O+",
+    "2000-05-15",
+    "2026-01-10",
+    "Bengaluru",
+    "Indian",
+    "Hindi",
+    "Hindi, English, Kannada",
     "9876543210",
-    "2025-01-15",
+    "",
+    "Mole on right hand",
+    "Direct",
+    "",
+    "SINGLE",
+    0,
+
+    "YES",
+    "9",
+    "2026-01-10",
+    "YES",
+    "Yellow",
+    "2026-01-10",
+    "YES",
+    "L",
+    "2026-01-10",
+    "YES",
+
+    "House No 10",
+    "MG Road",
+    "Bengaluru",
+    "India",
+    "Karnataka",
+    "560001",
+
+    "House No 10",
+    "MG Road",
+    "Bengaluru",
+    "",
+    "India",
+    "Karnataka",
+    "560001",
+
+    "9876543210",
+
+    "Ramesh Sharma",
+    "Father",
+    "Bengaluru",
+    "9876543211",
+
+    "B.Tech",
+    "Computer Science",
+    "ABC College",
+    "XYZ University",
+    "2025",
+
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+
+    "123456789012",
+    "Rahul Sharma",
+    "Savings",
+    "HDFC0001234",
+    "HDFC Bank",
+    "Bengaluru",
+    "100123456789",
+    "",
+    "",
+
+    "EMP001",
+    "rahul.sharma@company.com",
     "Engineering",
     "Software Engineer",
     50000,
     5000,
     0,
-    "john.doe@company.com",
     "TempPass123",
     "EMPLOYEE",
+
+    "",
+    "",
+    "",
+    "",
     "",
 ];
 
 export const downloadEmployeeTemplate = () => {
-    const worksheet = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS, EXAMPLE_ROW]);
+    const worksheet =
+        XLSX.utils.aoa_to_sheet([
+            EMPLOYEE_COLUMNS,
+            EXAMPLE_ROW,
+        ]);
 
-    worksheet["!cols"] = TEMPLATE_HEADERS.map((h) => ({
-        wch: Math.max(h.length, 18),
-    }));
+    worksheet["!cols"] =
+        EMPLOYEE_COLUMNS.map((header) => ({
+            wch: Math.max(
+                header.length + 3,
+                18
+            ),
+        }));
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+    worksheet["!freeze"] = {
+        xSplit: 0,
+        ySplit: 1,
+    };
 
-    XLSX.writeFile(workbook, "employee_template.xlsx");
+    const workbook =
+        XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Employees"
+    );
+
+    XLSX.writeFile(
+        workbook,
+        "Employee_Bulk_Upload_Template.xlsx"
+    );
 };

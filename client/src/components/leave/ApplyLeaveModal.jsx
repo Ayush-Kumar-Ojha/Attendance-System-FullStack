@@ -5,7 +5,7 @@ import {
     FileText,
     CalendarDays,
     Send,
-    AlertTriangle,
+    ShieldAlert,
     Clock,
 } from "lucide-react";
 import api from "../../api/axios";
@@ -21,12 +21,14 @@ const getLeaveDays = (leave) => {
     return diffDays;
 };
 
-const getApprovedDaysInMonth = (leaves, referenceDate) => {
+// Helper: Get taken/approved/pending leave days for current employee in target month
+const getTakenDaysInMonth = (leaves, referenceDate) => {
     const refMonth = referenceDate.getMonth();
     const refYear = referenceDate.getFullYear();
 
     return leaves
-        .filter((leave) => leave.status === "APPROVED")
+        .filter((leave) => leave.status === "APPROVED" || leave.status === "PENDING")
+        .filter((leave) => leave.type !== "COMPENSATORY")
         .filter((leave) => {
             const d = new Date(leave.startDate);
             return d.getMonth() === refMonth && d.getFullYear() === refYear;
@@ -55,7 +57,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
 
         try {
             await api.post("/leave", data);
-            toast.success("Leave application submitted!");
+            toast.success("Leave application submitted successfully!");
             onSuccess();
             onClose();
         } catch (err) {
@@ -81,9 +83,11 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
         }
 
         const startDate = new Date(data.startDate);
-        const takenDays = getApprovedDaysInMonth(leaves, startDate);
+        const takenDays = getTakenDaysInMonth(leaves, startDate);
+        const requestedDays = isHalfDay ? 0.5 : (Math.round((new Date(data.endDate).getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-        if (!isCompensatory && takenDays >= MONTHLY_PAID_LEAVE_LIMIT) {
+        // Check if employee already reached 3 days OR if this request pushes total over 3 days
+        if (!isCompensatory && (takenDays >= MONTHLY_PAID_LEAVE_LIMIT || takenDays + requestedDays > MONTHLY_PAID_LEAVE_LIMIT)) {
             setAlreadyTakenDays(takenDays);
             setPendingData(data);
             setShowLimitWarning(true);
@@ -143,13 +147,12 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                             <option value="SICK">Sick Leave</option>
                             <option value="CASUAL">Casual Leave</option>
                             <option value="ANNUAL">Annual Leave</option>
-                            <option value="MENSTRUAL">Menstrual Leave</option>
+                            <option value="MENSTRUAL">Wellness Leave</option>
                             <option value="HALF_DAY">Half Day Leave</option>
                             <option value="COMPENSATORY">Compensation Leave (Comp Off)</option>
                         </select>
                     </div>
 
-                    {/* Half Day sub-selection */}
                     {isHalfDay && (
                         <div>
                             <label className="text-sm font-medium text-slate-700 mb-2 block">
@@ -162,7 +165,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         </div>
                     )}
 
-                    {/* Compensatory Leave Worked Date Picker */}
                     {isCompensatory && (
                         <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-3">
                             <div className="flex items-center gap-2 text-xs font-semibold text-indigo-900">
@@ -182,7 +184,6 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         </div>
                     )}
 
-                    {/* Duration */}
                     <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                             <CalendarDays className="w-4 h-4 text-slate-400" />
@@ -225,10 +226,9 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         )}
                     </div>
 
-                    {/* Reason */}
                     <div>
                         <label className="text-sm font-medium text-slate-700 mb-2 block">
-                            Reason
+                            Reason / Emergency Situation Details
                         </label>
 
                         <textarea
@@ -239,12 +239,11 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                             placeholder={
                                 isCompensatory
                                     ? "Explain why you worked on the weekend/holiday..."
-                                    : "Briefly describe why you need this leave..."
+                                    : "Describe your leave reason or emergency situation..."
                             }
                         ></textarea>
                     </div>
 
-                    {/* Buttons */}
                     <div className="flex gap-3 pt-2">
                         <button
                             onClick={onClose}
@@ -270,7 +269,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                 </form>
             </div>
 
-            {/* Monthly leave limit reminder */}
+            {/* Monthly leave limit warning modal with Emergency & LOP Notice */}
             {showLimitWarning && (
                 <div
                     className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/20"
@@ -281,20 +280,20 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-start gap-3 mb-4">
-                            <div className="p-2 rounded-full bg-amber-50 shrink-0">
-                                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                            <div className="p-2.5 rounded-xl bg-amber-50 shrink-0 text-amber-600">
+                                <ShieldAlert className="w-6 h-6" />
                             </div>
 
                             <div>
                                 <h3 className="text-base font-semibold text-slate-900">
-                                    Monthly leave limit reached
+                                    Monthly Paid Leave Limit Reached (3 Days)
                                 </h3>
-                                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                                    You've already taken <strong>{alreadyTakenDays}</strong> approved leave day
-                                    {alreadyTakenDays === 1 ? "" : "s"} this month, which covers your paid leave allowance.
-                                    Any leave beyond {MONTHLY_PAID_LEAVE_LIMIT} days in a month is treated as{" "}
-                                    <strong>unpaid leave</strong>. Do you still want to submit this request?
+                                <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                                    You have already taken <strong>{alreadyTakenDays}</strong> day(s) of leave this month.
                                 </p>
+                                <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 leading-relaxed">
+                                    <strong>Loss of Pay (LOP) Notice:</strong> Submitting this 4th / extra leave will be counted as <strong>Loss of Pay (LOP)</strong> unless it is reviewed and approved by Admin as a <strong>Paid Emergency</strong>.
+                                </div>
                             </div>
                         </div>
 
@@ -314,7 +313,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, leaves = [] }) => {
                                 className="btn-primary flex-1 flex items-center justify-center gap-2"
                             >
                                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                {loading ? "Submitting..." : "Proceed Anyway"}
+                                {loading ? "Submitting..." : "Submit for Emergency Review"}
                             </button>
                         </div>
                     </div>

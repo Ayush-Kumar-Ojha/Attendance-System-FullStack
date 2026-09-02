@@ -14,6 +14,8 @@ const billVoucherSchema = new mongoose.Schema(
             required: true,
         },
 
+        referenceId: { type: String, default: "" },
+
         employeeCode: { type: String, default: "" },
         employeeName: { type: String, default: "" },
         email: { type: String, default: "" },

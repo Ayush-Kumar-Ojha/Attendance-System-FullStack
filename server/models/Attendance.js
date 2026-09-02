@@ -7,15 +7,33 @@ const attendanceSchema = new mongoose.Schema(
             ref: "Employee",
             required: true,
         },
-        date: { type: Date, required: true },
-        checkIn: { type: Date, default: null },
-        checkOut: { type: Date, default: null },
+
+        date: {
+            type: Date,
+            required: true,
+        },
+
+        checkIn: {
+            type: Date,
+            default: null,
+        },
+
+        checkOut: {
+            type: Date,
+            default: null,
+        },
+
         status: {
             type: String,
             enum: ["PRESENT", "ABSENT", "LATE"],
             default: "PRESENT",
         },
-        workingHours: { type: Number, default: null },
+
+        workingHours: {
+            type: Number,
+            default: null,
+        },
+
         dayType: {
             type: String,
             enum: [
@@ -29,15 +47,70 @@ const attendanceSchema = new mongoose.Schema(
             ],
             default: null,
         },
-        isWeekendOrHoliday: { type: Boolean, default: false },
+
+        isWeekendOrHoliday: {
+            type: Boolean,
+            default: false,
+        },
+
+        // =====================================================
+        // ATTENDANCE SOURCE
+        // =====================================================
+
+        source: {
+            type: String,
+            enum: [
+                "NORMAL",
+                "EMPLOYEE_CORRECTION",
+                "ADMIN_OVERRIDE",
+                "AUTO_CHECKOUT",
+            ],
+            default: "NORMAL",
+        },
+
+        // =====================================================
+        // AUTO CHECKOUT
+        // =====================================================
+
+        autoCheckedOut: {
+            type: Boolean,
+            default: false,
+        },
+
+        // =====================================================
+        // EMPLOYEE CORRECTION
+        // =====================================================
+
+        correctionReason: {
+            type: String,
+            default: "",
+        },
+
+        correctedAt: {
+            type: Date,
+            default: null,
+        },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+    }
 );
 
-attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+attendanceSchema.index(
+    {
+        employeeId: 1,
+        date: 1,
+    },
+    {
+        unique: true,
+    }
+);
 
 const Attendance =
     mongoose.models.Attendance ||
-    mongoose.model("Attendance", attendanceSchema);
+    mongoose.model(
+        "Attendance",
+        attendanceSchema
+    );
 
 export default Attendance;

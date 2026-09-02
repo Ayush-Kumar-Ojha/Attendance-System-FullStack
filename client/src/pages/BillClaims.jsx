@@ -10,8 +10,6 @@ import {
     Eye,
     Upload,
     IndianRupee,
-    CalendarDays,
-    FileText,
     X,
     RefreshCw,
     Image as ImageIcon,
@@ -36,14 +34,21 @@ const BillClaims = () => {
     const [claims, setClaims] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // ==============================
+    // Create claim
+    // ==============================
+
     const [showForm, setShowForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const [amount, setAmount] = useState("");
     const [reason, setReason] = useState("");
     const [billFile, setBillFile] = useState(null);
-
     const [previewUrl, setPreviewUrl] = useState("");
+
+    // ==============================
+    // Filters
+    // ==============================
 
     const [statusFilter, setStatusFilter] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
@@ -53,15 +58,18 @@ const BillClaims = () => {
 
     const [search, setSearch] = useState("");
 
+    // ==============================
+    // Details
+    // ==============================
+
     const [selectedClaim, setSelectedClaim] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
 
     const [actionLoading, setActionLoading] = useState(false);
-
     const [remark, setRemark] = useState("");
 
     // ==============================
-    // Voucher Generation
+    // Voucher
     // ==============================
 
     const [voucherClaim, setVoucherClaim] = useState(null);
@@ -84,14 +92,368 @@ const BillClaims = () => {
         reason: "",
     });
 
+    // ==============================
+    // Helpers
+    // ==============================
+
     const formatDateInput = (date) => {
         if (!date) return "";
+
         try {
-            return new Date(date).toISOString().split("T")[0];
+            const parsed = new Date(date);
+
+            if (Number.isNaN(parsed.getTime())) {
+                return "";
+            }
+
+            return parsed.toISOString().split("T")[0];
         } catch {
             return "";
         }
     };
+
+    const formatCurrency = (amountValue) => {
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0,
+        }).format(Number(amountValue || 0));
+    };
+
+    const formatDate = (date) => {
+        if (!date) return "-";
+
+        try {
+            const parsed = new Date(date);
+
+            if (Number.isNaN(parsed.getTime())) {
+                return "-";
+            }
+
+            return parsed.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+            });
+        } catch {
+            return "-";
+        }
+    };
+
+    // ==============================
+    // Fetch claims
+    // ==============================
+
+    const fetchClaims = async () => {
+        try {
+            setLoading(true);
+
+            const params = {};
+
+            if (isAdmin) {
+                if (statusFilter) {
+                    params.status = statusFilter;
+                }
+
+                if (monthFilter) {
+                    params.month = monthFilter;
+                }
+
+                if (yearFilter) {
+                    params.year = yearFilter;
+                }
+            }
+
+            const response = await api.get("/bill-claims", {
+                params,
+            });
+
+            setClaims(response.data?.data || []);
+        } catch (error) {
+            console.error("Fetch Bill Claims Error:", error);
+
+            toast.error(
+                error.response?.data?.error ||
+                    error.response?.data?.message ||
+                    "Failed to load bill claims"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchClaims();
+    }, [statusFilter, monthFilter, yearFilter, isAdmin]);
+
+    // ==============================
+    // Create claim form
+    // ==============================
+
+    const resetForm = () => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+
+        setAmount("");
+        setReason("");
+        setBillFile(null);
+        setPreviewUrl("");
+    };
+
+    const closeCreateModal = () => {
+        if (submitting) return;
+
+        resetForm();
+        setShowForm(false);
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        const allowedTypes = [
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+        ];
+
+        if (!allowedTypes.includes(file.type.toLowerCase())) {
+            toast.error("Only JPG, PNG and WEBP images are allowed");
+
+            e.target.value = "";
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Bill image must be below 5 MB");
+
+            e.target.value = "";
+            return;
+        }
+
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+
+        setBillFile(file);
+        setPreviewUrl(objectUrl);
+    };
+
+    const removeSelectedFile = () => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+
+        setBillFile(null);
+        setPreviewUrl("");
+    };
+
+    // ==============================
+    // SUBMIT BILL CLAIM
+    // ==============================
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (submitting) {
+            return;
+        }
+
+        const numericAmount = Number(amount);
+
+        if (!amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+            toast.error("Enter a valid expense amount");
+            return;
+        }
+
+        if (!billFile) {
+            toast.error("Please upload the bill image");
+            return;
+        }
+
+        if (!billFile.type.startsWith("image/")) {
+            toast.error("Please upload a valid image");
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+
+            const formData = new FormData();
+
+            formData.append("amount", String(numericAmount));
+            formData.append("reason", reason.trim());
+            formData.append("bill", billFile);
+
+            const response = await api.post(
+                "/bill-claims",
+                formData
+            );
+
+            if (!response.data?.success) {
+                throw new Error(
+                    response.data?.error ||
+                        "Failed to submit bill claim"
+                );
+            }
+
+            toast.success("Bill claim submitted successfully");
+
+            resetForm();
+            setShowForm(false);
+
+            await fetchClaims();
+        } catch (error) {
+            console.error(
+                "Create Bill Claim Error:",
+                error
+            );
+
+            const serverMessage =
+                error.response?.data?.error ||
+                error.response?.data?.message;
+
+            if (serverMessage) {
+                toast.error(serverMessage);
+            } else if (error.response?.status === 400) {
+                toast.error(
+                    "Invalid bill claim data. Please check the amount and bill image."
+                );
+            } else if (error.response?.status === 401) {
+                toast.error(
+                    "Your session has expired. Please login again."
+                );
+            } else if (error.response?.status === 403) {
+                toast.error(
+                    "You are not authorized to submit a bill claim."
+                );
+            } else if (error.response?.status === 413) {
+                toast.error(
+                    "Bill image is too large."
+                );
+            } else {
+                toast.error(
+                    "Failed to submit bill claim"
+                );
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // ==============================
+    // Details
+    // ==============================
+
+    const openDetails = (claim) => {
+        setSelectedClaim(claim);
+        setRemark(claim.adminRemark || "");
+        setShowDetails(true);
+    };
+
+    const closeDetails = () => {
+        if (actionLoading) return;
+
+        setShowDetails(false);
+        setSelectedClaim(null);
+        setRemark("");
+    };
+
+    // ==============================
+    // Approve / Reject
+    // ==============================
+
+    const updateClaimStatus = async (status) => {
+        if (!selectedClaim || actionLoading) {
+            return;
+        }
+
+        const claimId = selectedClaim.id || selectedClaim._id;
+
+        if (status === "REJECTED" && !remark.trim()) {
+            toast.error("Please enter a reason for rejection");
+            return;
+        }
+
+        try {
+            setActionLoading(true);
+
+            await api.put(
+                `/bill-claims/${claimId}/status`,
+                {
+                    status,
+                    adminRemark: remark.trim(),
+                }
+            );
+
+            toast.success(
+                status === "APPROVED"
+                    ? "Bill claim approved"
+                    : "Bill claim rejected"
+            );
+
+            closeDetails();
+
+            await fetchClaims();
+        } catch (error) {
+            console.error(
+                "Update Bill Claim Error:",
+                error
+            );
+
+            toast.error(
+                error.response?.data?.error ||
+                    "Failed to update claim"
+            );
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // ==============================
+    // Admin - Mark Tracking Chain Step Done
+    // ==============================
+
+    const handleMarkStepDone = async (claimId, stepKey) => {
+        try {
+            setActionLoading(true);
+
+            const response = await api.patch(
+                `/bill-claims/${claimId}/tracking/${stepKey}`,
+                {}
+            );
+
+            toast.success("Tracking step marked as completed");
+
+            if (selectedClaim && (selectedClaim.id === claimId || selectedClaim._id === claimId)) {
+                setSelectedClaim((prev) => ({
+                    ...prev,
+                    trackingChain: response.data?.data || prev.trackingChain,
+                }));
+            }
+
+            await fetchClaims();
+        } catch (error) {
+            console.error("Mark Tracking Step Error:", error);
+            toast.error(
+                error.response?.data?.error ||
+                    "Failed to update tracking step"
+            );
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // ==============================
+    // Voucher
+    // ==============================
 
     const openVoucherForm = (claim) => {
         const emp = claim.employee || {};
@@ -100,12 +462,18 @@ const BillClaims = () => {
 
         setVoucherFields({
             employeeCode: emp.employeeCode || "",
-            employeeName: `${emp.firstName || ""} ${emp.lastName || ""}`.trim(),
+            employeeName:
+                `${emp.firstName || ""} ${emp.lastName || ""}`.trim(),
             email: emp.email || "",
             phone: emp.phone || "",
             joinDate: formatDateInput(emp.joinDate),
             designation: emp.position || "",
-            department: emp.department || "",
+            department:
+                typeof emp.department === "object"
+                    ? emp.department?.department_name ||
+                      emp.department?.name ||
+                      ""
+                    : emp.department || "",
             panNumber: emp.panNumber || "",
             uanNumber: emp.uanNumber || "",
             bankName: emp.bankName || "",
@@ -119,36 +487,63 @@ const BillClaims = () => {
     };
 
     const handleVoucherFieldChange = (field, value) => {
-        setVoucherFields((prev) => ({ ...prev, [field]: value }));
+        setVoucherFields((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const closeVoucherForm = () => {
+        if (generatingVoucher) return;
+
+        setShowVoucherForm(false);
+        setVoucherClaim(null);
     };
 
     const handleGenerateVoucher = async (e) => {
         e.preventDefault();
 
-        if (!voucherClaim) return;
+        if (!voucherClaim || generatingVoucher) {
+            return;
+        }
+
+        const claimId = voucherClaim.id || voucherClaim._id;
 
         try {
             setGeneratingVoucher(true);
 
             const response = await api.post(
-                `/bill-claims/${voucherClaim.id}/generate-voucher`,
-                voucherFields
+                `/bill-claims/${claimId}/generate-voucher`,
+                {
+                    ...voucherFields,
+                    amount: Number(voucherFields.amount),
+                }
             );
 
-            const voucherId = response.data?.data?.id;
+            const voucherId = response.data?.data?.id || response.data?.data?._id;
+
+            if (!voucherId) {
+                throw new Error(
+                    "Voucher ID was not returned by server"
+                );
+            }
 
             toast.success("Bill voucher generated");
 
             setShowVoucherForm(false);
             setVoucherClaim(null);
 
-            if (voucherId) {
-                window.open(`/print/bill-voucher/${voucherId}`, "_blank");
-            }
+            window.open(
+                `/print/bill-voucher/${voucherId}`,
+                "_blank"
+            );
 
             await fetchClaims();
         } catch (error) {
-            console.error("Generate Bill Voucher Error:", error);
+            console.error(
+                "Generate Bill Voucher Error:",
+                error
+            );
 
             toast.error(
                 error.response?.data?.error ||
@@ -159,183 +554,62 @@ const BillClaims = () => {
         }
     };
 
-    const fetchClaims = async () => {
-        try {
-            setLoading(true);
+    const openVoucher = (voucherId) => {
+        const id = typeof voucherId === "object" ? (voucherId._id || voucherId.id) : voucherId;
 
-            const params = {};
-
-            if (isAdmin) {
-                if (statusFilter) params.status = statusFilter;
-                if (monthFilter) params.month = monthFilter;
-                if (yearFilter) params.year = yearFilter;
-            }
-
-            const response = await api.get("/bill-claims", {
-                params,
-            });
-
-            setClaims(response.data?.data || []);
-        } catch (error) {
-            console.error("Fetch Bill Claims Error:", error);
-
-            toast.error(
-                error.response?.data?.error ||
-                    "Failed to load bill claims"
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchClaims();
-    }, [statusFilter, monthFilter, yearFilter, isAdmin]);
-
-    const resetForm = () => {
-        setAmount("");
-        setReason("");
-        setBillFile(null);
-        setPreviewUrl("");
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files?.[0];
-
-        if (!file) return;
-
-        const allowedTypes = [
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/webp",
-        ];
-
-        if (!allowedTypes.includes(file.type)) {
-            toast.error("Only JPG, PNG and WEBP images are allowed");
+        if (!id) {
+            toast.error("Voucher is not available");
             return;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error("Bill image must be below 5 MB");
-            return;
-        }
-
-        setBillFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
+        window.open(
+            `/print/bill-voucher/${id}`,
+            "_blank"
+        );
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!amount || Number(amount) <= 0) {
-            toast.error("Enter a valid expense amount");
-            return;
-        }
-
-        if (!billFile) {
-            toast.error("Please upload the bill image");
-            return;
-        }
-
-        try {
-            setSubmitting(true);
-
-            const formData = new FormData();
-
-            formData.append("amount", amount);
-            formData.append("reason", reason);
-            formData.append("bill", billFile);
-
-            await api.post("/bill-claims", formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            });
-
-            toast.success("Bill claim submitted successfully");
-
-            resetForm();
-            setShowForm(false);
-
-            await fetchClaims();
-        } catch (error) {
-            console.error("Create Bill Claim Error:", error);
-
-            toast.error(
-                error.response?.data?.error ||
-                    "Failed to submit bill claim"
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const openDetails = (claim) => {
-        setSelectedClaim(claim);
-        setRemark(claim.adminRemark || "");
-        setShowDetails(true);
-    };
-
-    const updateClaimStatus = async (status) => {
-        if (!selectedClaim) return;
-
-        if (status === "REJECTED" && !remark.trim()) {
-            toast.error("Please enter a reason for rejection");
-            return;
-        }
-
-        try {
-            setActionLoading(true);
-
-            await api.put(
-                `/bill-claims/${selectedClaim.id}/status`,
-                {
-                    status,
-                    adminRemark: remark,
-                }
-            );
-
-            toast.success(
-                status === "APPROVED"
-                    ? "Bill claim approved"
-                    : "Bill claim rejected"
-            );
-
-            setShowDetails(false);
-            setSelectedClaim(null);
-            setRemark("");
-
-            await fetchClaims();
-        } catch (error) {
-            console.error("Update Bill Claim Error:", error);
-
-            toast.error(
-                error.response?.data?.error ||
-                    "Failed to update claim"
-            );
-        } finally {
-            setActionLoading(false);
-        }
-    };
+    // ==============================
+    // Search
+    // ==============================
 
     const filteredClaims = useMemo(() => {
-        if (!search.trim()) return claims;
+        if (!search.trim()) {
+            return claims;
+        }
 
-        const value = search.toLowerCase();
+        const value = search.toLowerCase().trim();
 
         return claims.filter((claim) => {
-            const employeeName = `${claim.employee?.firstName || ""} ${
-                claim.employee?.lastName || ""
-            }`.toLowerCase();
+            const employeeName =
+                `${claim.employee?.firstName || ""} ${
+                    claim.employee?.lastName || ""
+                }`.toLowerCase();
+
+            const employeeCode =
+                claim.employee?.employeeCode?.toLowerCase() || "";
+
+            const reason =
+                claim.reason?.toLowerCase() || "";
+
+            const status =
+                claim.status?.toLowerCase() || "";
+
+            const referenceId =
+                claim.referenceId?.toLowerCase() || "";
 
             return (
                 employeeName.includes(value) ||
-                claim.reason?.toLowerCase().includes(value) ||
-                claim.status?.toLowerCase().includes(value)
+                employeeCode.includes(value) ||
+                reason.includes(value) ||
+                status.includes(value) ||
+                referenceId.includes(value)
             );
         });
     }, [claims, search]);
+
+    // ==============================
+    // Statistics
+    // ==============================
 
     const statistics = useMemo(() => {
         const pending = claims.filter(
@@ -351,12 +625,14 @@ const BillClaims = () => {
         );
 
         const approvedAmount = approved.reduce(
-            (sum, item) => sum + Number(item.amount || 0),
+            (sum, item) =>
+                sum + Number(item.amount || 0),
             0
         );
 
         const pendingAmount = pending.reduce(
-            (sum, item) => sum + Number(item.amount || 0),
+            (sum, item) =>
+                sum + Number(item.amount || 0),
             0
         );
 
@@ -370,53 +646,9 @@ const BillClaims = () => {
         };
     }, [claims]);
 
-    const formatCurrency = (amountValue) => {
-        return new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency: "INR",
-            maximumFractionDigits: 0,
-        }).format(Number(amountValue || 0));
-    };
-
-    const formatDate = (date) => {
-        if (!date) return "-";
-
-        return new Date(date).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
-    };
-
-    const exportClaims = () => {
-        if (filteredClaims.length === 0) {
-            toast.error("No claims to export for the current filters");
-            return;
-        }
-
-        const rows = filteredClaims.map((claim) => ({
-            "Employee Code": claim.employee?.employeeCode || "",
-            "Employee Name": `${claim.employee?.firstName || ""} ${claim.employee?.lastName || ""}`.trim(),
-            "Designation": claim.employee?.position || "",
-            "Date": formatDate(claim.createdAt),
-            "Amount": Number(claim.amount || 0),
-            "Reason": claim.reason || "",
-            "Status": claim.status,
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(rows);
-        worksheet["!cols"] = Object.keys(rows[0]).map((k) => ({ wch: Math.max(k.length, 16) }));
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Bill Claims");
-
-        const parts = ["bill_claims"];
-        if (statusFilter) parts.push(statusFilter.toLowerCase());
-        if (monthFilter) parts.push(new Date(2000, monthFilter - 1).toLocaleString("en-IN", { month: "short" }).toLowerCase());
-        if (yearFilter) parts.push(yearFilter);
-
-        XLSX.writeFile(workbook, `${parts.join("_")}.xlsx`);
-    };
+    // ==============================
+    // Status UI
+    // ==============================
 
     const getStatusStyle = (status) => {
         switch (status) {
@@ -444,33 +676,113 @@ const BillClaims = () => {
         }
     };
 
+    // ==============================
+    // Excel export
+    // ==============================
+
+    const exportClaims = () => {
+        if (filteredClaims.length === 0) {
+            toast.error(
+                "No claims to export for the current filters"
+            );
+            return;
+        }
+
+        const rows = filteredClaims.map((claim) => ({
+            "Reference ID": claim.referenceId || "",
+            "Employee Code":
+                claim.employee?.employeeCode || "",
+            "Employee Name":
+                `${claim.employee?.firstName || ""} ${
+                    claim.employee?.lastName || ""
+                }`.trim(),
+            "Designation":
+                claim.employee?.position || "",
+            "Date": formatDate(claim.createdAt),
+            "Amount": Number(claim.amount || 0),
+            "Reason": claim.reason || "",
+            "Status": claim.status || "",
+            "Admin Remark":
+                claim.adminRemark || "",
+        }));
+
+        const worksheet =
+            XLSX.utils.json_to_sheet(rows);
+
+        worksheet["!cols"] = Object.keys(rows[0]).map(
+            (key) => ({
+                wch: Math.max(key.length + 2, 16),
+            })
+        );
+
+        const workbook =
+            XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            worksheet,
+            "Bill Claims"
+        );
+
+        const parts = ["bill_claims"];
+
+        if (statusFilter) {
+            parts.push(
+                statusFilter.toLowerCase()
+            );
+        }
+
+        if (monthFilter) {
+            parts.push(
+                new Date(
+                    2000,
+                    Number(monthFilter) - 1
+                )
+                    .toLocaleString("en-IN", {
+                        month: "short",
+                    })
+                    .toLowerCase()
+            );
+        }
+
+        if (yearFilter) {
+            parts.push(yearFilter);
+        }
+
+        XLSX.writeFile(
+            workbook,
+            `${parts.join("_")}.xlsx`
+        );
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-6">
             <div className="mx-auto max-w-7xl space-y-6">
-                {/* Header */}
+
+                {/* ================= HEADER ================= */}
+
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-xl bg-indigo-100 p-3 text-indigo-600">
-                                <Receipt size={25} />
-                            </div>
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-indigo-100 p-3 text-indigo-600">
+                            <Receipt size={25} />
+                        </div>
 
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-900">
-                                    Bill Claims
-                                </h1>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900">
+                                Bill Claims
+                            </h1>
 
-                                <p className="text-sm text-slate-500">
-                                    {isAdmin
-                                        ? "Review and manage employee expense claims"
-                                        : "Submit and track your expense reimbursements"}
-                                </p>
-                            </div>
+                            <p className="text-sm text-slate-500">
+                                {isAdmin
+                                    ? "Review and manage employee expense claims"
+                                    : "Submit and track your expense reimbursements"}
+                            </p>
                         </div>
                     </div>
 
                     {!isAdmin && (
                         <button
+                            type="button"
                             onClick={() => setShowForm(true)}
                             className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-indigo-700"
                         >
@@ -481,6 +793,7 @@ const BillClaims = () => {
 
                     {isAdmin && (
                         <button
+                            type="button"
                             onClick={exportClaims}
                             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 hover:bg-slate-50"
                         >
@@ -490,7 +803,8 @@ const BillClaims = () => {
                     )}
                 </div>
 
-                {/* Statistics */}
+                {/* ================= STATISTICS ================= */}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         title="Total Claims"
@@ -512,23 +826,30 @@ const BillClaims = () => {
 
                     <StatCard
                         title="Approved Amount"
-                        value={formatCurrency(statistics.approvedAmount)}
+                        value={formatCurrency(
+                            statistics.approvedAmount
+                        )}
                         icon={<IndianRupee size={20} />}
                     />
                 </div>
 
-                                {/* Admin Filters */}
+                {/* ================= ADMIN FILTERS ================= */}
+
                 {isAdmin && (
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                         <div className="mb-2 flex items-center gap-2">
-                            <Filter size={16} className="text-slate-500" />
+                            <Filter
+                                size={16}
+                                className="text-slate-500"
+                            />
+
                             <h2 className="text-sm font-semibold text-slate-900">
                                 Filters
                             </h2>
                         </div>
 
                         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
-                            <div className="relative md:col-span-1">
+                            <div className="relative">
                                 <Search
                                     size={16}
                                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -537,9 +858,11 @@ const BillClaims = () => {
                                 <input
                                     value={search}
                                     onChange={(e) =>
-                                        setSearch(e.target.value)
+                                        setSearch(
+                                            e.target.value
+                                        )
                                     }
-                                    placeholder="Search employee..."
+                                    placeholder="Search employee or ref..."
                                     className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                 />
                             </div>
@@ -547,12 +870,18 @@ const BillClaims = () => {
                             <select
                                 value={statusFilter}
                                 onChange={(e) =>
-                                    setStatusFilter(e.target.value)
+                                    setStatusFilter(
+                                        e.target.value
+                                    )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
-                                <option value="">All Status</option>
-                                <option value="PENDING">Pending</option>
+                                <option value="">
+                                    All Status
+                                </option>
+                                <option value="PENDING">
+                                    Pending
+                                </option>
                                 <option value="APPROVED">
                                     Approved
                                 </option>
@@ -564,17 +893,26 @@ const BillClaims = () => {
                             <select
                                 value={monthFilter}
                                 onChange={(e) =>
-                                    setMonthFilter(e.target.value)
+                                    setMonthFilter(
+                                        e.target.value
+                                    )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
-                                <option value="">All Months</option>
+                                <option value="">
+                                    All Months
+                                </option>
+
                                 {Array.from(
                                     { length: 12 },
                                     (_, index) => (
                                         <option
-                                            key={index + 1}
-                                            value={index + 1}
+                                            key={
+                                                index + 1
+                                            }
+                                            value={
+                                                index + 1
+                                            }
                                         >
                                             {new Date(
                                                 2000,
@@ -593,10 +931,15 @@ const BillClaims = () => {
                             <select
                                 value={yearFilter}
                                 onChange={(e) =>
-                                    setYearFilter(e.target.value)
+                                    setYearFilter(
+                                        e.target.value
+                                    )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
+                                <option value="">
+                                    All Years
+                                </option>
                                 {Array.from(
                                     { length: 6 },
                                     (_, index) => {
@@ -619,7 +962,8 @@ const BillClaims = () => {
                     </div>
                 )}
 
-                {/* Claims */}
+                {/* ================= CLAIM HISTORY ================= */}
+
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-100 px-5 py-4">
                         <div className="flex items-center justify-between">
@@ -637,6 +981,7 @@ const BillClaims = () => {
                             </div>
 
                             <button
+                                type="button"
                                 onClick={fetchClaims}
                                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                             >
@@ -673,11 +1018,16 @@ const BillClaims = () => {
                         </div>
                     ) : (
                         <>
-                            {/* Desktop */}
+                            {/* ================= DESKTOP ================= */}
+
                             <div className="hidden overflow-x-auto md:block">
                                 <table className="w-full">
                                     <thead className="bg-slate-50">
                                         <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th className="px-5 py-4">
+                                                Ref ID
+                                            </th>
+
                                             {isAdmin && (
                                                 <th className="px-5 py-4">
                                                     Employee
@@ -700,17 +1050,11 @@ const BillClaims = () => {
                                                 Status
                                             </th>
 
-                                            {isAdmin ? (
-                                                <th className="px-5 py-4 text-left">
-                                                    Generate Bill Amount
-                                                </th>
-                                            ) : (
-                                                <th className="px-5 py-4 text-left">
-                                                    Download Voucher
-                                                </th>
-                                            )}
+                                            <th className="px-5 py-4">
+                                                Voucher
+                                            </th>
 
-                                            <th className="px-5 py-4 text-left">
+                                            <th className="px-5 py-4">
                                                 Action
                                             </th>
                                         </tr>
@@ -720,9 +1064,16 @@ const BillClaims = () => {
                                         {filteredClaims.map(
                                             (claim) => (
                                                 <tr
-                                                    key={claim.id}
+                                                    key={
+                                                        claim.id ||
+                                                        claim._id
+                                                    }
                                                     className="transition hover:bg-slate-50"
                                                 >
+                                                    <td className="px-5 py-4 text-xs font-mono font-semibold text-indigo-600">
+                                                        {claim.referenceId || "—"}
+                                                    </td>
+
                                                     {isAdmin && (
                                                         <td className="px-5 py-4">
                                                             <div className="flex items-center gap-3">
@@ -792,64 +1143,55 @@ const BillClaims = () => {
                                                         </span>
                                                     </td>
 
-                                                    {isAdmin ? (
-                                                        <td className="px-5 py-4 text-left">
-                                                            {claim.status === "APPROVED" ? (
-                                                                claim.billVoucherId ? (
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            window.open(
-                                                                                `/print/bill-voucher/${claim.billVoucherId}`,
-                                                                                "_blank"
-                                                                            )
-                                                                        }
-                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                                                                    >
-                                                                        <Download size={15} />
-                                                                        Download
-                                                                    </button>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            openVoucherForm(claim)
-                                                                        }
-                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-                                                                    >
-                                                                        <FileSpreadsheet size={15} />
-                                                                        Generate
-                                                                    </button>
-                                                                )
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">
-                                                                    &mdash;
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    ) : (
-                                                        <td className="px-5 py-4 text-left">
-                                                            {claim.status === "APPROVED" && claim.billVoucherId ? (
-                                                                <button
-                                                                    onClick={() =>
-                                                                        window.open(
-                                                                            `/print/bill-voucher/${claim.billVoucherId}`,
-                                                                            "_blank"
-                                                                        )
+                                                    <td className="px-5 py-4">
+                                                        {claim.status ===
+                                                            "APPROVED" &&
+                                                        claim.billVoucherId ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openVoucher(
+                                                                        claim.billVoucherId
+                                                                    )
+                                                                }
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                                            >
+                                                                <Download
+                                                                    size={
+                                                                        15
                                                                     }
-                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                                                                >
-                                                                    <Download size={15} />
-                                                                    Download
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">
-                                                                    &mdash;
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    )}
+                                                                />
+                                                                Download
+                                                            </button>
+                                                        ) : isAdmin &&
+                                                          claim.status ===
+                                                              "APPROVED" ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openVoucherForm(
+                                                                        claim
+                                                                    )
+                                                                }
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                                            >
+                                                                <FileSpreadsheet
+                                                                    size={
+                                                                        15
+                                                                    }
+                                                                />
+                                                                Generate
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </td>
 
-                                                    <td className="px-5 py-4 text-left">
+                                                    <td className="px-5 py-4">
                                                         <button
+                                                            type="button"
                                                             onClick={() =>
                                                                 openDetails(
                                                                     claim
@@ -858,7 +1200,9 @@ const BillClaims = () => {
                                                             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                                         >
                                                             <Eye
-                                                                size={15}
+                                                                size={
+                                                                    15
+                                                                }
                                                             />
                                                             View
                                                         </button>
@@ -870,129 +1214,155 @@ const BillClaims = () => {
                                 </table>
                             </div>
 
-                            {/* Mobile */}
+                            {/* ================= MOBILE ================= */}
+
                             <div className="divide-y divide-slate-100 md:hidden">
-                                {filteredClaims.map((claim) => (
-                                    <div
-                                        key={claim.id}
-                                        className="p-4"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                {isAdmin && (
-                                                    <p className="mb-1 text-sm font-semibold text-slate-800">
-                                                        {
-                                                            claim
-                                                                .employee
-                                                                ?.firstName
-                                                        }{" "}
-                                                        {
-                                                            claim
-                                                                .employee
-                                                                ?.lastName
-                                                        }
+                                {filteredClaims.map(
+                                    (claim) => (
+                                        <div
+                                            key={
+                                                claim.id ||
+                                                claim._id
+                                            }
+                                            className="p-4"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    {claim.referenceId && (
+                                                        <span className="mb-1 block text-xs font-mono font-semibold text-indigo-600">
+                                                            {claim.referenceId}
+                                                        </span>
+                                                    )}
+
+                                                    {isAdmin && (
+                                                        <p className="mb-1 text-sm font-semibold text-slate-800">
+                                                            {
+                                                                claim
+                                                                    .employee
+                                                                    ?.firstName
+                                                            }{" "}
+                                                            {
+                                                                claim
+                                                                    .employee
+                                                                    ?.lastName
+                                                            }
+                                                        </p>
+                                                    )}
+
+                                                    <p className="text-xs text-slate-500">
+                                                        {formatDate(
+                                                            claim.createdAt
+                                                        )}
                                                     </p>
-                                                )}
+                                                </div>
 
-                                                <p className="text-xs text-slate-500">
-                                                    {formatDate(
-                                                        claim.createdAt
+                                                <span
+                                                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${getStatusStyle(
+                                                        claim.status
+                                                    )}`}
+                                                >
+                                                    {getStatusIcon(
+                                                        claim.status
                                                     )}
-                                                </p>
+
+                                                    {claim.status}
+                                                </span>
                                             </div>
 
-                                            <span
-                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${getStatusStyle(
-                                                    claim.status
-                                                )}`}
-                                            >
-                                                {getStatusIcon(
-                                                    claim.status
-                                                )}
-                                                {claim.status}
-                                            </span>
-                                        </div>
+                                            <div className="mt-4 flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-xs text-slate-500">
+                                                        Amount
+                                                    </p>
 
-                                        <div className="mt-4 flex items-center justify-between">
-                                            <div>
-                                                <p className="text-xs text-slate-500">
-                                                    Amount
-                                                </p>
+                                                    <p className="font-bold text-slate-900">
+                                                        {formatCurrency(
+                                                            claim.amount
+                                                        )}
+                                                    </p>
+                                                </div>
 
-                                                <p className="font-bold text-slate-900">
-                                                    {formatCurrency(
-                                                        claim.amount
-                                                    )}
-                                                </p>
-                                            </div>
-
-                                            <button
-                                                onClick={() =>
-                                                    openDetails(
-                                                        claim
-                                                    )
-                                                }
-                                                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"
-                                            >
-                                                <Eye size={15} />
-                                                View
-                                            </button>
-                                        </div>
-
-                                        {isAdmin && claim.status === "APPROVED" && (
-                                            claim.billVoucherId ? (
                                                 <button
+                                                    type="button"
                                                     onClick={() =>
-                                                        window.open(
-                                                            `/print/bill-voucher/${claim.billVoucherId}`,
-                                                            "_blank"
+                                                        openDetails(
+                                                            claim
                                                         )
                                                     }
-                                                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
+                                                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"
                                                 >
-                                                    <Download size={15} />
-                                                    Download Voucher
+                                                    <Eye
+                                                        size={
+                                                            15
+                                                        }
+                                                    />
+                                                    View
                                                 </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => openVoucherForm(claim)}
-                                                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
-                                                >
-                                                    <FileSpreadsheet size={15} />
-                                                    Generate Bill Amount
-                                                </button>
-                                            )
-                                        )}
+                                            </div>
 
-                                        {!isAdmin && claim.status === "APPROVED" && claim.billVoucherId && (
-                                            <button
-                                                onClick={() =>
-                                                    window.open(
-                                                        `/print/bill-voucher/${claim.billVoucherId}`,
-                                                        "_blank"
-                                                    )
-                                                }
-                                                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
-                                            >
-                                                <Download size={15} />
-                                                Download Voucher
-                                            </button>
-                                        )}
+                                            {claim.status ===
+                                                "APPROVED" &&
+                                                claim.billVoucherId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openVoucher(
+                                                                claim.billVoucherId
+                                                            )
+                                                        }
+                                                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
+                                                    >
+                                                        <Download
+                                                            size={
+                                                                15
+                                                            }
+                                                        />
+                                                        Download Voucher
+                                                    </button>
+                                                )}
 
-                                        {claim.reason && (
-                                            <p className="mt-3 text-sm text-slate-600">
-                                                {claim.reason}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                                            {isAdmin &&
+                                                claim.status ===
+                                                    "APPROVED" &&
+                                                !claim.billVoucherId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openVoucherForm(
+                                                                claim
+                                                            )
+                                                        }
+                                                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
+                                                    >
+                                                        <FileSpreadsheet
+                                                            size={
+                                                                15
+                                                            }
+                                                        />
+                                                        Generate Voucher
+                                                    </button>
+                                                )}
+
+                                            {claim.reason && (
+                                                <p className="mt-3 text-sm text-slate-600">
+                                                    {
+                                                        claim.reason
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                )}
                             </div>
                         </>
                     )}
                 </div>
             </div>
 
-            {/* Create Modal */}
+            {/* =========================================================
+                CREATE BILL CLAIM MODAL
+            ========================================================= */}
+
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="max-h-[95vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
@@ -1003,16 +1373,13 @@ const BillClaims = () => {
                                 </h2>
 
                                 <p className="text-sm text-slate-500">
-                                    Upload your bill and request
-                                    reimbursement.
+                                    Upload your bill and request reimbursement.
                                 </p>
                             </div>
 
                             <button
-                                onClick={() => {
-                                    resetForm();
-                                    setShowForm(false);
-                                }}
+                                type="button"
+                                onClick={closeCreateModal}
                                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                             >
                                 <X size={20} />
@@ -1023,6 +1390,8 @@ const BillClaims = () => {
                             onSubmit={handleSubmit}
                             className="space-y-5 p-5"
                         >
+                            {/* Amount */}
+
                             <div>
                                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                                     Expense Amount *
@@ -1051,6 +1420,8 @@ const BillClaims = () => {
                                 </div>
                             </div>
 
+                            {/* Reason */}
+
                             <div>
                                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                                     Reason
@@ -1059,13 +1430,17 @@ const BillClaims = () => {
                                 <textarea
                                     value={reason}
                                     onChange={(e) =>
-                                        setReason(e.target.value)
+                                        setReason(
+                                            e.target.value
+                                        )
                                     }
                                     rows={4}
                                     placeholder="What was this expense for?"
                                     className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                 />
                             </div>
+
+                            {/* Bill upload */}
 
                             <div>
                                 <label className="mb-2 block text-sm font-semibold text-slate-700">
@@ -1088,7 +1463,7 @@ const BillClaims = () => {
 
                                     <input
                                         type="file"
-                                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                                         onChange={
                                             handleFileChange
                                         }
@@ -1105,7 +1480,9 @@ const BillClaims = () => {
 
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm font-medium text-slate-800">
-                                                {billFile.name}
+                                                {
+                                                    billFile.name
+                                                }
                                             </p>
 
                                             <p className="text-xs text-slate-500">
@@ -1113,19 +1490,18 @@ const BillClaims = () => {
                                                     billFile.size /
                                                     1024 /
                                                     1024
-                                                ).toFixed(2)}{" "}
+                                                ).toFixed(
+                                                    2
+                                                )}{" "}
                                                 MB
                                             </p>
                                         </div>
 
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setBillFile(
-                                                    null
-                                                );
-                                                setPreviewUrl("");
-                                            }}
+                                            onClick={
+                                                removeSelectedFile
+                                            }
                                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200"
                                         >
                                             <X size={17} />
@@ -1134,22 +1510,24 @@ const BillClaims = () => {
                                 )}
 
                                 {previewUrl && (
-                                    <img
-                                        src={previewUrl}
-                                        alt="Bill preview"
-                                        className="mt-3 max-h-48 w-full rounded-xl border object-contain"
-                                    />
+                                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-300 bg-white">
+                                        <img
+                                            src={previewUrl}
+                                            alt="Bill preview"
+                                            className="max-h-80 w-full object-contain"
+                                        />
+                                    </div>
                                 )}
                             </div>
+
+                            {/* Buttons */}
 
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        resetForm();
-                                        setShowForm(false);
-                                    }}
-                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                    onClick={closeCreateModal}
+                                    disabled={submitting}
+                                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                 >
                                     Cancel
                                 </button>
@@ -1173,7 +1551,10 @@ const BillClaims = () => {
                 </div>
             )}
 
-            {/* Details Modal */}
+            {/* =========================================================
+                DETAILS MODAL WITH PAYMENT TRACKING TIMELINE
+            ========================================================= */}
+
             {showDetails && selectedClaim && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
@@ -1192,9 +1573,8 @@ const BillClaims = () => {
                             </div>
 
                             <button
-                                onClick={() =>
-                                    setShowDetails(false)
-                                }
+                                type="button"
+                                onClick={closeDetails}
                                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                             >
                                 <X size={20} />
@@ -1202,6 +1582,8 @@ const BillClaims = () => {
                         </div>
 
                         <div className="space-y-5 p-5">
+                            {/* Employee */}
+
                             {isAdmin && (
                                 <div className="rounded-xl bg-slate-50 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1228,8 +1610,19 @@ const BillClaims = () => {
                                                 ?.position
                                         }
                                     </p>
+
+                                    {selectedClaim.referenceId && (
+                                        <p className="mt-2 text-xs font-mono font-semibold text-indigo-600">
+                                            Reference:{" "}
+                                            {
+                                                selectedClaim.referenceId
+                                            }
+                                        </p>
+                                    )}
                                 </div>
                             )}
+
+                            {/* Amount / Status */}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="rounded-xl border border-slate-200 p-4">
@@ -1257,10 +1650,123 @@ const BillClaims = () => {
                                         {getStatusIcon(
                                             selectedClaim.status
                                         )}
-                                        {selectedClaim.status}
+
+                                        {
+                                            selectedClaim.status
+                                        }
                                     </span>
                                 </div>
                             </div>
+
+                            {/* =========================================================
+                                PAYMENT TRACKING PROGRESS TIMELINE
+                            ========================================================= */}
+
+                            {selectedClaim.trackingChain && selectedClaim.trackingChain.length > 0 && (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                                    <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                                        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                            <Clock3 size={16} className="text-indigo-600" />
+                                            Payment Progress Tracker
+                                        </h3>
+
+                                        {selectedClaim.referenceId && (
+                                            <span className="rounded-md bg-indigo-100 px-2.5 py-1 font-mono text-xs font-bold text-indigo-700">
+                                                {selectedClaim.referenceId}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Timeline list */}
+                                    <div className="relative space-y-4 before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
+                                        {selectedClaim.trackingChain.map((stepItem, index) => {
+                                            const isDone = stepItem.status === "DONE";
+                                            const isPreviousDone =
+                                                index === 0 ||
+                                                selectedClaim.trackingChain[index - 1]?.status === "DONE";
+
+                                            const canMarkDone =
+                                                isAdmin && !isDone && isPreviousDone;
+
+                                            return (
+                                                <div
+                                                    key={stepItem.step}
+                                                    className="relative flex items-start gap-3.5 pl-1"
+                                                >
+                                                    {/* Step Circle */}
+                                                    <div
+                                                        className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition ${
+                                                            isDone
+                                                                ? "bg-emerald-600 text-white ring-4 ring-emerald-50"
+                                                                : canMarkDone
+                                                                ? "bg-indigo-600 text-white ring-4 ring-indigo-50 animate-pulse"
+                                                                : "bg-slate-200 text-slate-500"
+                                                        }`}
+                                                    >
+                                                        {isDone ? (
+                                                            <CheckCircle2 size={15} />
+                                                        ) : (
+                                                            index + 1
+                                                        )}
+                                                    </div>
+
+                                                    {/* Step Information */}
+                                                    <div className="min-w-0 flex-1 pt-0.5">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <p
+                                                                className={`text-sm font-semibold ${
+                                                                    isDone
+                                                                        ? "text-emerald-900"
+                                                                        : canMarkDone
+                                                                        ? "text-indigo-900"
+                                                                        : "text-slate-600"
+                                                                }`}
+                                                            >
+                                                                {stepItem.label}
+                                                            </p>
+
+                                                            {isDone && stepItem.completedAt && (
+                                                                <span className="text-xs text-slate-500">
+                                                                    {formatDate(
+                                                                        stepItem.completedAt
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {stepItem.notes && (
+                                                            <p className="mt-1 text-xs italic text-slate-500">
+                                                                "{stepItem.notes}"
+                                                            </p>
+                                                        )}
+
+                                                        {/* Action Button for Admin to mark next step as DONE */}
+                                                        {canMarkDone && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleMarkStepDone(
+                                                                        selectedClaim.id ||
+                                                                            selectedClaim._id,
+                                                                        stepItem.step
+                                                                    )
+                                                                }
+                                                                disabled={actionLoading}
+                                                                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                                                            >
+                                                                <CheckCircle2 size={13} />
+                                                                Mark "{stepItem.label}" Completed
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Reason */}
 
                             <div>
                                 <p className="mb-2 text-sm font-semibold text-slate-700">
@@ -1272,6 +1778,8 @@ const BillClaims = () => {
                                         "No reason provided"}
                                 </div>
                             </div>
+
+                            {/* Bill */}
 
                             {selectedClaim.billImage && (
                                 <div>
@@ -1298,6 +1806,8 @@ const BillClaims = () => {
                                 </div>
                             )}
 
+                            {/* Admin remark */}
+
                             {selectedClaim.adminRemark && (
                                 <div className="rounded-xl border border-slate-200 p-4">
                                     <p className="mb-1 text-sm font-semibold text-slate-700">
@@ -1312,6 +1822,8 @@ const BillClaims = () => {
                                 </div>
                             )}
 
+                            {/* Admin approval */}
+
                             {isAdmin &&
                                 selectedClaim.status ===
                                     "PENDING" && (
@@ -1324,7 +1836,8 @@ const BillClaims = () => {
                                             value={remark}
                                             onChange={(e) =>
                                                 setRemark(
-                                                    e.target.value
+                                                    e.target
+                                                        .value
                                                 )
                                             }
                                             rows={3}
@@ -1334,6 +1847,7 @@ const BillClaims = () => {
 
                                         <div className="mt-3 flex gap-3">
                                             <button
+                                                type="button"
                                                 onClick={() =>
                                                     updateClaimStatus(
                                                         "REJECTED"
@@ -1351,6 +1865,7 @@ const BillClaims = () => {
                                             </button>
 
                                             <button
+                                                type="button"
                                                 onClick={() =>
                                                     updateClaimStatus(
                                                         "APPROVED"
@@ -1370,219 +1885,208 @@ const BillClaims = () => {
                                     </div>
                                 )}
 
-                            {isAdmin &&
-                                selectedClaim.status === "APPROVED" && (
-                                    <div className="border-t border-slate-100 pt-5">
-                                        {selectedClaim.billVoucherId ? (
-                                            <button
-                                                onClick={() =>
-                                                    window.open(
-                                                        `/print/bill-voucher/${selectedClaim.billVoucherId}`,
-                                                        "_blank"
-                                                    )
-                                                }
-                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
-                                            >
-                                                <Download size={18} />
-                                                Download Voucher
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() =>
-                                                    openVoucherForm(selectedClaim)
-                                                }
-                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700"
-                                            >
-                                                <FileSpreadsheet size={18} />
-                                                Generate Bill Amount
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
+                            {/* Voucher */}
+
+                            {selectedClaim.status ===
+                                "APPROVED" && (
+                                <div className="border-t border-slate-100 pt-5">
+                                    {selectedClaim.billVoucherId ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                openVoucher(
+                                                    selectedClaim.billVoucherId
+                                                )
+                                            }
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700"
+                                        >
+                                            <Download size={18} />
+                                            Download Voucher
+                                        </button>
+                                    ) : isAdmin ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                openVoucherForm(
+                                                    selectedClaim
+                                                )
+                                            }
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700"
+                                        >
+                                            <FileSpreadsheet
+                                                size={18}
+                                            />
+                                            Generate Voucher
+                                        </button>
+                                    ) : null}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Generate Bill Voucher Modal */}
+            {/* =========================================================
+                VOUCHER MODAL
+            ========================================================= */}
+
             {showVoucherForm && voucherClaim && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b border-slate-100 p-5">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900">
-                                    Generate Bill Amount
+                                    Generate Bill Voucher
                                 </h2>
+
                                 <p className="text-sm text-slate-500">
-                                    Review the details below, then generate a printable voucher.
+                                    Review the details and generate the printable voucher.
                                 </p>
                             </div>
 
                             <button
-                                onClick={() => {
-                                    setShowVoucherForm(false);
-                                    setVoucherClaim(null);
-                                }}
+                                type="button"
+                                onClick={
+                                    closeVoucherForm
+                                }
                                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                             >
                                 <X size={20} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleGenerateVoucher} className="space-y-5 p-5">
+                        <form
+                            onSubmit={
+                                handleGenerateVoucher
+                            }
+                            className="space-y-5 p-5"
+                        >
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Employee Code
-                                    </label>
-                                    <input
-                                        value={voucherFields.employeeCode}
-                                        onChange={(e) => handleVoucherFieldChange("employeeCode", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
+                                {[
+                                    [
+                                        "employeeCode",
+                                        "Employee Code",
+                                    ],
+                                    [
+                                        "employeeName",
+                                        "Employee Name",
+                                    ],
+                                    ["email", "Email ID"],
+                                    ["phone", "Phone No"],
+                                    [
+                                        "joinDate",
+                                        "Joining Date",
+                                    ],
+                                    [
+                                        "designation",
+                                        "Designation",
+                                    ],
+                                    ["department", "Department"],
+                                    ["panNumber", "PAN"],
+                                    ["uanNumber", "UAN No"],
+                                    ["bankName", "Bank Name"],
+                                    [
+                                        "bankAccountNumber",
+                                        "Bank Account No",
+                                    ],
+                                ].map(
+                                    ([field, label]) => (
+                                        <div
+                                            key={field}
+                                        >
+                                            <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                                {label}
+                                            </label>
 
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Employee Name
-                                    </label>
-                                    <input
-                                        value={voucherFields.employeeName}
-                                        onChange={(e) => handleVoucherFieldChange("employeeName", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Email ID
-                                    </label>
-                                    <input
-                                        type="email"
-                                        value={voucherFields.email}
-                                        onChange={(e) => handleVoucherFieldChange("email", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Phone No
-                                    </label>
-                                    <input
-                                        value={voucherFields.phone}
-                                        onChange={(e) => handleVoucherFieldChange("phone", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Joining Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={voucherFields.joinDate}
-                                        onChange={(e) => handleVoucherFieldChange("joinDate", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Designation
-                                    </label>
-                                    <input
-                                        value={voucherFields.designation}
-                                        onChange={(e) => handleVoucherFieldChange("designation", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        PAN
-                                    </label>
-                                    <input
-                                        value={voucherFields.panNumber}
-                                        onChange={(e) => handleVoucherFieldChange("panNumber", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        UAN No
-                                    </label>
-                                    <input
-                                        value={voucherFields.uanNumber}
-                                        onChange={(e) => handleVoucherFieldChange("uanNumber", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Bank Name
-                                    </label>
-                                    <input
-                                        value={voucherFields.bankName}
-                                        onChange={(e) => handleVoucherFieldChange("bankName", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Bank Account No
-                                    </label>
-                                    <input
-                                        value={voucherFields.bankAccountNumber}
-                                        onChange={(e) => handleVoucherFieldChange("bankAccountNumber", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
-                                    />
-                                </div>
+                                            <input
+                                                type={
+                                                    field ===
+                                                    "joinDate"
+                                                        ? "date"
+                                                        : field ===
+                                                            "email"
+                                                          ? "email"
+                                                          : "text"
+                                                }
+                                                value={
+                                                    voucherFields[
+                                                        field
+                                                    ]
+                                                }
+                                                onChange={(
+                                                    e
+                                                ) =>
+                                                    handleVoucherFieldChange(
+                                                        field,
+                                                        e.target
+                                                            .value
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+                                    )
+                                )}
                             </div>
 
                             <div className="border-t border-slate-100 pt-4">
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                            Bill Amount
-                                        </label>
-                                        <div className="relative">
-                                            <IndianRupee size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input
-                                                type="number"
-                                                value={voucherFields.amount}
-                                                onChange={(e) => handleVoucherFieldChange("amount", e.target.value)}
-                                                className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Bill Amount
+                                </label>
 
-                                <div className="mt-4">
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Reason
-                                    </label>
-                                    <textarea
-                                        value={voucherFields.reason}
-                                        onChange={(e) => handleVoucherFieldChange("reason", e.target.value)}
-                                        rows={3}
-                                        className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-500"
+                                <div className="relative">
+                                    <IndianRupee
+                                        size={16}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                    />
+
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="0.01"
+                                        value={
+                                            voucherFields.amount
+                                        }
+                                        onChange={(e) =>
+                                            handleVoucherFieldChange(
+                                                "amount",
+                                                e.target
+                                                    .value
+                                            )
+                                        }
+                                        className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500"
+                                        required
                                     />
                                 </div>
+
+                                <label className="mb-1.5 mt-4 block text-sm font-semibold text-slate-700">
+                                    Reason
+                                </label>
+
+                                <textarea
+                                    value={
+                                        voucherFields.reason
+                                    }
+                                    onChange={(e) =>
+                                        handleVoucherFieldChange(
+                                            "reason",
+                                            e.target.value
+                                        )
+                                    }
+                                    rows={3}
+                                    className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-500"
+                                />
                             </div>
 
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setShowVoucherForm(false);
-                                        setVoucherClaim(null);
-                                    }}
+                                    onClick={
+                                        closeVoucherForm
+                                    }
+                                    disabled={
+                                        generatingVoucher
+                                    }
                                     className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                                 >
                                     Cancel
@@ -1590,13 +2094,18 @@ const BillClaims = () => {
 
                                 <button
                                     type="submit"
-                                    disabled={generatingVoucher}
+                                    disabled={
+                                        generatingVoucher
+                                    }
                                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                                 >
                                     {generatingVoucher && (
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                                     )}
-                                    {generatingVoucher ? "Generating..." : "Generate Voucher"}
+
+                                    {generatingVoucher
+                                        ? "Generating..."
+                                        : "Generate Voucher"}
                                 </button>
                             </div>
                         </form>
@@ -1607,12 +2116,19 @@ const BillClaims = () => {
     );
 };
 
-const StatCard = ({ title, value, icon }) => {
+const StatCard = ({
+    title,
+    value,
+    icon,
+}) => {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-xs font-medium text-slate-500">{title}</p>
+                    <p className="text-xs font-medium text-slate-500">
+                        {title}
+                    </p>
+
                     <p className="mt-0.5 text-xl font-bold text-slate-900">
                         {value}
                     </p>

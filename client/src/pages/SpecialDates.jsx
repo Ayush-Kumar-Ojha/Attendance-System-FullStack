@@ -1,363 +1,390 @@
-import { useState, useEffect, useCallback } from "react";
-import { Gift, Heart, PartyPopper, Save, Loader2, X, Briefcase, MessageSquarePlus } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import api from "../api/axios";
+import React, { useEffect, useState, useMemo } from "react";
+import {
+    Sparkles,
+    Gift,
+    Edit3,
+    X,
+    Search,
+    Cake,
+    Heart,
+    PartyPopper,
+    Send,
+} from "lucide-react";
 import toast from "react-hot-toast";
-import { format, differenceInYears } from "date-fns";
-import Loading from "../components/Loading";
+import api from "../api/axios";
 
 const SpecialDates = () => {
-    const { user } = useAuth();
-    const isAdmin = user?.role === "ADMIN";
-
+    const [specialDatesData, setSpecialDatesData] = useState({
+        today: [],
+        all: [],
+    });
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+
+    // Modal state for editing message
+    const [selectedCelebration, setSelectedCelebration] = useState(null);
+    const [messageInput, setMessageInput] = useState("");
     const [saving, setSaving] = useState(false);
 
-    // Employee state
-    const [dateOfBirth, setDateOfBirth] = useState("");
-    const [anniversaryDate, setAnniversaryDate] = useState("");
-    const [joinDate, setJoinDate] = useState(null);
-    const [celebration, setCelebration] = useState(null);
-    const [hrMessage, setHrMessage] = useState("");
-
-    // Admin state
-    const [todaysCelebrations, setTodaysCelebrations] = useState([]);
-    const [allDates, setAllDates] = useState([]);
-    const [messageModal, setMessageModal] = useState(null); // { employeeId, name, currentMessage }
-    const [messageInput, setMessageInput] = useState("");
-    const [savingMessage, setSavingMessage] = useState(false);
-
-    const checkCelebration = (data) => {
-        if (!data) return;
-        const today = new Date();
-        const todayMonthDay = `${today.getMonth()}-${today.getDate()}`;
-
-        if (data.dateOfBirth) {
-            const dob = new Date(data.dateOfBirth);
-            if (`${dob.getMonth()}-${dob.getDate()}` === todayMonthDay) {
-                setCelebration({ type: "birthday" });
-                return;
-            }
-        }
-        if (data.anniversaryDate) {
-            const anniv = new Date(data.anniversaryDate);
-            if (`${anniv.getMonth()}-${anniv.getDate()}` === todayMonthDay) {
-                setCelebration({ type: "anniversary" });
-                return;
-            }
-        }
-        if (data.joinDate) {
-            const join = new Date(data.joinDate);
-            if (`${join.getMonth()}-${join.getDate()}` === todayMonthDay) {
-                const years = differenceInYears(today, join);
-                if (years > 0) {
-                    setCelebration({ type: "workAnniversary", years });
-                }
-            }
-        }
-    };
-
-    const fetchData = useCallback(async () => {
+    const fetchSpecialDates = async () => {
         try {
-            const res = await api.get("/special-dates");
-            if (isAdmin) {
-                setTodaysCelebrations(res.data.today || []);
-                setAllDates(res.data.all || []);
-            } else {
-                const data = res.data.data;
-                if (data?.dateOfBirth) setDateOfBirth(data.dateOfBirth.split("T")[0]);
-                if (data?.anniversaryDate) setAnniversaryDate(data.anniversaryDate.split("T")[0]);
-                if (data?.joinDate) setJoinDate(data.joinDate);
-                if (data?.hrMessage) setHrMessage(data.hrMessage);
-                checkCelebration(data);
-            }
+            setLoading(true);
+            const response = await api.get("/special-dates");
+            setSpecialDatesData(response.data || { today: [], all: [] });
         } catch (error) {
-            toast.error(error?.response?.data?.error || error.message);
+            console.error("Fetch Special Dates Error:", error);
+            toast.error(
+                error.response?.data?.error || "Failed to load special dates"
+            );
         } finally {
             setLoading(false);
         }
-    }, [isAdmin]);
+    };
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        fetchSpecialDates();
+    }, []);
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+    const openEditModal = (celebration) => {
+        setSelectedCelebration(celebration);
+        setMessageInput(celebration.message || "");
+    };
+
+    const handleSaveMessage = async () => {
+        if (!selectedCelebration) return;
+
         try {
-            await api.post("/special-dates", { dateOfBirth, anniversaryDate });
-            toast.success("Special dates saved");
+            setSaving(true);
+            await api.post(
+                `/special-dates/${selectedCelebration.employeeId}/message`,
+                { message: messageInput }
+            );
+
+            toast.success("Wish message saved successfully!");
+            setSelectedCelebration(null);
+            setMessageInput("");
+            await fetchSpecialDates();
         } catch (error) {
-            toast.error(error?.response?.data?.error || error.message);
+            console.error("Save Wish Error:", error);
+            toast.error("Failed to save wish message");
         } finally {
             setSaving(false);
         }
     };
 
-    const openMessageModal = (c) => {
-        setMessageModal(c);
-        setMessageInput(c.message || "");
-    };
-
-    const handleSaveMessage = async (e) => {
-        e.preventDefault();
-        setSavingMessage(true);
+    const formatDate = (dateString) => {
+        if (!dateString) return "—";
         try {
-            await api.post(`/special-dates/${messageModal.employeeId}/message`, { message: messageInput });
-            toast.success("Message saved");
-            setMessageModal(null);
-            fetchData();
-        } catch (error) {
-            toast.error(error?.response?.data?.error || error.message);
-        } finally {
-            setSavingMessage(false);
+            const date = new Date(dateString);
+            if (Number.isNaN(date.getTime())) return "—";
+            return date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            });
+        } catch {
+            return "—";
         }
     };
 
-    const celebrationIcons = {
-        birthday: <Gift className="w-8 h-8 text-amber-500 shrink-0" />,
-        anniversary: <Heart className="w-8 h-8 text-rose-500 shrink-0" />,
-        workAnniversary: <Briefcase className="w-8 h-8 text-indigo-500 shrink-0" />,
+    const formatShortDate = (dateString) => {
+        if (!dateString) return "—";
+        try {
+            const date = new Date(dateString);
+            if (Number.isNaN(date.getTime())) return "—";
+            return date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+            });
+        } catch {
+            return "—";
+        }
     };
 
-    const celebrationLabels = {
-        birthday: "🎂 Birthday today!",
-        anniversary: "💍 Anniversary today!",
-        workAnniversary: (years) => `🎉 Completed ${years} year${years > 1 ? "s" : ""} today!`,
-    };
+    const filteredEmployees = useMemo(() => {
+        const allList = specialDatesData.all || [];
+        if (!search.trim()) return allList;
 
-    if (loading) return <Loading />;
+        const term = search.toLowerCase();
+        return allList.filter(
+            (emp) =>
+                emp.name?.toLowerCase().includes(term) ||
+                emp.department?.toLowerCase().includes(term)
+        );
+    }, [specialDatesData.all, search]);
 
     return (
-        <div className="animate-fade-in">
-            <div className="page-header">
-                <h1 className="page-title">Special Dates</h1>
-                <p className="page-subtitle">
-                    {isAdmin
-                        ? "Celebrate your team's milestones"
-                        : "Let us celebrate your special days with you"}
+        <div className="space-y-8 animate-fade-in pb-12">
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                    Special Dates
+                </h1>
+                <p className="text-sm text-slate-500 mt-0.5">
+                    Celebrate your team's milestones and send special wishes
                 </p>
             </div>
 
-            {isAdmin ? (
-                <>
-                    <div className="mb-8">
-                        <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                            <PartyPopper className="w-4 h-4 text-indigo-600" />
-                            Today's Celebrations
-                        </h2>
+            {/* =========================================================
+                TODAY'S CELEBRATIONS SECTION
+            ========================================================= */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                    <span>Today's Celebrations</span>
+                    {specialDatesData.today?.length > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                            {specialDatesData.today.length}
+                        </span>
+                    )}
+                </div>
 
-                        {todaysCelebrations.length === 0 ? (
-                            <div className="card p-6 text-center text-slate-400 text-sm">
-                                No celebrations today
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {todaysCelebrations.map((c) => (
-                                    <div key={c.employeeId + c.type} className="card p-5 border-l-4 border-amber-400">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            {celebrationIcons[c.type]}
-                                            <div>
-                                                <p className="font-semibold text-slate-900">{c.name}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    {c.type === "workAnniversary"
-                                                        ? celebrationLabels.workAnniversary(c.years)
-                                                        : celebrationLabels[c.type]}
-                                                </p>
+                {loading ? (
+                    <div className="flex items-center justify-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
+                    </div>
+                ) : specialDatesData.today?.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+                            <PartyPopper size={24} />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                            No celebrations today
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Check back tomorrow for upcoming team birthdays or work anniversaries!
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {specialDatesData.today.map((item, index) => {
+                            const isBirthday = item.type === "birthday";
+                            const isAnniversary = item.type === "anniversary";
+                            const isWork = item.type === "workAnniversary";
+
+                            return (
+                                <div
+                                    key={`${item.employeeId}-${index}`}
+                                    className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-indigo-200"
+                                >
+                                    <div>
+                                        {/* Card Top Header */}
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <div
+                                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-base font-bold shadow-xs ${
+                                                        isBirthday
+                                                            ? "bg-rose-50 text-rose-600 border border-rose-100"
+                                                            : isAnniversary
+                                                            ? "bg-purple-50 text-purple-600 border border-purple-100"
+                                                            : "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                                                    }`}
+                                                >
+                                                    {isBirthday && <Cake size={20} />}
+                                                    {isAnniversary && <Heart size={20} />}
+                                                    {isWork && <PartyPopper size={20} />}
+                                                </div>
+
+                                                <div>
+                                                    <h3 className="font-bold text-slate-900 text-sm">
+                                                        {item.name}
+                                                    </h3>
+                                                    <p className="text-xs font-semibold mt-0.5 flex items-center gap-1.5">
+                                                        {isBirthday && (
+                                                            <span className="text-rose-600">🎂 Birthday today!</span>
+                                                        )}
+                                                        {isAnniversary && (
+                                                            <span className="text-purple-600">💍 Marriage Anniversary!</span>
+                                                        )}
+                                                        {isWork && (
+                                                            <span className="text-indigo-600">
+                                                                🌟 Completed {item.years} year{item.years > 1 ? "s" : ""} today!
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                        {c.message && (
-                                            <p className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2 mb-2 italic">"{c.message}"</p>
-                                        )}
-                                        <button
-                                            onClick={() => openMessageModal(c)}
-                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                                        >
-                                            <MessageSquarePlus className="w-3.5 h-3.5" />
-                                            {c.message ? "Edit message" : "Write a message"}
-                                        </button>
+
+                                        {/* Crisp, clean, bold Wish Message Box */}
+                                        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 p-3.5 text-xs text-slate-800">
+                                            {item.message ? (
+                                                <p className="font-semibold text-sm text-slate-900 tracking-tight leading-relaxed break-words">
+                                                    "{item.message}"
+                                                </p>
+                                            ) : (
+                                                <p className="text-slate-400 font-medium">
+                                                    No wish message sent yet...
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+
+                                    {/* Edit Wish Action */}
+                                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditModal(item)}
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 transition"
+                                        >
+                                            <Edit3 size={13} />
+                                            {item.message ? "Edit message" : "Add wish message"}
+                                        </button>
+
+                                        {item.message && (
+                                            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                                                Wish Active ✓
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
+                )}
+            </div>
 
-                    <div className="card overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="table-modern">
-                                <thead>
-                                    <tr>
-                                        <th>Employee</th>
-                                        <th>Department</th>
-                                        <th>Birthday</th>
-                                        <th>Anniversary</th>
-                                        <th>Joining Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {allDates.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-center py-12 text-slate-400">
-                                                No data found
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        allDates.map((emp) => (
-                                            <tr key={emp.employeeId}>
-                                                <td className="text-slate-900">{emp.name}</td>
-                                                <td className="text-slate-500">{emp.department || "-"}</td>
-                                                <td className="text-slate-500">
-                                                    {emp.dateOfBirth ? format(new Date(emp.dateOfBirth), "MMM dd") : "-"}
-                                                </td>
-                                                <td className="text-slate-500">
-                                                    {emp.anniversaryDate ? format(new Date(emp.anniversaryDate), "MMM dd") : "-"}
-                                                </td>
-                                                <td className="text-slate-500">
-                                                    {emp.joinDate ? format(new Date(emp.joinDate), "MMM dd, yyyy") : "-"}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </>
-            ) : (
-                <form onSubmit={handleSave} className="card p-5 sm:p-6 max-w-lg">
-                    <h2 className="text-base font-medium text-slate-900 mb-6 pb-4 border-b border-slate-100 flex items-center gap-2">
-                        <Gift className="w-5 h-5 text-slate-400" />
-                        Your Special Dates
-                    </h2>
-
-                    <div className="space-y-5">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Date of Birth
-                            </label>
-                            <input
-                                type="date"
-                                value={dateOfBirth}
-                                onChange={(e) => setDateOfBirth(e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Anniversary Date
-                            </label>
-                            <input
-                                type="date"
-                                value={anniversaryDate}
-                                onChange={(e) => setAnniversaryDate(e.target.value)}
-                            />
-                            <p className="text-xs text-slate-400 mt-1.5">Optional — leave blank if not applicable</p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Joining Date
-                            </label>
-                            <input
-                                disabled
-                                value={joinDate ? format(new Date(joinDate), "MMMM dd, yyyy") : "Not available"}
-                                className="bg-slate-50 text-slate-400 cursor-not-allowed"
-                            />
-                            <p className="text-xs text-slate-400 mt-1.5">Set by your organization — we'll celebrate your work anniversary automatically</p>
-                        </div>
-
-                        <div className="flex justify-end pt-2">
-                            <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 justify-center w-full sm:w-auto">
-                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                Save Changes
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            )}
-
-            {/* Celebration Popup (Employee) */}
-            {celebration && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-                    onClick={() => setCelebration(null)}
-                >
-                    <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center animate-fade-in"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={() => setCelebration(null)}
-                            className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-
-                        <div className="text-5xl mb-4">
-                            {celebration.type === "birthday" && "🎉"}
-                            {celebration.type === "anniversary" && "💐"}
-                            {celebration.type === "workAnniversary" && "🏆"}
-                        </div>
-                        <h2 className="text-xl font-bold text-slate-900 mb-2">
-                            {celebration.type === "birthday" && "Happy Birthday!"}
-                            {celebration.type === "anniversary" && "Happy Anniversary!"}
-                            {celebration.type === "workAnniversary" && `${celebration.years} Year${celebration.years > 1 ? "s" : ""} With Us!`}
+            {/* =========================================================
+                ALL EMPLOYEES SPECIAL DATES TABLE
+            ========================================================= */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+                <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 className="font-bold text-slate-900 text-base">
+                            Employee Special Dates Directory
                         </h2>
-                        <p className="text-sm text-slate-500 mb-3">
-                            {celebration.type === "birthday" && "Wishing you a fantastic year ahead! 🎂"}
-                            {celebration.type === "anniversary" && "Wishing you many more wonderful years! 💍"}
-                            {celebration.type === "workAnniversary" && "Thank you for being part of the team! 🎉"}
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Overview of birth dates, anniversaries, and joining dates
                         </p>
-                        {hrMessage && (
-                            <p className="text-sm text-slate-700 bg-indigo-50 rounded-xl p-3 italic mt-3">
-                                "{hrMessage}"
-                            </p>
-                        )}
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                        <Search
+                            size={15}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Search employee..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-xs outline-none focus:border-indigo-500"
+                        />
                     </div>
                 </div>
-            )}
 
-            {/* Admin: Write/Edit Message Modal */}
-            {messageModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-                    onClick={() => setMessageModal(null)}
-                >
-                    <div
-                        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between p-6 pb-0">
-                            <h2 className="text-lg font-semibold text-slate-800">
-                                Message for {messageModal.name}
-                            </h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                            <tr>
+                                <th className="px-6 py-4">Employee</th>
+                                <th className="px-6 py-4">Department</th>
+                                <th className="px-6 py-4">Birthday</th>
+                                <th className="px-6 py-4">Anniversary</th>
+                                <th className="px-6 py-4">Joining Date</th>
+                            </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                            {filteredEmployees.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan={5}
+                                        className="px-6 py-12 text-center text-slate-400"
+                                    >
+                                        No employee special dates found
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredEmployees.map((emp) => (
+                                    <tr
+                                        key={emp.employeeId}
+                                        className="transition hover:bg-slate-50/60"
+                                    >
+                                        <td className="px-6 py-4 font-bold text-slate-900">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                                    {emp.name?.charAt(0) || "E"}
+                                                </div>
+                                                <span>{emp.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {emp.department || "—"}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {formatShortDate(emp.dateOfBirth)}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {formatShortDate(emp.anniversaryDate)}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {formatDate(emp.joinDate)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* =========================================================
+                EDIT WISH MESSAGE MODAL
+            ========================================================= */}
+            {selectedCelebration && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-5">
+                        <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">
+                                    Message for {selectedCelebration.name}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    This wish will pop up on their employee dashboard for 24 hours.
+                                </p>
+                            </div>
+
                             <button
-                                onClick={() => setMessageModal(null)}
-                                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                                onClick={() => setSelectedCelebration(null)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                             >
-                                <X className="w-5 h-5" />
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSaveMessage} className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Wish Message
+                            </label>
                             <textarea
+                                rows={4}
                                 value={messageInput}
                                 onChange={(e) => setMessageInput(e.target.value)}
-                                rows={4}
-                                className="resize-none"
-                                placeholder="Write a personal message they'll see on their special day..."
+                                placeholder="e.g. Wishing you a very Happy Birthday! Have a wonderful year ahead 🎉"
+                                className="w-full resize-none rounded-xl border border-slate-200 p-3.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                autoFocus
                             />
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setMessageModal(null)} className="btn-secondary flex-1">
-                                    Cancel
-                                </button>
-                                <button type="submit" disabled={savingMessage} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                                    {savingMessage && <Loader2 className="w-4 h-4 animate-spin" />}
-                                    Save Message
-                                </button>
-                            </div>
-                        </form>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCelebration(null)}
+                                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveMessage}
+                                disabled={saving}
+                                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 shadow-sm"
+                            >
+                                <Send size={14} />
+                                {saving ? "Saving..." : "Save Message"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

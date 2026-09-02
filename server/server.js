@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import multer from "multer";
+import path from "path";
 import connectDB from "./config/db.js";
 import authRouter from "./routes/authRoutes.js";
 import employeesRouter from "./routes/employeeRoutes.js";
@@ -22,35 +23,46 @@ import documentRouter from "./routes/documentRoutes.js";
 import billClaimRouter from "./routes/billClaimRoutes.js";
 import advanceRouter from "./routes/advanceRoutes.js";
 
-
-const app = express()
+const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(cors())
-app.use(express.json())
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static uploads serving for disk fallback
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Routes
-app.get("/", (req, res)=> res.send("Server is running"))
-app.use("/api/auth",authRouter)
+app.get("/", (req, res) => res.send("Server is running"));
+app.use("/api/auth", authRouter);
 app.use("/api/employees", employeesRouter);
-app.use("/api/profile",profileRouter)
-app.use("/api/attendance",attendanceRouter)
-app.use("/api/leave", multer().none(), leaveRouter)
-app.use("/api/payslip",payslipRouter)
-app.use("/api/dashboard",dashboardRouter)
-app.use("/api/departments",departmentRouter)
-app.use("/api/announcements",announcementRouter)
-app.use("/api/special-dates", specialDatesRouter)
-app.use("/api/reports", reportRouter)
-app.use("/api/posts", postRouter)
-app.use("/api/messages", messageRouter)
-app.use("/api/documents", documentRouter)
+app.use("/api/profile", profileRouter);
+app.use("/api/attendance", attendanceRouter);
+app.use("/api/leave", multer().none(), leaveRouter);
+app.use("/api/payslip", payslipRouter);
+app.use("/api/dashboard", dashboardRouter);
+app.use("/api/departments", departmentRouter);
+app.use("/api/announcements", announcementRouter);
+app.use("/api/special-dates", specialDatesRouter);
+app.use("/api/reports", reportRouter);
+app.use("/api/posts", postRouter);
+app.use("/api/messages", messageRouter);
+app.use("/api/documents", documentRouter);
 app.use("/api/bill-claims", billClaimRouter);
 app.use("/api/advances", advanceRouter);
 
-
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
-await connectDB()
-app.listen(PORT, ()=> console.log(`Server running on port ${PORT}`))
+const startServer = async () => {
+    try {
+        await connectDB();
+        app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    } catch (error) {
+        console.error("Failed to connect to database:", error);
+        process.exit(1);
+    }
+};
+
+startServer();
