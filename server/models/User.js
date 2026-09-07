@@ -30,6 +30,25 @@ const userSchema = new mongoose.Schema(
     cvFileName: { type: String, default: null },
     skills: { type: [String], default: [] },
     phone: { type: String, default: "" },
+
+    // CHAT & POSTING RESTRICTIONS
+    isChatBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    postingBlockType: {
+      type: String,
+      enum: ["NONE", "TEMPORARY", "PERMANENT"],
+      default: "NONE",
+    },
+    postingBlockedUntil: {
+      type: Date,
+      default: null,
+    },
+    postingBlockReason: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

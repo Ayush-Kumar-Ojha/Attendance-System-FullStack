@@ -7,6 +7,9 @@ import {
     getOrCreateConversation,
     getMessages,
     sendMessage,
+    toggleBlockChat,
+    getAdminsList,
+    getBlockedChatUsers,
 } from "../controllers/messageController.js";
 
 import {
@@ -17,39 +20,20 @@ import {
 
 const messageRouter = Router();
 
-// Message requests
 messageRouter.get("/requests", protect, getMessageRequests);
 messageRouter.post("/requests", protect, sendMessageRequest);
-messageRouter.patch(
-    "/requests/:id",
-    protect,
-    respondToMessageRequest
-);
+messageRouter.patch("/requests/:id", protect, respondToMessageRequest);
 
-// Conversations
-messageRouter.get(
-    "/conversations",
-    protect,
-    getConversations
-);
+// Admin management routes
+messageRouter.get("/admins", protect, getAdminsList);
+messageRouter.get("/blocked-users", protect, getBlockedChatUsers);
+messageRouter.post("/toggle-block", protect, toggleBlockChat);
 
-messageRouter.post(
-    "/conversations",
-    protect,
-    getOrCreateConversation
-);
+// Conversation routes
+messageRouter.get("/conversations", protect, getConversations);
+messageRouter.post("/conversations", protect, getOrCreateConversation);
 
-// Messages
-messageRouter.get(
-    "/conversations/:id/messages",
-    protect,
-    getMessages
-);
-
-messageRouter.post(
-    "/conversations/:id/messages",
-    protect,
-    sendMessage
-);
+messageRouter.get("/conversations/:id/messages", protect, getMessages);
+messageRouter.post("/conversations/:id/messages", protect, sendMessage);
 
 export default messageRouter;

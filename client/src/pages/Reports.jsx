@@ -556,19 +556,6 @@ const Reports = () => {
                 </div>
 
                 <div className="flex items-center gap-2 print:hidden">
-                    <button
-                        onClick={fetchReport}
-                        disabled={fetchingReport}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw
-                            className={`w-4 h-4 ${
-                                fetchingReport ? "animate-spin" : ""
-                            }`}
-                        />
-
-                        Refresh
-                    </button>
 
                     <button
                         onClick={handlePrint}

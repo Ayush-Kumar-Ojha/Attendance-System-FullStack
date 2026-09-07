@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { protect } from "../middleware/auth.js";
+import { protect, protectAdmin } from "../middleware/auth.js";
 import { uploadPostImages } from "../middleware/uploadPost.js";
 
 import {
@@ -10,11 +10,20 @@ import {
     toggleLike,
     addComment,
     resharePost,
+    restrictUserPosting,
+    getUserPostingRestriction,
+    getRestrictedPosters,
 } from "../controllers/postController.js";
 
 const postRouter = Router();
 
 postRouter.get("/", protect, getPosts);
+
+postRouter.get("/restricted-users", protect, protectAdmin, getRestrictedPosters);
+postRouter.get("/user-restriction", protect, getUserPostingRestriction);
+postRouter.get("/user-restriction/:userId", protect, getUserPostingRestriction);
+
+postRouter.post("/restrict-user/:userId", protect, protectAdmin, restrictUserPosting);
 
 postRouter.post(
     "/",
@@ -41,7 +50,6 @@ postRouter.post(
     addComment
 );
 
-// Reshare
 postRouter.post(
     "/:id/reshare",
     protect,

@@ -1,6 +1,9 @@
 import { Router } from "express";
 
-import { protect, protectAdmin } from "../middleware/auth.js";
+import {
+    protect,
+    protectAdmin,
+} from "../middleware/auth.js";
 
 import {
     createLeave,
@@ -11,13 +14,39 @@ import {
 
 const leaveRouter = Router();
 
-// Employee - Apply for leave
-leaveRouter.post("/", protect, createLeave);
+// ============================================================
+// EMPLOYEE - APPLY FOR LEAVE
+// POST /api/leave
+// ============================================================
 
-// Admin / Employee - Get leaves
-leaveRouter.get("/", protect, getLeaves);
+leaveRouter.post(
+    "/",
+    protect,
+    createLeave
+);
 
-// Admin - Approve / Emergency Approve / LOP / Reject
+// ============================================================
+// ADMIN / EMPLOYEE - GET LEAVES
+// GET /api/leave
+// ============================================================
+
+leaveRouter.get(
+    "/",
+    protect,
+    getLeaves
+);
+
+// ============================================================
+// ADMIN - UPDATE LEAVE
+//
+// Admin actions:
+// 1. Accept
+// 2. Accept as Loss of Pay
+// 3. Reject
+//
+// Existing Review / Edit functionality is preserved.
+// ============================================================
+
 leaveRouter.patch(
     "/:id",
     protect,
@@ -25,7 +54,11 @@ leaveRouter.patch(
     updateLeaveStatus
 );
 
-// Employee - Cancel own pending leave
+// ============================================================
+// EMPLOYEE - CANCEL OWN PENDING LEAVE
+// DELETE /api/leave/:id
+// ============================================================
+
 leaveRouter.delete(
     "/:id",
     protect,

@@ -1,4 +1,9 @@
-import { useState, useMemo } from "react";
+import {
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+
 import {
     Plus,
     Trash2,
@@ -11,16 +16,31 @@ import {
     Clock,
     CheckCircle2,
 } from "lucide-react";
+
 import { format } from "date-fns";
 import logo from "../assets/logo.jpg";
+import api from "../api/axios";
+
+// ============================================================
+// ITEM
+// ============================================================
 
 const emptyItem = () => ({
     itemNo: "",
+    idNo: "",
+    partNo: "",
     description: "",
+    manufacturerPartNo: "",
     qty: "",
+    uom: "",
+    estimatedDor: "",
     hsnCode: "",
     remarks: "",
 });
+
+// ============================================================
+// APPROVAL MATRIX
+// ============================================================
 
 const APPROVAL_COLUMNS = [
     "Requested By",
@@ -32,25 +52,29 @@ const APPROVAL_COLUMNS = [
 
 const emptyApprovalRow = () =>
     Object.fromEntries(
-        APPROVAL_COLUMNS.map((col) => [
-            col,
-            "",
-        ])
+        APPROVAL_COLUMNS.map(
+            (column) => [
+                column,
+                "",
+            ]
+        )
     );
 
 // ============================================================
-// TODAY DATE FOR DATE INPUT
+// TODAY DATE
 // ============================================================
 
 const getTodayInputDate = () => {
-    const now = new Date();
+    const now =
+        new Date();
 
     const year =
         now.getFullYear();
 
     const month =
         String(
-            now.getMonth() + 1
+            now.getMonth() +
+            1
         ).padStart(
             2,
             "0"
@@ -67,354 +91,631 @@ const getTodayInputDate = () => {
     return `${year}-${month}-${day}`;
 };
 
-// Sample past gate passes data
+// ============================================================
+// AUTO RESIZE TEXTAREA
+// ============================================================
+
+const autoResizeTextarea = (
+    element
+) => {
+    if (!element) {
+        return;
+    }
+
+    element.style.height =
+        "auto";
+
+    element.style.height =
+        `${element.scrollHeight}px`;
+};
+
+// ============================================================
+// FALLBACK HISTORY
+// ============================================================
+
 const INITIAL_PAST_PASSES = [
     {
         id: 1,
-        gatePassNo: "GP-2026-001",
-        passType: "Returnable",
-        to: "TechCorp India Pvt Ltd, Whitefield, Bengaluru",
-        modeOfTransport: "DOCKET #7712",
-        purpose: "Equipment Repair & Calibration",
-        createdAt: "2026-08-24",
+
+        gatePassNo:
+            "GP-2026-001",
+
+        passType:
+            "Returnable",
+
+        to:
+            "TechCorp India Pvt Ltd, Whitefield, Bengaluru",
+
+        modeOfTransport:
+            "DOCKET #7712",
+
+        purpose:
+            "Equipment Repair & Calibration",
+
+        createdAt:
+            "2026-08-24",
     },
+
     {
         id: 2,
-        gatePassNo: "GP-2026-002",
-        passType: "Non-Returnable",
-        to: "Apex Logistics, Electronic City, Bengaluru",
-        modeOfTransport: "Vehicle KA-01-MJ-4321",
-        purpose: "Scrap Material Disposal",
-        createdAt: "2026-08-20",
+
+        gatePassNo:
+            "GP-2026-002",
+
+        passType:
+            "Non-Returnable",
+
+        to:
+            "Apex Logistics, Electronic City, Bengaluru",
+
+        modeOfTransport:
+            "Vehicle KA-01-MJ-4321",
+
+        purpose:
+            "Scrap Material Disposal",
+
+        createdAt:
+            "2026-08-20",
     },
+
     {
         id: 3,
-        gatePassNo: "GP-2026-003",
-        passType: "Returnable",
-        to: "SmartSys Solutions, Indiranagar, Bengaluru",
-        modeOfTransport: "Courier Express",
-        purpose: "Demo Unit Testing",
-        createdAt: "2026-08-15",
+
+        gatePassNo:
+            "GP-2026-003",
+
+        passType:
+            "Returnable",
+
+        to:
+            "SmartSys Solutions, Indiranagar, Bengaluru",
+
+        modeOfTransport:
+            "Courier Express",
+
+        purpose:
+            "Demo Unit Testing",
+
+        createdAt:
+            "2026-08-15",
     },
 ];
 
-const GatePass = () => {
+// ============================================================
+// NORMALIZE OLD + NEW RECORDS
+// ============================================================
 
-    // Navigation view:
-    // 'list' | 'create'
+const normalizeGatePass = (
+    pass
+) => ({
+    ...pass,
+
+    id:
+        pass.id ||
+        pass._id,
+
+    createdAt:
+        pass.gatePassDate ||
+        pass.createdAt,
+
+    items:
+        Array.isArray(
+            pass.items
+        )
+            ? pass.items.map(
+                (
+                    item,
+                    index
+                ) => ({
+                    ...emptyItem(),
+
+                    ...item,
+
+                    itemNo:
+                        item.itemNo ||
+                        String(
+                            index +
+                            1
+                        ),
+
+                    // Old records using hsnCode
+                    // continue to display.
+                    partNo:
+                        item.partNo ||
+                        item.hsnCode ||
+                        "",
+                })
+            )
+            : [],
+
+    approvalName:
+        pass.approvalName ||
+        emptyApprovalRow(),
+
+    approvalEmpNo:
+        pass.approvalEmpNo ||
+        emptyApprovalRow(),
+
+    approvalDept:
+        pass.approvalDept ||
+        emptyApprovalRow(),
+});
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
+const GatePass = () => {
+    // ========================================================
+    // PAGE
+    // ========================================================
+
     const [
         view,
         setView,
-    ] =
-        useState(
-            "list"
-        );
+    ] = useState(
+        "list"
+    );
 
-    // ============================================================
-    // HISTORY STATE
-    // ============================================================
+    // ========================================================
+    // HISTORY
+    // ========================================================
 
     const [
         pastPasses,
         setPastPasses,
-    ] =
-        useState(
-            INITIAL_PAST_PASSES
-        );
+    ] = useState(
+        INITIAL_PAST_PASSES
+    );
+
+    const [
+        canViewAll,
+        setCanViewAll,
+    ] = useState(
+        false
+    );
+
+    const [
+        savingGatePass,
+        setSavingGatePass,
+    ] = useState(
+        false
+    );
+
+    const [
+        savedPassId,
+        setSavedPassId,
+    ] = useState(
+        null
+    );
+
+    // ========================================================
+    // FILTERS
+    // ========================================================
 
     const [
         search,
         setSearch,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         typeFilter,
         setTypeFilter,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         monthFilter,
         setMonthFilter,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         yearFilter,
         setYearFilter,
-    ] =
-        useState(
-            String(
-                new Date().getFullYear()
-            )
-        );
+    ] = useState(
+        String(
+            new Date().getFullYear()
+        )
+    );
 
-    // ============================================================
-    // GATE PASS FORM STATE
-    // ============================================================
+    // ========================================================
+    // FORM
+    // ========================================================
 
     const [
         passType,
         setPassType,
-    ] =
-        useState(
-            "Returnable"
-        );
+    ] = useState(
+        "Returnable"
+    );
 
     const [
         to,
         setTo,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         gatePassNo,
         setGatePassNo,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         modeOfTransport,
         setModeOfTransport,
-    ] =
-        useState(
-            ""
-        );
+    ] = useState(
+        ""
+    );
 
     const [
         purpose,
         setPurpose,
-    ] =
-        useState(
-            ""
-        );
-
-    // ============================================================
-    // NEW — EDITABLE AUTO-FILLED DATE
-    // ============================================================
+    ] = useState(
+        ""
+    );
 
     const [
         gatePassDate,
         setGatePassDate,
-    ] =
-        useState(
-            getTodayInputDate()
-        );
+    ] = useState(
+        getTodayInputDate()
+    );
 
     const [
         items,
         setItems,
-    ] =
-        useState([
-            emptyItem(),
-            emptyItem(),
-        ]);
+    ] = useState([
+        emptyItem(),
+    ]);
 
     const [
         approvalName,
         setApprovalName,
-    ] =
-        useState(
-            emptyApprovalRow()
-        );
+    ] = useState(
+        emptyApprovalRow()
+    );
 
     const [
         approvalEmpNo,
         setApprovalEmpNo,
-    ] =
-        useState(
-            emptyApprovalRow()
-        );
+    ] = useState(
+        emptyApprovalRow()
+    );
 
-    // ============================================================
-    // FILTER LOGIC
-    // ============================================================
+    const [
+        approvalDept,
+        setApprovalDept,
+    ] = useState(
+        emptyApprovalRow()
+    );
+
+    // ========================================================
+    // LOAD HISTORY
+    // ========================================================
+
+    useEffect(() => {
+        let mounted =
+            true;
+
+        const fetchGatePassHistory =
+            async () => {
+                try {
+                    const response =
+                        await api.get(
+                            "/gate-passes"
+                        );
+
+                    if (
+                        !mounted
+                    ) {
+                        return;
+                    }
+
+                    const data =
+                        response.data
+                            ?.data ||
+                        [];
+
+                    setPastPasses(
+                        data.map(
+                            normalizeGatePass
+                        )
+                    );
+
+                    setCanViewAll(
+                        Boolean(
+                            response.data
+                                ?.canViewAll
+                        )
+                    );
+                } catch (error) {
+                    console.error(
+                        "Fetch Gate Pass History Error:",
+                        error
+                    );
+                }
+            };
+
+        fetchGatePassHistory();
+
+        return () => {
+            mounted =
+                false;
+        };
+    }, []);
+
+    // ========================================================
+    // FILTERED HISTORY
+    // ========================================================
 
     const filteredPasses =
-        useMemo(
-            () => {
-                return pastPasses.filter(
-                    (
-                        pass
-                    ) => {
-                        const matchesSearch =
-                            !search.trim() ||
-                            pass.to
-                                .toLowerCase()
-                                .includes(
-                                    search.toLowerCase()
-                                ) ||
-                            pass.gatePassNo
-                                .toLowerCase()
-                                .includes(
-                                    search.toLowerCase()
-                                ) ||
-                            pass.purpose
-                                .toLowerCase()
-                                .includes(
-                                    search.toLowerCase()
-                                );
+        useMemo(() => {
+            return pastPasses.filter(
+                (pass) => {
+                    const keyword =
+                        search
+                            .trim()
+                            .toLowerCase();
 
-                        const matchesType =
-                            !typeFilter ||
-                            pass.passType ===
-                            typeFilter;
+                    const passTo =
+                        String(
+                            pass.to ||
+                            ""
+                        ).toLowerCase();
 
-                        const passDate =
-                            new Date(
-                                pass.createdAt
-                            );
+                    const passNo =
+                        String(
+                            pass.gatePassNo ||
+                            ""
+                        ).toLowerCase();
 
-                        const matchesMonth =
-                            !monthFilter ||
-                            passDate.getMonth() +
-                            1 ===
-                            Number(
-                                monthFilter
-                            );
+                    const passPurpose =
+                        String(
+                            pass.purpose ||
+                            ""
+                        ).toLowerCase();
 
-                        const matchesYear =
-                            !yearFilter ||
-                            passDate.getFullYear() ===
-                            Number(
-                                yearFilter
-                            );
-
-                        return (
-                            matchesSearch &&
-                            matchesType &&
-                            matchesMonth &&
-                            matchesYear
+                    const matchesSearch =
+                        !keyword ||
+                        passTo.includes(
+                            keyword
+                        ) ||
+                        passNo.includes(
+                            keyword
+                        ) ||
+                        passPurpose.includes(
+                            keyword
                         );
-                    }
-                );
-            },
-            [
-                pastPasses,
-                search,
-                typeFilter,
-                monthFilter,
-                yearFilter,
-            ]
-        );
 
-    // ============================================================
-    // STATISTICS
-    // ============================================================
+                    const matchesType =
+                        !typeFilter ||
+                        pass.passType ===
+                        typeFilter;
+
+                    const passDate =
+                        new Date(
+                            pass.createdAt
+                        );
+
+                    const matchesMonth =
+                        !monthFilter ||
+                        passDate.getMonth() +
+                        1 ===
+                        Number(
+                            monthFilter
+                        );
+
+                    const matchesYear =
+                        !yearFilter ||
+                        passDate.getFullYear() ===
+                        Number(
+                            yearFilter
+                        );
+
+                    return (
+                        matchesSearch &&
+                        matchesType &&
+                        matchesMonth &&
+                        matchesYear
+                    );
+                }
+            );
+        }, [
+            pastPasses,
+            search,
+            typeFilter,
+            monthFilter,
+            yearFilter,
+        ]);
+
+    // ========================================================
+    // STATS
+    // ========================================================
 
     const stats =
-        useMemo(
-            () => {
-                const returnable =
-                    pastPasses.filter(
-                        (
-                            pass
-                        ) =>
-                            pass.passType ===
-                            "Returnable"
-                    ).length;
+        useMemo(() => {
+            const returnable =
+                pastPasses.filter(
+                    (pass) =>
+                        pass.passType ===
+                        "Returnable"
+                ).length;
 
-                const nonReturnable =
-                    pastPasses.filter(
-                        (
-                            pass
-                        ) =>
-                            pass.passType ===
-                            "Non-Returnable"
-                    ).length;
+            const nonReturnable =
+                pastPasses.filter(
+                    (pass) =>
+                        pass.passType ===
+                        "Non-Returnable"
+                ).length;
 
-                return {
-                    total:
-                        pastPasses.length,
+            return {
+                total:
+                    pastPasses.length,
 
-                    returnable,
+                returnable,
 
-                    nonReturnable,
-                };
-            },
-            [
-                pastPasses,
-            ]
+                nonReturnable,
+            };
+        }, [
+            pastPasses,
+        ]);
+
+    // ========================================================
+    // ITEM UPDATE
+    // ========================================================
+
+    const updateItem = (
+        index,
+        field,
+        value
+    ) => {
+        setItems(
+            (previous) =>
+                previous.map(
+                    (
+                        item,
+                        currentIndex
+                    ) =>
+                        currentIndex ===
+                            index
+                            ? {
+                                ...item,
+
+                                [field]:
+                                    value,
+                            }
+                            : item
+                )
         );
+    };
 
-    // ============================================================
-    // ITEMS
-    // ============================================================
+    // ========================================================
+    // AUTOMATIC UOM LOOKUP
+    //
+    // WH Part No. is the lookup key.
+    // ========================================================
 
-    const updateItem =
-        (
-            index,
-            field,
-            value
-        ) => {
+    const fetchItemUom = async (
+        index,
+        whPartNo
+    ) => {
+        const cleanPartNo =
+            String(
+                whPartNo ||
+                ""
+            ).trim();
+
+        if (!cleanPartNo) {
+            updateItem(
+                index,
+                "uom",
+                ""
+            );
+
+            return;
+        }
+
+        try {
+            const response =
+                await api.get(
+                    "/gate-passes/item-details",
+                    {
+                        params: {
+                            whPartNo:
+                                cleanPartNo,
+                        },
+                    }
+                );
+
+            const masterItem =
+                response.data
+                    ?.data;
+
             setItems(
-                (
-                    prev
-                ) =>
-                    prev.map(
+                (previous) =>
+                    previous.map(
                         (
-                            item,
-                            i
+                            currentItem,
+                            currentIndex
                         ) =>
-                            i ===
+                            currentIndex ===
                                 index
                                 ? {
-                                    ...item,
-                                    [field]:
-                                        value,
+                                    ...currentItem,
+
+                                    uom:
+                                        masterItem?.uom ||
+                                        "",
                                 }
-                                : item
+                                : currentItem
                     )
             );
-        };
-
-    const addItemRow =
-        () =>
-            setItems(
-                (
-                    prev
-                ) => [
-                        ...prev,
-                        emptyItem(),
-                    ]
+        } catch (error) {
+            console.error(
+                "Gate Pass UOM Lookup Error:",
+                error
             );
 
-    const removeItemRow =
-        (
-            index
-        ) => {
-            setItems(
-                (
-                    prev
-                ) =>
-                    prev.filter(
-                        (
-                            _,
-                            i
-                        ) =>
-                            i !==
-                            index
-                    )
+            updateItem(
+                index,
+                "uom",
+                ""
             );
-        };
+        }
+    };
 
-    // ============================================================
-    // OPEN NEW GATE PASS FORM
-    // ============================================================
+    // ========================================================
+    // ADD ITEM
+    // ========================================================
+
+    const addItemRow = () => {
+        setItems(
+            (previous) => [
+                ...previous,
+
+                emptyItem(),
+            ]
+        );
+    };
+
+    // ========================================================
+    // REMOVE ITEM
+    // ========================================================
+
+    const removeItemRow = (
+        index
+    ) => {
+        setItems(
+            (previous) =>
+                previous.filter(
+                    (
+                        _,
+                        currentIndex
+                    ) =>
+                        currentIndex !==
+                        index
+                )
+        );
+    };
+
+    // ========================================================
+    // NEW PASS
+    // ========================================================
 
     const handleOpenCreateForm =
         () => {
+            setPassType(
+                "Returnable"
+            );
+
             setGatePassNo(
                 ""
             );
@@ -431,14 +732,11 @@ const GatePass = () => {
                 ""
             );
 
-            // NEW
-            // Always fill today's date for a new gate pass
             setGatePassDate(
                 getTodayInputDate()
             );
 
             setItems([
-                emptyItem(),
                 emptyItem(),
             ]);
 
@@ -450,54 +748,290 @@ const GatePass = () => {
                 emptyApprovalRow()
             );
 
+            setApprovalDept(
+                emptyApprovalRow()
+            );
+
+            setSavedPassId(
+                null
+            );
+
             setView(
                 "create"
             );
         };
 
-    // ============================================================
-    // DETAIL FIELDS
-    // ============================================================
+    // ========================================================
+    // SAVE + PRINT
+    // ========================================================
 
-    const detailFields = [
-        {
-            label:
-                "Gate Pass No.",
+    const handleSaveAndPrint =
+        async () => {
+            try {
+                if (!savedPassId) {
+                    setSavingGatePass(
+                        true
+                    );
 
-            value:
-                gatePassNo,
+                    const preparedItems =
+                        items.map(
+                            (
+                                item,
+                                index
+                            ) => ({
+                                ...item,
 
-            onChange:
-                setGatePassNo,
+                                itemNo:
+                                    String(
+                                        index +
+                                        1
+                                    ),
+                            })
+                        );
 
-            placeholder:
-                "Enter Gate Pass No.",
-        },
-        {
-            label:
-                "Mode of Transport / DOCKET No.",
+                    const response =
+                        await api.post(
+                            "/gate-passes",
+                            {
+                                gatePassNo,
 
-            value:
-                modeOfTransport,
+                                passType,
 
-            onChange:
-                setModeOfTransport,
-        },
-        {
-            label:
-                "Purpose",
+                                to,
 
-            value:
-                purpose,
+                                modeOfTransport,
 
-            onChange:
-                setPurpose,
-        },
-    ];
+                                purpose,
 
-    // ============================================================
-    // VIEW 1 — HISTORY
-    // ============================================================
+                                gatePassDate,
+
+                                items:
+                                    preparedItems,
+
+                                approvalName,
+
+                                approvalEmpNo,
+
+                                approvalDept,
+                            }
+                        );
+
+                    const savedPass =
+                        normalizeGatePass(
+                            response.data
+                                ?.data ||
+                            {}
+                        );
+
+                    if (
+                        savedPass.id
+                    ) {
+                        setSavedPassId(
+                            savedPass.id
+                        );
+                    }
+
+                    // Backend returns the final UOM.
+                    if (
+                        savedPass.items
+                            ?.length
+                    ) {
+                        setItems(
+                            savedPass.items.map(
+                                (
+                                    item,
+                                    index
+                                ) => ({
+                                    ...emptyItem(),
+
+                                    ...item,
+
+                                    itemNo:
+                                        String(
+                                            index +
+                                            1
+                                        ),
+                                })
+                            )
+                        );
+                    }
+
+                    setPastPasses(
+                        (
+                            previous
+                        ) => {
+                            const withoutDuplicate =
+                                previous.filter(
+                                    (
+                                        pass
+                                    ) =>
+                                        String(
+                                            pass.id
+                                        ) !==
+                                        String(
+                                            savedPass.id
+                                        )
+                                );
+
+                            return savedPass.id
+                                ? [
+                                    savedPass,
+
+                                    ...withoutDuplicate,
+                                ]
+                                : previous;
+                        }
+                    );
+
+                    if (
+                        response.data
+                            ?.canViewAll !==
+                        undefined
+                    ) {
+                        setCanViewAll(
+                            Boolean(
+                                response
+                                    .data
+                                    .canViewAll
+                            )
+                        );
+                    }
+                }
+
+                setTimeout(
+                    () => {
+                        window.print();
+                    },
+                    150
+                );
+            } catch (error) {
+                console.error(
+                    "Generate Gate Pass Error:",
+                    error
+                );
+
+                alert(
+                    error.response
+                        ?.data
+                        ?.error ||
+                    "Failed to save gate pass. Please try again."
+                );
+            } finally {
+                setSavingGatePass(
+                    false
+                );
+            }
+        };
+
+    // ========================================================
+    // OPEN EXISTING
+    // ========================================================
+
+    const openExistingPass = (
+        pass
+    ) => {
+        setPassType(
+            pass.passType ||
+            "Returnable"
+        );
+
+        setGatePassNo(
+            pass.gatePassNo ||
+            ""
+        );
+
+        setTo(
+            pass.to ||
+            ""
+        );
+
+        setModeOfTransport(
+            pass.modeOfTransport ||
+            ""
+        );
+
+        setPurpose(
+            pass.purpose ||
+            ""
+        );
+
+        const originalDate =
+            pass.gatePassDate ||
+            pass.createdAt;
+
+        if (originalDate) {
+            try {
+                setGatePassDate(
+                    format(
+                        new Date(
+                            originalDate
+                        ),
+                        "yyyy-MM-dd"
+                    )
+                );
+            } catch {
+                setGatePassDate(
+                    getTodayInputDate()
+                );
+            }
+        }
+
+        setItems(
+            pass.items?.length
+                ? pass.items.map(
+                    (
+                        item,
+                        index
+                    ) => ({
+                        ...emptyItem(),
+
+                        ...item,
+
+                        itemNo:
+                            String(
+                                index +
+                                1
+                            ),
+
+                        partNo:
+                            item.partNo ||
+                            item.hsnCode ||
+                            "",
+                    })
+                )
+                : [
+                    emptyItem(),
+                ]
+        );
+
+        setApprovalName(
+            pass.approvalName ||
+            emptyApprovalRow()
+        );
+
+        setApprovalEmpNo(
+            pass.approvalEmpNo ||
+            emptyApprovalRow()
+        );
+
+        setApprovalDept(
+            pass.approvalDept ||
+            emptyApprovalRow()
+        );
+
+        setSavedPassId(
+            pass.id ||
+            pass._id
+        );
+
+        setView(
+            "create"
+        );
+    };
+
+    // ========================================================
+    // LIST PAGE
+    // ========================================================
 
     if (
         view ===
@@ -505,15 +1039,12 @@ const GatePass = () => {
     ) {
         return (
             <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-
                 <div className="mx-auto max-w-7xl space-y-6">
 
-                    {/* Header */}
+                    {/* HEADER */}
 
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
                         <div>
-
                             <h1 className="text-2xl font-bold text-slate-900">
                                 Gate Pass
                             </h1>
@@ -521,7 +1052,6 @@ const GatePass = () => {
                             <p className="text-sm text-slate-500">
                                 View past gate passes and generate new ones
                             </p>
-
                         </div>
 
                         <button
@@ -538,19 +1068,14 @@ const GatePass = () => {
 
                             Generate Gate Pass
                         </button>
-
                     </div>
 
-                    {/* Stat Cards */}
+                    {/* STAT CARDS */}
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-
                             <div className="flex items-center justify-between">
-
                                 <div>
-
                                     <p className="text-xs font-medium text-slate-500">
                                         Total Gate Passes
                                     </p>
@@ -560,29 +1085,21 @@ const GatePass = () => {
                                             stats.total
                                         }
                                     </p>
-
                                 </div>
 
                                 <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
-
                                     <FileText
                                         size={
                                             20
                                         }
                                     />
-
                                 </div>
-
                             </div>
-
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-
                             <div className="flex items-center justify-between">
-
                                 <div>
-
                                     <p className="text-xs font-medium text-slate-500">
                                         Returnable
                                     </p>
@@ -592,29 +1109,21 @@ const GatePass = () => {
                                             stats.returnable
                                         }
                                     </p>
-
                                 </div>
 
                                 <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
-
                                     <Clock
                                         size={
                                             20
                                         }
                                     />
-
                                 </div>
-
                             </div>
-
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-
                             <div className="flex items-center justify-between">
-
                                 <div>
-
                                     <p className="text-xs font-medium text-slate-500">
                                         Non-Returnable
                                     </p>
@@ -624,31 +1133,23 @@ const GatePass = () => {
                                             stats.nonReturnable
                                         }
                                     </p>
-
                                 </div>
 
                                 <div className="rounded-lg bg-violet-50 p-2 text-violet-600">
-
                                     <CheckCircle2
                                         size={
                                             20
                                         }
                                     />
-
                                 </div>
-
                             </div>
-
                         </div>
-
                     </div>
 
-                    {/* Filters */}
+                    {/* FILTERS */}
 
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-
                         <div className="mb-2 flex items-center gap-2">
-
                             <Filter
                                 size={
                                     16
@@ -659,13 +1160,10 @@ const GatePass = () => {
                             <h2 className="text-sm font-semibold text-slate-900">
                                 Filters
                             </h2>
-
                         </div>
 
                         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
-
-                            <div className="relative md:col-span-1">
-
+                            <div className="relative">
                                 <Search
                                     size={
                                         16
@@ -678,16 +1176,17 @@ const GatePass = () => {
                                         search
                                     }
                                     onChange={(
-                                        e
+                                        event
                                     ) =>
                                         setSearch(
-                                            e.target.value
+                                            event
+                                                .target
+                                                .value
                                         )
                                     }
                                     placeholder="Search recipient, gate pass no..."
                                     className="w-full rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                                 />
-
                             </div>
 
                             <select
@@ -695,15 +1194,16 @@ const GatePass = () => {
                                     typeFilter
                                 }
                                 onChange={(
-                                    e
+                                    event
                                 ) =>
                                     setTypeFilter(
-                                        e.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
-
                                 <option value="">
                                     All Pass Types
                                 </option>
@@ -715,7 +1215,6 @@ const GatePass = () => {
                                 <option value="Non-Returnable">
                                     Non-Returnable
                                 </option>
-
                             </select>
 
                             <select
@@ -723,15 +1222,16 @@ const GatePass = () => {
                                     monthFilter
                                 }
                                 onChange={(
-                                    e
+                                    event
                                 ) =>
                                     setMonthFilter(
-                                        e.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
-
                                 <option value="">
                                     All Months
                                 </option>
@@ -745,7 +1245,6 @@ const GatePass = () => {
                                         _,
                                         index
                                     ) => (
-
                                         <option
                                             key={
                                                 index +
@@ -767,10 +1266,8 @@ const GatePass = () => {
                                                 }
                                             )}
                                         </option>
-
                                     )
                                 )}
-
                             </select>
 
                             <select
@@ -778,15 +1275,16 @@ const GatePass = () => {
                                     yearFilter
                                 }
                                 onChange={(
-                                    e
+                                    event
                                 ) =>
                                     setYearFilter(
-                                        e.target.value
+                                        event
+                                            .target
+                                            .value
                                     )
                                 }
                                 className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
                             >
-
                                 {Array.from(
                                     {
                                         length:
@@ -801,7 +1299,6 @@ const GatePass = () => {
                                             index;
 
                                         return (
-
                                             <option
                                                 key={
                                                     year
@@ -814,25 +1311,18 @@ const GatePass = () => {
                                                     year
                                                 }
                                             </option>
-
                                         );
                                     }
                                 )}
-
                             </select>
-
                         </div>
-
                     </div>
 
-                    {/* Past Gate Passes */}
+                    {/* HISTORY TABLE */}
 
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
                         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-
                             <div>
-
                                 <h2 className="font-bold text-slate-900">
                                     Past Gate Passes
                                 </h2>
@@ -848,43 +1338,30 @@ const GatePass = () => {
                                         : ""}{" "}
                                     found
                                 </p>
-
                             </div>
-
                         </div>
 
                         {filteredPasses.length ===
                             0 ? (
-
                             <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-
                                 <div className="mb-3 rounded-full bg-slate-100 p-3">
-
                                     <FileText
                                         size={
                                             24
                                         }
                                         className="text-slate-400"
                                     />
-
                                 </div>
 
                                 <h3 className="font-semibold text-slate-800">
                                     No gate passes found
                                 </h3>
-
                             </div>
-
                         ) : (
-
                             <div className="overflow-x-auto">
-
-                                <table className="w-full text-left">
-
+                                <table className="w-full table-fixed text-left">
                                     <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                                         <tr>
-
                                             <th className="px-5 py-3">
                                                 Gate Pass No.
                                             </th>
@@ -905,47 +1382,42 @@ const GatePass = () => {
                                                 Purpose
                                             </th>
 
-                                            <th className="px-5 py-3 text-center">
-                                                Action
-                                            </th>
-
+                                            {canViewAll && (
+                                                <th className="px-5 py-3">
+                                                    Generated By
+                                                </th>
+                                            )}
                                         </tr>
-
                                     </thead>
 
                                     <tbody className="divide-y divide-slate-100 text-sm">
-
                                         {filteredPasses.map(
                                             (
                                                 pass
                                             ) => (
-
                                                 <tr
                                                     key={
                                                         pass.id
                                                     }
                                                     className="transition hover:bg-slate-50"
                                                 >
-
                                                     <td className="px-5 py-3.5 font-medium text-slate-800">
-                                                        {
-                                                            pass.gatePassNo
-                                                        }
+                                                        {pass.gatePassNo ||
+                                                            "—"}
                                                     </td>
 
                                                     <td className="px-5 py-3.5 text-slate-600">
-
-                                                        {format(
-                                                            new Date(
-                                                                pass.createdAt
-                                                            ),
-                                                            "dd MMM yyyy"
-                                                        )}
-
+                                                        {pass.createdAt
+                                                            ? format(
+                                                                new Date(
+                                                                    pass.createdAt
+                                                                ),
+                                                                "dd MMM yyyy"
+                                                            )
+                                                            : "—"}
                                                     </td>
 
                                                     <td className="px-5 py-3.5">
-
                                                         <span
                                                             className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${pass.passType ===
                                                                 "Returnable"
@@ -957,13 +1429,11 @@ const GatePass = () => {
                                                                 pass.passType
                                                             }
                                                         </span>
-
                                                     </td>
 
                                                     <td className="max-w-[220px] truncate px-5 py-3.5 text-slate-700">
-                                                        {
-                                                            pass.to
-                                                        }
+                                                        {pass.to ||
+                                                            "—"}
                                                     </td>
 
                                                     <td className="max-w-[200px] truncate px-5 py-3.5 text-slate-600">
@@ -971,732 +1441,1390 @@ const GatePass = () => {
                                                             "—"}
                                                     </td>
 
-                                                    <td className="px-5 py-3.5 text-center">
-
-                                                        <button
-                                                            onClick={() => {
-                                                                setPassType(
-                                                                    pass.passType
-                                                                );
-
-                                                                setGatePassNo(
-                                                                    pass.gatePassNo
-                                                                );
-
-                                                                setTo(
-                                                                    pass.to
-                                                                );
-
-                                                                setModeOfTransport(
-                                                                    pass.modeOfTransport
-                                                                );
-
-                                                                setPurpose(
-                                                                    pass.purpose
-                                                                );
-
-                                                                // NEW
-                                                                // Use that past pass's date
-                                                                setGatePassDate(
-                                                                    pass.createdAt
-                                                                );
-
-                                                                setView(
-                                                                    "create"
-                                                                );
-                                                            }}
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                                                        >
-
-                                                            <Eye
-                                                                size={
-                                                                    14
-                                                                }
-                                                            />
-
-                                                            View / Print
-
-                                                        </button>
-
-                                                    </td>
-
+                                                    {canViewAll && (
+                                                        <td className="px-5 py-3.5 text-slate-600">
+                                                            {pass.createdByName ||
+                                                                "Admin"}
+                                                        </td>
+                                                    )}
                                                 </tr>
-
                                             )
                                         )}
-
                                     </tbody>
-
                                 </table>
-
                             </div>
-
                         )}
-
                     </div>
-
                 </div>
-
             </div>
         );
     }
 
-    // ============================================================
-    // VIEW 2 — GATE PASS FORM
-    // ============================================================
+    // ========================================================
+    // GATE PASS DOCUMENT
+    // ========================================================
 
     return (
-        <div className="mx-auto my-6 max-w-3xl animate-fade-in bg-white p-6 print:my-0 print:p-0">
+        <>
+            <style>
+                {`
 
-            {/* Controls */}
+                    /* ================================================
+                       PROFESSIONAL DOCUMENT FONT
+                    ================================================ */
 
-            <div className="mb-6 flex items-center justify-between print:hidden">
-
-                <button
-                    onClick={() =>
-                        setView(
-                            "list"
-                        )
+                    .gate-pass-document,
+                    .gate-pass-document input,
+                    .gate-pass-document textarea,
+                    .gate-pass-document table,
+                    .gate-pass-document button {
+                        font-family: "Times New Roman", Times, serif;
                     }
-                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                >
 
-                    <ArrowLeft
-                        size={
-                            16
-                        }
-                    />
+                    /* ================================================
+                       TABLE
+                    ================================================ */
 
-                    Back to Gate Passes
+                    .gate-pass-date-screen {
+    text-align: center;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 14px;
+}
 
-                </button>
+.gate-pass-date-screen::-webkit-datetime-edit {
+    text-align: center;
+}
 
-                {/* Pass Type */}
+.gate-pass-date-screen::-webkit-calendar-picker-indicator {
+    margin-left: 0;
+}
 
-                <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+                    .gate-pass-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        table-layout: fixed;
+                    }
+
+                    .gate-pass-table th,
+                    .gate-pass-table td {
+                        border: 1px solid #0f172a;
+                        vertical-align: middle;
+                    }
+
+
+                    /* ================================================
+   PRINT ITEM ROW - PERFECT VERTICAL ALIGNMENT
+================================================ */
+
+.gate-pass-item-cell {
+    vertical-align: middle !important;
+    padding: 0 !important;
+}
+
+.gate-pass-item-input,
+.gate-pass-item-textarea {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 100% !important;
+    height: 28px !important;
+    min-height: 28px !important;
+
+    margin: 0 !important;
+    padding: 0 2px !important;
+
+    line-height: 28px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+
+    border: none !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+    resize: none !important;
+}
+
+.gate-pass-item-textarea {
+    padding-top: 7px !important;
+    padding-bottom: 0 !important;
+    line-height: 14px !important;
+}
+                    /* ================================================
+                       ITEM ROW
+                    ================================================ */
+
+                    .gate-pass-item-cell {
+                        vertical-align: middle !important;
+                    }
+
+                    .gate-pass-item-input,
+                    .gate-pass-item-textarea {
+                        display: block;
+                        width: 100%;
+                        margin: 0 auto;
+                        padding: 4px 2px;
+                        border: none;
+                        background: transparent;
+                        text-align: center;
+                        line-height: 16px;
+                        outline: none;
+                        box-sizing: border-box;
+                        font-family: "Times New Roman", Times, serif;
+                    }
+
+                    .gate-pass-item-textarea {
+                        min-height: 26px;
+                        resize: none;
+                        overflow: hidden;
+                    }
+
+                    /* ================================================
+                       AUTO TO TEXTAREA
+                    ================================================ */
+
+                    .gate-pass-to-textarea {
+                        display: block;
+                        width: 100%;
+                        min-height: 20px;
+                        height: auto;
+                        overflow: hidden;
+                        resize: none;
+                        border: none;
+                        background: transparent;
+                        padding: 0;
+                        line-height: 20px;
+                        outline: none;
+                        box-sizing: border-box;
+                    }
+
+                    /* ================================================
+                       DATE
+                    ================================================ */
+
+                    .gate-pass-date-print {
+                        display: none;
+                    }
+
+                    /* ================================================
+                       TABLE SCROLLBAR
+                    ================================================ */
+
+                    .gate-pass-table-wrapper {
+                        scrollbar-width: none;
+                    }
+
+                    .gate-pass-table-wrapper::-webkit-scrollbar {
+                        display: none;
+                    }
+
+                    /* ================================================
+                       PRINT
+                    ================================================ */
+
+                    @media print {
+    @page {
+        size: A4 portrait;
+        margin: 6mm;
+    }
+
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        overflow: visible !important;
+
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .print-hidden {
+        display: none !important;
+    }
+
+    html,
+    body,
+    #root,
+    main {
+        overflow: visible !important;
+        scrollbar-width: none !important;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar,
+    #root::-webkit-scrollbar,
+    main::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
+    /* ================================================
+       GATE PASS DOCUMENT
+    ================================================ */
+
+    .gate-pass-document {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+    }
+
+    .gate-pass-document * {
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+    }
+
+    /* ================================================
+       TABLE WRAPPER / SCROLLBAR
+    ================================================ */
+
+    .gate-pass-table-wrapper {
+        overflow: visible !important;
+        scrollbar-width: none !important;
+    }
+
+    .gate-pass-table-wrapper::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
+    /* ================================================
+       TABLE
+    ================================================ */
+
+    .gate-pass-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        table-layout: fixed !important;
+    }
+
+    .gate-pass-table th,
+    .gate-pass-table td {
+        border: 1pt solid #000 !important;
+        vertical-align: middle !important;
+
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+
+        line-height: 1.1 !important;
+    }
+
+    /* ================================================
+       ITEM ROW - VERTICAL + HORIZONTAL ALIGNMENT
+    ================================================ */
+
+    .gate-pass-item-cell {
+        vertical-align: middle !important;
+        padding: 0 !important;
+        text-align: center !important;
+    }
+
+    /* Normal input fields:
+       ID, WH Part No, Qty, UOM
+    */
+
+    .gate-pass-item-input {
+        display: block !important;
+
+        width: 100% !important;
+        height: 28px !important;
+        min-height: 28px !important;
+
+        margin: 0 !important;
+        padding: 0 2px !important;
+
+        border: none !important;
+        outline: none !important;
+
+        background: transparent !important;
+
+        text-align: center !important;
+        vertical-align: middle !important;
+
+        line-height: 28px !important;
+
+        box-sizing: border-box !important;
+
+        color: #000 !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+    }
+
+    /* Textarea fields:
+       Description
+       Manufacturer Part No.
+       Remarks
+    */
+
+    .gate-pass-item-textarea {
+        display: block !important;
+
+        width: 100% !important;
+        height: 28px !important;
+        min-height: 28px !important;
+
+        margin: 0 !important;
+
+        /*
+           This top padding is what vertically centers
+           textarea text like "Tools", "24-HZ", "good".
+        */
+        padding: 7px 2px 0 2px !important;
+
+        border: none !important;
+        outline: none !important;
+
+        background: transparent !important;
+
+        text-align: center !important;
+        vertical-align: middle !important;
+
+        line-height: 14px !important;
+
+        box-sizing: border-box !important;
+
+        overflow: hidden !important;
+        resize: none !important;
+
+        color: #000 !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+    }
+
+    /* ================================================
+       DATE FIELD
+    ================================================ */
+
+    .gate-pass-date-screen {
+        display: none !important;
+    }
+
+    .gate-pass-date-print {
+        display: block !important;
+
+        width: 100% !important;
+
+        margin: 0 !important;
+
+        text-align: center !important;
+
+        color: #000 !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+
+        font-size: 11px !important;
+        line-height: 28px !important;
+    }
+
+    /* ================================================
+       ALL PRINTED INPUT/TEXTAREA TEXT
+    ================================================ */
+
+    input,
+    textarea {
+        color: #000 !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+    }
+
+    textarea {
+        overflow: hidden !important;
+        resize: none !important;
+    }
+
+    /* ================================================
+       APPROVAL MATRIX
+    ================================================ */
+
+    .approval-matrix-section {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .approval-matrix-section input,
+    .approval-matrix-section textarea {
+        color: #000 !important;
+
+        font-family:
+            "Times New Roman",
+            Times,
+            serif !important;
+
+        text-align: center !important;
+    }
+
+    /* ================================================
+       PREVENT ROWS / SECTIONS SPLITTING
+    ================================================ */
+
+    .gate-pass-section,
+    .approval-matrix-section,
+    tr {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+}
+                `}
+            </style>
+
+            <div className="min-h-screen bg-slate-100 px-4 py-6 print:bg-white print:p-0">
+
+                {/* SCREEN CONTROLS */}
+
+                <div className="print-hidden mx-auto mb-4 flex max-w-5xl items-center justify-between">
 
                     <button
-                        type="button"
                         onClick={() =>
-                            setPassType(
+                            setView(
+                                "list"
+                            )
+                        }
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    >
+                        <ArrowLeft
+                            size={
+                                16
+                            }
+                        />
+
+                        Back to Gate Passes
+                    </button>
+
+                    <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setPassType(
+                                    "Returnable"
+                                )
+                            }
+                            className={`rounded-lg px-4 py-2 text-xs font-semibold ${passType ===
                                 "Returnable"
-                            )
-                        }
-                        className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${passType ===
-                            "Returnable"
-                            ? "bg-white text-indigo-700 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
-                    >
-                        Returnable
-                    </button>
+                                ? "bg-indigo-600 text-white"
+                                : "text-slate-600"
+                                }`}
+                        >
+                            Returnable
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setPassType(
+                                    "Non-Returnable"
+                                )
+                            }
+                            className={`rounded-lg px-4 py-2 text-xs font-semibold ${passType ===
+                                "Non-Returnable"
+                                ? "bg-indigo-600 text-white"
+                                : "text-slate-600"
+                                }`}
+                        >
+                            Non-Returnable
+                        </button>
+                    </div>
 
                     <button
-                        type="button"
-                        onClick={() =>
-                            setPassType(
-                                "Non-Returnable"
-                            )
+                        onClick={
+                            handleSaveAndPrint
                         }
-                        className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${passType ===
-                            "Non-Returnable"
-                            ? "bg-white text-indigo-700 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
+                        disabled={
+                            savingGatePass
+                        }
+                        className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        Non-Returnable
+                        <Printer
+                            size={
+                                17
+                            }
+                        />
+
+                        {savingGatePass
+                            ? "Saving..."
+                            : "Download / Print"}
                     </button>
-
                 </div>
 
-                <button
-                    onClick={() =>
-                        window.print()
-                    }
-                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow transition-colors hover:bg-indigo-700"
-                >
+                {/* DOCUMENT */}
 
-                    <Printer
-                        size={
-                            16
-                        }
-                    />
+                <div className="gate-pass-document mx-auto max-w-5xl bg-white px-8 py-6 shadow-xl print:p-0 print:shadow-none">
 
-                    Download / Print
+                    {/* COMPANY */}
 
-                </button>
+                    <div className="gate-pass-section text-center">
+                        <img
+                            src={
+                                logo
+                            }
+                            alt="Wehark Solutions"
+                            className="mx-auto h-14 w-auto object-contain"
+                        />
 
-            </div>
-
-            {/* Logo */}
-
-            <div className="mb-6 flex justify-center">
-
-                <img
-                    src={
-                        logo
-                    }
-                    alt="Wehark Solutions"
-                    className="h-16 object-contain"
-                />
-
-            </div>
-
-            {/* =====================================================
-                TITLE + EDITABLE DATE
-            ===================================================== */}
-
-            <div className="relative mb-6 flex items-center justify-center">
-
-                <h2 className="text-center text-xl font-bold text-slate-900">
-
-                    {passType ===
-                        "Returnable"
-                        ? "Returnable Gate Pass"
-                        : "Non-Returnable Gate Pass"}
-
-                </h2>
-
-                <div className="absolute right-3 flex items-center gap-1 text-sm font-bold text-slate-900">
-
-                    <span>
-                        Date:
-                    </span>
-
-                    {/* SCREEN — EDITABLE */}
-
-                    <input
-                        type="date"
-                        value={gatePassDate}
-                        onChange={(e) =>
-                            setGatePassDate(e.target.value)
-                        }
-                        className="
-        w-[155px]
-        cursor-pointer
-        border-none
-        bg-transparent
-        text-sm
-        font-semibold
-        text-slate-900
-        outline-none
-        print:hidden
-        [&::-webkit-calendar-picker-indicator]:ml-2
-        [&::-webkit-calendar-picker-indicator]:cursor-pointer
-    "
-                    />
-
-                    {/* PRINT — FORMATTED TEXT */}
-
-                    <span className="hidden font-semibold print:inline">
-
-                        {gatePassDate
-                            ? format(
-                                new Date(
-                                    `${gatePassDate}T00:00:00`
-                                ),
-                                "dd MMM yyyy"
-                            )
-                            : "-"}
-
-                    </span>
-
-                </div>
-
-            </div>
-
-            <div className="space-y-5">
-
-                {/* =================================================
-                    COMPANY + DETAILS
-                ================================================= */}
-
-                <div className="border border-slate-800 text-[12px]">
-
-                    <div className="border-b border-slate-800 px-3 py-2.5 text-center">
-
-                        <p className="text-[14px] font-bold">
+                        <h1 className="mt-1 text-[17px] font-bold uppercase tracking-wide text-slate-950">
                             WEHARK SOLUTIONS PRIVATE LIMITED
+                        </h1>
+
+                        <p className="mt-1 text-[11px] font-medium text-slate-900">
+                            Earthen Phoenix, 1st Floor, 10th E Cross,
+                            Sanjeevappa Layout, Nagavarapalya,
                         </p>
 
-                        <p className="mt-1">
-                            Earthen Phoenix, 1
-                            <sup>
-                                st
-                            </sup>{" "}
-                            Foor, 10
-                            <sup>
-                                th
-                            </sup>{" "}
-                            E Cross, Nagavarapalya, CV
+                        <p className="text-[11px] font-medium text-slate-900">
+                            CV Ramannagar, Bengaluru - 560093
                         </p>
 
-                        <p>
-                            Ramannagar, Bengaluru - 560093
-                        </p>
-
-                        <p>
+                        <p className="text-[11px] font-medium text-slate-900">
                             Ph No.: +91 8867590544
                         </p>
 
-                        <p className="mt-1 font-semibold">
-                            GSTN: 29AADCW9221H1Z2
-                        </p>
-
+                        <h2 className="mt-2 text-[13px] font-bold">
+                            {passType ===
+                                "Returnable"
+                                ? "Returnable Pass"
+                                : "Non-Returnable Pass"}
+                        </h2>
                     </div>
 
-                    <div className="grid grid-cols-2 border-b border-slate-800">
+                    {/* BASIC DETAILS */}
 
-                        <div className="flex flex-col justify-start border-r border-slate-800 p-2.5">
+                    <div className="gate-pass-section mt-4 text-[12px]">
 
-                            <p className="mb-1 font-semibold">
-                                To,
+                        <div className="flex items-start justify-between gap-6">
+
+                            {/* GP NO */}
+
+                            <div className="flex flex-1 items-center gap-2">
+                                <span className="shrink-0 font-bold">
+                                    GP No:
+                                </span>
+
+                                <input
+                                    value={
+                                        gatePassNo
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
+                                        setGatePassNo(
+                                            event
+                                                .target
+                                                .value
+                                        )
+                                    }
+                                    placeholder="Enter Gate Pass No."
+                                    className="w-full border-0 border-b border-dashed border-slate-400 bg-transparent px-1 py-0.5 font-semibold outline-none print:border-none"
+                                />
+                            </div>
+
+                            {/* DATE */}
+
+                            <div className="flex shrink-0 items-center gap-2">
+                                <span className="font-bold">
+                                    Date:
+                                </span>
+
+                                <input
+                                    type="date"
+                                    value={
+                                        gatePassDate
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
+                                        setGatePassDate(
+                                            event
+                                                .target
+                                                .value
+                                        )
+                                    }
+                                    className="gate-pass-date-screen border-none bg-transparent font-semibold outline-none"
+                                />
+
+                                <span className="gate-pass-date-print font-semibold">
+                                    {gatePassDate
+                                        ? format(
+                                            new Date(
+                                                `${gatePassDate}T00:00:00`
+                                            ),
+                                            "dd-MM-yyyy"
+                                        )
+                                        : "—"}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* TO */}
+
+                        <div className="mt-3">
+                            <p className="font-bold">
+                                To:
                             </p>
 
                             <textarea
                                 value={
                                     to
                                 }
-                                onChange={(
-                                    e
+                                ref={(
+                                    element
                                 ) =>
-                                    setTo(
-                                        e.target.value
+                                    autoResizeTextarea(
+                                        element
                                     )
                                 }
-                                placeholder="Recipient name & address"
+                                onChange={(
+                                    event
+                                ) => {
+                                    setTo(
+                                        event
+                                            .target
+                                            .value
+                                    );
+
+                                    autoResizeTextarea(
+                                        event.target
+                                    );
+                                }}
                                 rows={
-                                    6
+                                    1
                                 }
-                                className="w-full resize-none border-none bg-transparent text-[12px] text-slate-800 outline-none"
+                                placeholder="Recipient / Company name and full address"
+                                className="gate-pass-to-textarea mt-1 text-[12px] font-medium"
                             />
-
                         </div>
 
-                        <div className="flex flex-col justify-between">
+                        {/* PURPOSE */}
 
-                            {detailFields.map(
-                                (
-                                    field,
-                                    index
-                                ) => (
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className="shrink-0 font-bold">
+                                Purpose:
+                            </span>
 
-                                    <div
-                                        key={
-                                            field.label
-                                        }
-                                        className={`flex flex-1 items-stretch ${index !==
-                                            detailFields.length -
-                                            1
-                                            ? "border-b border-slate-800"
-                                            : ""
-                                            }`}
-                                    >
-
-                                        <div className="flex w-1/2 items-center border-r border-slate-800 p-2.5 font-semibold">
-                                            {
-                                                field.label
-                                            }
-                                        </div>
-
-                                        <div className="flex w-1/2 items-center p-2.5">
-
-                                            <input
-                                                value={
-                                                    field.value
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    field.onChange(
-                                                        e.target.value
-                                                    )
-                                                }
-                                                placeholder={
-                                                    field.placeholder ||
-                                                    ""
-                                                }
-                                                className="w-full border-none bg-transparent outline-none"
-                                            />
-
-                                        </div>
-
-                                    </div>
-
-                                )
-                            )}
-
+                            <input
+                                value={
+                                    purpose
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setPurpose(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                                className="w-full border-none bg-transparent outline-none"
+                                placeholder="Purpose"
+                            />
                         </div>
 
+                        {/* MODE */}
+
+                        <div className="mt-1 flex items-center gap-2">
+                            <span className="shrink-0 font-bold">
+                                Mode / Docket:
+                            </span>
+
+                            <input
+                                value={
+                                    modeOfTransport
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setModeOfTransport(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                                className="w-full border-none bg-transparent outline-none"
+                                placeholder="Mode of Transport / Docket No."
+                            />
+                        </div>
                     </div>
 
-                    {/* Items */}
+                    {/* ITEM TABLE */}
 
-                    <table className="w-full border-collapse">
+                    <div className="gate-pass-section gate-pass-table-wrapper mt-4 overflow-x-auto">
+                        <table className="gate-pass-table text-[10px]">
+                            <colgroup>
+                                <col
+                                    style={{
+                                        width:
+                                            "6%",
+                                    }}
+                                />
 
-                        <thead>
+                                <col
+                                    style={{
+                                        width:
+                                            "8%",
+                                    }}
+                                />
 
-                            <tr className="border-b border-slate-800">
+                                <col
+                                    style={{
+                                        width:
+                                            "12%",
+                                    }}
+                                />
 
-                                <th className="w-16 border-r border-slate-800 p-2 text-center">
-                                    Item No.
-                                </th>
+                                <col
+                                    style={{
+                                        width:
+                                            "17%",
+                                    }}
+                                />
 
-                                <th className="border-r border-slate-800 p-2 text-center">
-                                    Description
-                                </th>
+                                <col
+                                    style={{
+                                        width:
+                                            "13%",
+                                    }}
+                                />
 
-                                <th className="w-16 border-r border-slate-800 p-2 text-center">
-                                    QTY/
-                                </th>
+                                <col
+                                    style={{
+                                        width:
+                                            "7%",
+                                    }}
+                                />
 
-                                <th className="w-24 border-r border-slate-800 p-2 text-center">
-                                    HSN Code
-                                </th>
+                                <col
+                                    style={{
+                                        width:
+                                            "8%",
+                                    }}
+                                />
 
-                                <th className="w-28 p-2 text-center">
+                                <col
+                                    style={{
+                                        width:
+                                            "15%",
+                                    }}
+                                />
 
-                                    <span className="flex items-center justify-center gap-1">
+                                <col
+                                    style={{
+                                        width:
+                                            "14%",
+                                    }}
+                                />
+                            </colgroup>
 
-                                        Remarks
+                            <thead>
+                                <tr>
+                                    <th className="px-1 py-1.5 text-center">
+                                        Sl.No
+                                    </th>
 
-                                        <button
-                                            type="button"
-                                            onClick={
-                                                addItemRow
+                                    <th className="px-1 py-1.5 text-center">
+                                        Id.No
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        WH Part No.
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        Description
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        Manf.
+                                        <br />
+                                        Part No.
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        Qty
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        UOM
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        Estimated
+                                        <br />
+                                        DOR
+                                    </th>
+
+                                    <th className="px-1 py-1.5 text-center">
+                                        <span className="flex items-center justify-center gap-1">
+                                            Remarks
+
+                                            <button
+                                                type="button"
+                                                onClick={
+                                                    addItemRow
+                                                }
+                                                className="print-hidden text-indigo-600 hover:text-indigo-800"
+                                                title="Add row"
+                                            >
+                                                <Plus
+                                                    size={
+                                                        13
+                                                    }
+                                                />
+                                            </button>
+                                        </span>
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {items.map(
+                                    (
+                                        item,
+                                        index
+                                    ) => (
+                                        <tr
+                                            key={
+                                                index
                                             }
-                                            className="text-indigo-600 hover:text-indigo-800 print:hidden"
-                                            title="Add row"
                                         >
+                                            {/* AUTOMATIC SERIAL NUMBER */}
 
-                                            <Plus
-                                                size={
-                                                    14
+                                            <td className="gate-pass-item-cell p-1 text-center font-semibold">
+                                                {
+                                                    index +
+                                                    1
                                                 }
-                                            />
+                                            </td>
 
-                                        </button>
+                                            {/* ID NUMBER */}
 
-                                    </span>
-
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                            {items.map(
-                                (
-                                    item,
-                                    index
-                                ) => (
-
-                                    <tr
-                                        key={
-                                            index
-                                        }
-                                        className="border-b border-slate-800 last:border-b-0"
-                                    >
-
-                                        <td className="border-r border-slate-800 p-1">
-
-                                            <input
-                                                value={
-                                                    item.itemNo
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    updateItem(
-                                                        index,
-                                                        "itemNo",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent text-center outline-none"
-                                            />
-
-                                        </td>
-
-                                        <td className="border-r border-slate-800 p-1">
-
-                                            <input
-                                                value={
-                                                    item.description
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    updateItem(
-                                                        index,
-                                                        "description",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent outline-none"
-                                            />
-
-                                        </td>
-
-                                        <td className="border-r border-slate-800 p-1">
-
-                                            <input
-                                                value={
-                                                    item.qty
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    updateItem(
-                                                        index,
-                                                        "qty",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent text-center outline-none"
-                                            />
-
-                                        </td>
-
-                                        <td className="border-r border-slate-800 p-1">
-
-                                            <input
-                                                value={
-                                                    item.hsnCode
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    updateItem(
-                                                        index,
-                                                        "hsnCode",
-                                                        e.target.value
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent text-center outline-none"
-                                            />
-
-                                        </td>
-
-                                        <td className="p-1">
-
-                                            <div className="flex items-center gap-1">
-
+                                            <td className="gate-pass-item-cell p-1">
                                                 <input
                                                     value={
-                                                        item.remarks
+                                                        item.idNo
                                                     }
                                                     onChange={(
-                                                        e
+                                                        event
                                                     ) =>
                                                         updateItem(
                                                             index,
-                                                            "remarks",
-                                                            e.target.value
+                                                            "idNo",
+                                                            event
+                                                                .target
+                                                                .value
                                                         )
                                                     }
-                                                    className="w-full border-none bg-transparent outline-none"
+                                                    className="gate-pass-item-input"
+                                                />
+                                            </td>
+
+                                            {/* WH PART NUMBER */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <input
+                                                    value={
+                                                        item.partNo
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) => {
+                                                        const value =
+                                                            event
+                                                                .target
+                                                                .value;
+
+                                                        setItems(
+                                                            (
+                                                                previous
+                                                            ) =>
+                                                                previous.map(
+                                                                    (
+                                                                        currentItem,
+                                                                        currentIndex
+                                                                    ) =>
+                                                                        currentIndex ===
+                                                                            index
+                                                                            ? {
+                                                                                ...currentItem,
+
+                                                                                partNo:
+                                                                                    value,
+
+                                                                                // Clear previous unit
+                                                                                // whenever item changes.
+                                                                                uom:
+                                                                                    "",
+                                                                            }
+                                                                            : currentItem
+                                                                )
+                                                        );
+                                                    }}
+                                                    onBlur={(
+                                                        event
+                                                    ) =>
+                                                        fetchItemUom(
+                                                            index,
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                    placeholder="WH Part No."
+                                                    className="gate-pass-item-input"
+                                                />
+                                            </td>
+
+                                            {/* DESCRIPTION */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <textarea
+                                                    value={
+                                                        item.description
+                                                    }
+                                                    ref={(
+                                                        element
+                                                    ) =>
+                                                        autoResizeTextarea(
+                                                            element
+                                                        )
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) => {
+                                                        updateItem(
+                                                            index,
+                                                            "description",
+                                                            event
+                                                                .target
+                                                                .value
+                                                        );
+
+                                                        autoResizeTextarea(
+                                                            event.target
+                                                        );
+                                                    }}
+                                                    rows={
+                                                        1
+                                                    }
+                                                    className="gate-pass-item-textarea"
+                                                />
+                                            </td>
+
+                                            {/* MANUFACTURER PART */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <textarea
+                                                    value={
+                                                        item.manufacturerPartNo
+                                                    }
+                                                    ref={(
+                                                        element
+                                                    ) =>
+                                                        autoResizeTextarea(
+                                                            element
+                                                        )
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) => {
+                                                        updateItem(
+                                                            index,
+                                                            "manufacturerPartNo",
+                                                            event
+                                                                .target
+                                                                .value
+                                                        );
+
+                                                        autoResizeTextarea(
+                                                            event.target
+                                                        );
+                                                    }}
+                                                    rows={
+                                                        1
+                                                    }
+                                                    className="gate-pass-item-textarea"
+                                                />
+                                            </td>
+
+                                            {/* QTY */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <input
+                                                    value={
+                                                        item.qty
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        updateItem(
+                                                            index,
+                                                            "qty",
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                    className="gate-pass-item-input"
+                                                />
+                                            </td>
+
+                                            {/* UOM - MANUAL */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <input
+                                                    value={item.uom || ""}
+                                                    onChange={(event) =>
+                                                        updateItem(
+                                                            index,
+                                                            "uom",
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    className="gate-pass-item-input"
+                                                />
+                                            </td>
+
+                                            {/* ESTIMATED DOR */}
+
+                                            <td className="gate-pass-item-cell p-1">
+                                                <input
+                                                    type="date"
+                                                    value={
+                                                        item.estimatedDor
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        updateItem(
+                                                            index,
+                                                            "estimatedDor",
+                                                            event
+                                                                .target
+                                                                .value
+                                                        )
+                                                    }
+                                                    className="gate-pass-date-screen gate-pass-item-input text-[18px] text-center"
                                                 />
 
-                                                {items.length >
-                                                    1 && (
+                                                <span className="gate-pass-date-print text-center leading-4">
+                                                    {item.estimatedDor
+                                                        ? format(
+                                                            new Date(
+                                                                `${item.estimatedDor}T00:00:00`
+                                                            ),
+                                                            "dd-MM-yyyy"
+                                                        )
+                                                        : ""}
+                                                </span>
+                                            </td>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                removeItemRow(
-                                                                    index
-                                                                )
-                                                            }
-                                                            className="shrink-0 text-slate-300 hover:text-rose-500 print:hidden"
-                                                            title="Remove row"
-                                                        >
+                                            {/* REMARKS */}
 
-                                                            <Trash2
-                                                                size={
-                                                                    13
+                                            <td className="gate-pass-item-cell p-1">
+                                                <div className="flex items-center">
+                                                    <textarea
+                                                        value={
+                                                            item.remarks
+                                                        }
+                                                        ref={(
+                                                            element
+                                                        ) =>
+                                                            autoResizeTextarea(
+                                                                element
+                                                            )
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) => {
+                                                            updateItem(
+                                                                index,
+                                                                "remarks",
+                                                                event
+                                                                    .target
+                                                                    .value
+                                                            );
+
+                                                            autoResizeTextarea(
+                                                                event.target
+                                                            );
+                                                        }}
+                                                        rows={
+                                                            1
+                                                        }
+                                                        className="gate-pass-item-textarea"
+                                                    />
+
+                                                    {items.length >
+                                                        1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    removeItemRow(
+                                                                        index
+                                                                    )
                                                                 }
-                                                            />
+                                                                className="print-hidden shrink-0 text-rose-500 hover:text-rose-700"
+                                                                title="Remove row"
+                                                            >
+                                                                <Trash2
+                                                                    size={
+                                                                        13
+                                                                    }
+                                                                />
+                                                            </button>
+                                                        )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
 
-                                                        </button>
+                    {/* APPROVAL MATRIX */}
 
-                                                    )}
+                    <div className="gate-pass-section approval-matrix-section mt-4">
+                        <table className="gate-pass-table text-[10px]">
+                            <colgroup>
+                                <col
+                                    style={{
+                                        width:
+                                            "12%",
+                                    }}
+                                />
 
-                                            </div>
+                                {APPROVAL_COLUMNS.map(
+                                    (
+                                        column
+                                    ) => (
+                                        <col
+                                            key={
+                                                column
+                                            }
+                                            style={{
+                                                width:
+                                                    "17.6%",
+                                            }}
+                                        />
+                                    )
+                                )}
+                            </colgroup>
 
-                                        </td>
+                            <thead>
+                                <tr>
+                                    <th className="px-1 py-1.5"></th>
 
-                                    </tr>
+                                    {APPROVAL_COLUMNS.map(
+                                        (
+                                            column
+                                        ) => (
+                                            <th
+                                                key={
+                                                    column
+                                                }
+                                                className="px-1 py-1.5 text-center"
+                                            >
+                                                {
+                                                    column
+                                                }
+                                            </th>
+                                        )
+                                    )}
+                                </tr>
+                            </thead>
 
-                                )
-                            )}
+                            <tbody>
+                                {/* NAME */}
 
-                        </tbody>
+                                <tr>
+                                    <td className="px-2 py-1.5 font-bold">
+                                        Name
+                                    </td>
 
-                    </table>
+                                    {APPROVAL_COLUMNS.map(
+                                        (
+                                            column
+                                        ) => (
+                                            <td
+                                                key={
+                                                    column
+                                                }
+                                                className="p-1 align-middle"
+                                            >
+                                                <textarea
+                                                    value={
+                                                        approvalName[
+                                                        column
+                                                        ] ||
+                                                        ""
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setApprovalName(
+                                                            (
+                                                                previous
+                                                            ) => ({
+                                                                ...previous,
 
+                                                                [column]:
+                                                                    event
+                                                                        .target
+                                                                        .value,
+                                                            })
+                                                        )
+                                                    }
+                                                    rows={
+                                                        1
+                                                    }
+                                                    className="w-full resize-none overflow-hidden border-none bg-transparent py-1 text-center leading-4 outline-none"
+                                                />
+                                            </td>
+                                        )
+                                    )}
+                                </tr>
+
+                                {/* EMP NO */}
+
+                                <tr>
+                                    <td className="px-2 py-1.5 font-bold">
+                                        Emp.No
+                                    </td>
+
+                                    {APPROVAL_COLUMNS.map(
+                                        (
+                                            column
+                                        ) => (
+                                            <td
+                                                key={
+                                                    column
+                                                }
+                                                className="p-1 align-middle"
+                                            >
+                                                <input
+                                                    value={
+                                                        approvalEmpNo[
+                                                        column
+                                                        ] ||
+                                                        ""
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setApprovalEmpNo(
+                                                            (
+                                                                previous
+                                                            ) => ({
+                                                                ...previous,
+
+                                                                [column]:
+                                                                    event
+                                                                        .target
+                                                                        .value,
+                                                            })
+                                                        )
+                                                    }
+                                                    className="w-full border-none bg-transparent py-1 text-center leading-4 outline-none"
+                                                />
+                                            </td>
+                                        )
+                                    )}
+                                </tr>
+
+                                {/* DEPARTMENT */}
+
+                                <tr>
+                                    <td className="px-2 py-1.5 font-bold">
+                                        Dept
+                                    </td>
+
+                                    {APPROVAL_COLUMNS.map(
+                                        (
+                                            column
+                                        ) => (
+                                            <td
+                                                key={
+                                                    column
+                                                }
+                                                className="p-1 align-middle"
+                                            >
+                                                <input
+                                                    value={
+                                                        approvalDept[
+                                                        column
+                                                        ] ||
+                                                        ""
+                                                    }
+                                                    onChange={(
+                                                        event
+                                                    ) =>
+                                                        setApprovalDept(
+                                                            (
+                                                                previous
+                                                            ) => ({
+                                                                ...previous,
+
+                                                                [column]:
+                                                                    event
+                                                                        .target
+                                                                        .value,
+                                                            })
+                                                        )
+                                                    }
+                                                    className="w-full border-none bg-transparent py-1 text-center leading-4 outline-none"
+                                                />
+                                            </td>
+                                        )
+                                    )}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* NOTE */}
+
+                    <p className="mt-3 text-center text-[10px] text-slate-700">
+                        Note: This is a computer-generated gate pass; therefore, a signature is not required.
+                    </p>
+
+                    {/* FOOTER */}
+
+                    <div className="mt-3 border-t border-slate-300 pt-1.5 text-center text-[9px] text-slate-500">
+                        CIN: U46909TN2024PTC17326
+
+                        &nbsp;&nbsp;&nbsp;
+                        |
+                        &nbsp;&nbsp;&nbsp;
+
+                        GSTIN: 29AADCW9221H1Z2
+
+                    </div>
                 </div>
-
-                {/* =================================================
-                    APPROVAL MATRIX
-                ================================================= */}
-
-                <div className="border border-slate-800 text-[12px]">
-
-                    <table className="w-full border-collapse">
-
-                        <thead>
-
-                            <tr className="border-b border-slate-800">
-
-                                <th className="w-24 border-r border-slate-800 p-2"></th>
-
-                                {APPROVAL_COLUMNS.map(
-                                    (
-                                        col
-                                    ) => (
-
-                                        <th
-                                            key={
-                                                col
-                                            }
-                                            className="border-r border-slate-800 p-2 text-center last:border-r-0"
-                                        >
-                                            {
-                                                col
-                                            }
-                                        </th>
-
-                                    )
-                                )}
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                            <tr className="border-b border-slate-800">
-
-                                <td className="border-r border-slate-800 p-2 font-semibold">
-                                    Name
-                                </td>
-
-                                {APPROVAL_COLUMNS.map(
-                                    (
-                                        col
-                                    ) => (
-
-                                        <td
-                                            key={
-                                                col
-                                            }
-                                            className="border-r border-slate-800 p-1 last:border-r-0"
-                                        >
-
-                                            <input
-                                                value={
-                                                    approvalName[
-                                                    col
-                                                    ]
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    setApprovalName(
-                                                        (
-                                                            prev
-                                                        ) => ({
-                                                            ...prev,
-                                                            [col]:
-                                                                e.target.value,
-                                                        })
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent text-center outline-none"
-                                            />
-
-                                        </td>
-
-                                    )
-                                )}
-
-                            </tr>
-
-                            <tr>
-
-                                <td className="border-r border-slate-800 p-2 font-semibold">
-                                    Emp.No
-                                </td>
-
-                                {APPROVAL_COLUMNS.map(
-                                    (
-                                        col
-                                    ) => (
-
-                                        <td
-                                            key={
-                                                col
-                                            }
-                                            className="border-r border-slate-800 p-1 last:border-r-0"
-                                        >
-
-                                            <input
-                                                value={
-                                                    approvalEmpNo[
-                                                    col
-                                                    ]
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    setApprovalEmpNo(
-                                                        (
-                                                            prev
-                                                        ) => ({
-                                                            ...prev,
-                                                            [col]:
-                                                                e.target.value,
-                                                        })
-                                                    )
-                                                }
-                                                className="w-full border-none bg-transparent text-center outline-none"
-                                            />
-
-                                        </td>
-
-                                    )
-                                )}
-
-                            </tr>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
             </div>
-
-            {/* Note */}
-
-            <p className="mt-4 text-[11px] text-slate-700">
-                Note: This is a computer-generated gate pass; therefore, a signature is not required.
-            </p>
-
-            {/* Footer */}
-
-            <div className="mt-6 border-t border-slate-300 pt-2 text-center text-[10px] text-slate-500">
-                CIN: U27104TN2024PTC173268
-                &nbsp;&nbsp;&nbsp;&nbsp;
-                GSTN: 29AADCW9221H1Z2
-                &nbsp;&nbsp;&nbsp;&nbsp;
-                MSME/ UDYAM Reg No: UDYAM-TN-24-0121823
-            </div>
-
-        </div>
+        </>
     );
 };
 

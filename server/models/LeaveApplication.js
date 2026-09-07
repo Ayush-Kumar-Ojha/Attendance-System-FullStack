@@ -49,24 +49,32 @@ const leaveApplicationSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            enum: ["PENDING", "APPROVED", "REJECTED"],
+            enum: [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+            ],
             default: "PENDING",
         },
 
+        // PAID    -> Admin accepted as normal paid leave
+        // UNPAID  -> Admin accepted as Loss of Pay
+        // null    -> Pending / Rejected
         paymentType: {
             type: String,
             enum: ["PAID", "UNPAID", null],
             default: null,
         },
 
-        // Admin approved this as a special paid emergency.
-        // This does NOT consume the normal 3-day monthly paid quota.
+        // Kept because older records may already contain this field.
+        // We are not removing old database functionality.
         isEmergencyOverride: {
             type: Boolean,
             default: false,
         },
 
-        // Approved as Loss of Pay.
+        // TRUE only when admin explicitly clicks
+        // "Accept as Loss of Pay".
         isLop: {
             type: Boolean,
             default: false,
@@ -84,6 +92,9 @@ const leaveApplicationSchema = new mongoose.Schema(
 
 const LeaveApplication =
     mongoose.models.LeaveApplication ||
-    mongoose.model("LeaveApplication", leaveApplicationSchema);
+    mongoose.model(
+        "LeaveApplication",
+        leaveApplicationSchema
+    );
 
 export default LeaveApplication;

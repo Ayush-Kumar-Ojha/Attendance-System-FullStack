@@ -434,12 +434,12 @@ const Advance = () => {
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900">
-                                Salary Advance
+                                Advance
                             </h1>
                             <p className="text-sm text-slate-500">
                                 {isAdmin
-                                    ? "Review employee salary advance requests"
-                                    : "Request and track your salary advance"}
+                                    ? "Review employee advance requests"
+                                    : "Request and track your advance"}
                             </p>
                         </div>
                     </div>
@@ -612,7 +612,7 @@ const Advance = () => {
                             <p className="mt-1 text-sm text-slate-500">
                                 {isAdmin
                                     ? "No requests match the selected filters."
-                                    : "You haven't requested a salary advance yet."}
+                                    : "You haven't requested an advance yet."}
                             </p>
                         </div>
                     ) : (
@@ -795,7 +795,7 @@ const Advance = () => {
 
             {showForm && (
                 <Modal
-                    title="Request Salary Advance"
+                    title="Request Advance"
                     subtitle="Submit your request for admin approval."
                     onClose={() => {
                         resetForm();

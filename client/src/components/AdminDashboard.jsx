@@ -1205,7 +1205,7 @@ const AdminDashboard = ({
                 HEADER
             ===================================================== */}
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
 
                 <div className="page-header">
 
@@ -1220,159 +1220,202 @@ const AdminDashboard = ({
 
                 </div>
 
-                {/* EMPLOYEE SEARCH BAR */}
+                {/* TOP RIGHT CONTROLS: Attendance Override, Employee Documents, Search Bar */}
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-2.5">
 
-                <div
-                    ref={
-                        searchRef
-                    }
-                    className="relative w-full sm:w-80"
-                >
+                    {/* ATTENDANCE OVERRIDE BUTTON */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            resetAttendanceOverride();
 
-                    <div className="relative">
-
-                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                        <input
-                            type="text"
-                            value={
-                                searchTerm
+                            setShowAttendanceOverride(
+                                true
+                            );
+                        }}
+                        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                    >
+                        <PencilLine
+                            size={
+                                15
                             }
-                            onFocus={() =>
-                                setIsSearching(
-                                    true
-                                )
-                            }
-                            onChange={(
-                                event
-                            ) => {
-                                setSearchTerm(
-                                    event.target.value
-                                );
-
-                                setIsSearching(
-                                    true
-                                );
-                            }}
-                            placeholder="Search employee by name..."
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm shadow-xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         />
+                        Attendance Override
+                    </button>
 
-                        {searchTerm && (
+                    {/* EMPLOYEE DOCUMENTS BUTTON */}
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setShowDocsModal(
+                                true
+                            )
+                        }
+                        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                    >
+                        <FolderOpen
+                            size={
+                                15
+                            }
+                        />
+                        Employee Documents
+                    </button>
 
-                            <button
-                                onClick={() =>
-                                    setSearchTerm(
-                                        ""
+                    {/* EMPLOYEE SEARCH BAR */}
+
+                    <div
+                        ref={
+                            searchRef
+                        }
+                        className="relative w-full sm:w-80"
+                    >
+
+                        <div className="relative">
+
+                            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                            <input
+                                type="text"
+                                value={
+                                    searchTerm
+                                }
+                                onFocus={() =>
+                                    setIsSearching(
+                                        true
                                     )
                                 }
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                                <X
-                                    size={
-                                        15
+                                onChange={(
+                                    event
+                                ) => {
+                                    setSearchTerm(
+                                        event.target.value
+                                    );
+
+                                    setIsSearching(
+                                        true
+                                    );
+                                }}
+                                placeholder="Search employee by name..."
+                                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm shadow-xs outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            />
+
+                            {searchTerm && (
+
+                                <button
+                                    onClick={() =>
+                                        setSearchTerm(
+                                            ""
+                                        )
                                     }
-                                />
-                            </button>
-
-                        )}
-
-                    </div>
-
-                    {/* AUTOCOMPLETE */}
-
-                    {isSearching &&
-                        searchTerm.trim() && (
-
-                            <div className="animate-modal-in absolute left-0 right-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-
-                                {searchResults.length ===
-                                0 ? (
-
-                                    <div className="p-4 text-center text-xs text-slate-400">
-                                        No employee
-                                        found matching
-                                        "
-                                        {
-                                            searchTerm
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <X
+                                        size={
+                                            15
                                         }
-                                        "
-                                    </div>
+                                    />
+                                </button>
 
-                                ) : (
+                            )}
 
-                                    searchResults.map(
-                                        (
-                                            employee
-                                        ) => {
-                                            const empId =
-                                                employee._id ||
-                                                employee.id;
+                        </div>
 
-                                            const name =
-                                                `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
+                        {/* AUTOCOMPLETE */}
 
-                                            return (
+                        {isSearching &&
+                            searchTerm.trim() && (
 
-                                                <div
-                                                    key={
-                                                        empId
-                                                    }
-                                                    onClick={() =>
-                                                        handleSelectEmployee(
+                                <div className="animate-modal-in absolute left-0 right-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+
+                                    {searchResults.length ===
+                                    0 ? (
+
+                                        <div className="p-4 text-center text-xs text-slate-400">
+                                            No employee
+                                            found matching
+                                            "
+                                            {
+                                                searchTerm
+                                            }
+                                            "
+                                        </div>
+
+                                    ) : (
+
+                                        searchResults.map(
+                                            (
+                                                employee
+                                            ) => {
+                                                const empId =
+                                                    employee._id ||
+                                                    employee.id;
+
+                                                const name =
+                                                    `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
+
+                                                return (
+
+                                                    <div
+                                                        key={
                                                             empId
-                                                        )
-                                                    }
-                                                    className="flex cursor-pointer items-center justify-between rounded-lg p-2.5 transition hover:bg-slate-50"
-                                                >
+                                                        }
+                                                        onClick={() =>
+                                                            handleSelectEmployee(
+                                                                empId
+                                                            )
+                                                        }
+                                                        className="flex cursor-pointer items-center justify-between rounded-lg p-2.5 transition hover:bg-slate-50"
+                                                    >
 
-                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-3">
 
-                                                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
-                                                            {employee
-                                                                .firstName
-                                                                ?.[0] ||
-                                                                "E"}
+                                                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                                                {employee
+                                                                    .firstName
+                                                                    ?.[0] ||
+                                                                    "E"}
+                                                            </div>
+
+                                                            <div>
+
+                                                                <p className="text-sm font-semibold text-slate-800">
+                                                                    {
+                                                                        name
+                                                                    }
+                                                                </p>
+
+                                                                <p className="text-xs text-slate-500">
+                                                                    {employee.position ||
+                                                                        "Employee"}{" "}
+                                                                    •{" "}
+                                                                    {employee.department ||
+                                                                        "Dept"}
+                                                                </p>
+
+                                                            </div>
+
                                                         </div>
 
-                                                        <div>
-
-                                                            <p className="text-sm font-semibold text-slate-800">
-                                                                {
-                                                                    name
-                                                                }
-                                                            </p>
-
-                                                            <p className="text-xs text-slate-500">
-                                                                {employee.position ||
-                                                                    "Employee"}{" "}
-                                                                •{" "}
-                                                                {employee.department ||
-                                                                    "Dept"}
-                                                            </p>
-
-                                                        </div>
+                                                        <ChevronRight
+                                                            size={
+                                                                16
+                                                            }
+                                                            className="text-slate-400"
+                                                        />
 
                                                     </div>
 
-                                                    <ChevronRight
-                                                        size={
-                                                            16
-                                                        }
-                                                        className="text-slate-400"
-                                                    />
+                                                );
+                                            }
+                                        )
 
-                                                </div>
+                                    )}
 
-                                            );
-                                        }
-                                    )
+                                </div>
 
-                                )}
+                            )}
 
-                            </div>
-
-                        )}
+                    </div>
 
                 </div>
 
@@ -1435,68 +1478,19 @@ const AdminDashboard = ({
             </div>
 
             {/* =====================================================
-                QUICK ADMIN ACTIONS
+                TODAY SNAPSHOT
             ===================================================== */}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between mb-3">
 
                 <h2 className="text-sm font-semibold text-slate-700">
                     Today's Snapshot
                 </h2>
 
-                <div className="flex flex-wrap gap-2">
-
-                    {/* NEW ADMIN ATTENDANCE OVERRIDE */}
-
-                    <button
-                        type="button"
-                        onClick={() => {
-                            resetAttendanceOverride();
-
-                            setShowAttendanceOverride(
-                                true
-                            );
-                        }}
-                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                    >
-
-                        <PencilLine
-                            size={
-                                15
-                            }
-                        />
-
-                        Attendance Override
-
-                    </button>
-
-                    {/* EXISTING DOCUMENT BUTTON */}
-
-                    <button
-                        onClick={() =>
-                            setShowDocsModal(
-                                true
-                            )
-                        }
-                        className="flex cursor-pointer items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                    >
-
-                        <FolderOpen
-                            size={
-                                15
-                            }
-                        />
-
-                        Employee Documents
-
-                    </button>
-
-                </div>
-
             </div>
 
             {/* =====================================================
-                TODAY SNAPSHOT
+                TODAY SNAPSHOT CARDS
             ===================================================== */}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">

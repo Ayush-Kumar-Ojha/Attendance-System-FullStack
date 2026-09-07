@@ -1,21 +1,147 @@
 import mongoose from "mongoose";
 
+const dynamicFieldSchema = new mongoose.Schema(
+    {
+        section: {
+            type: String,
+            trim: true,
+            default: "Excel Fields",
+        },
+        label: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        key: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        value: {
+            type: mongoose.Schema.Types.Mixed,
+            default: "",
+        },
+    },
+    { _id: false }
+);
+
+const customFieldSchema = new mongoose.Schema(
+    {
+        id: {
+            type: String,
+            default: "",
+        },
+        section: {
+            type: String,
+            default: "",
+        },
+        label: {
+            type: String,
+            default: "",
+        },
+        value: {
+            type: mongoose.Schema.Types.Mixed,
+            default: "",
+        },
+        type: {
+            type: String,
+            default: "",
+        },
+    },
+    { _id: false }
+);
+
+const customSectionFieldSchema = new mongoose.Schema(
+    {
+        id: {
+            type: String,
+            default: "",
+        },
+        label: {
+            type: String,
+            default: "",
+        },
+        value: {
+            type: mongoose.Schema.Types.Mixed,
+            default: "",
+        },
+    },
+    { _id: false }
+);
+
+const customSectionSchema = new mongoose.Schema(
+    {
+        id: {
+            type: String,
+            default: "",
+        },
+        title: {
+            type: String,
+            default: "",
+        },
+        fields: {
+            type: [customSectionFieldSchema],
+            default: [],
+        },
+    },
+    { _id: false }
+);
+
+const employeeDocumentSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        fileName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        fileUrl: {
+            type: String,
+            default: "",
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now,
+        },
+    },
+    { _id: true }
+);
+
 const employeeSchema = new mongoose.Schema(
     {
-        // =====================================================
-        // USER / LOGIN LINK
-        // =====================================================
-
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             default: null,
         },
 
-        // =====================================================
-        // CORE / SYSTEM FIELDS
-        // =====================================================
+        // CHAT & POSTING RESTRICTIONS
+        isChatBlocked: {
+            type: Boolean,
+            default: false,
+        },
 
+        postingBlockType: {
+            type: String,
+            enum: ["NONE", "TEMPORARY", "PERMANENT"],
+            default: "NONE",
+        },
+
+        postingBlockedUntil: {
+            type: Date,
+            default: null,
+        },
+
+        postingBlockReason: {
+            type: String,
+            default: "",
+        },
+
+        // BASIC DETAILS
         employeeCode: {
             type: String,
             trim: true,
@@ -39,39 +165,6 @@ const employeeSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
-
-        email: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        department: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        position: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        employmentStatus: {
-            type: String,
-            enum: ["ACTIVE", "INACTIVE", ""],
-            default: "",
-        },
-
-        isDeleted: {
-            type: Boolean,
-            default: false,
-        },
-
-        // =====================================================
-        // PERSONAL DETAILS
-        // =====================================================
 
         fatherName: {
             type: String,
@@ -131,13 +224,27 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        passportNumber: {
+        mobileNumber: {
             type: String,
             trim: true,
             default: "",
         },
 
-        identificationMark: {
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: "",
+        },
+
+        // JOB DETAILS
+        department: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        position: {
             type: String,
             trim: true,
             default: "",
@@ -150,6 +257,30 @@ const employeeSchema = new mongoose.Schema(
         },
 
         vendorCode: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        employmentStatus: {
+            type: String,
+            enum: ["ACTIVE", "INACTIVE", ""],
+            default: "",
+        },
+
+        confirmationDate: {
+            type: Date,
+            default: null,
+        },
+
+        // PERSONAL DETAILS
+        passportNumber: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        identificationMark: {
             type: String,
             trim: true,
             default: "",
@@ -171,15 +302,7 @@ const employeeSchema = new mongoose.Schema(
             default: null,
         },
 
-        confirmationDate: {
-            type: Date,
-            default: null,
-        },
-
-        // =====================================================
         // SAFETY / PPE
-        // =====================================================
-
         safetyIssued: {
             type: String,
             trim: true,
@@ -237,10 +360,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
         // PERMANENT ADDRESS
-        // =====================================================
-
         permanentAddressLine1: {
             type: String,
             trim: true,
@@ -277,10 +397,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
         // PRESENT ADDRESS
-        // =====================================================
-
         presentAddressLine1: {
             type: String,
             trim: true,
@@ -323,16 +440,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        mobileNumber: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        // =====================================================
         // EMERGENCY CONTACT
-        // =====================================================
-
         emergencyContactPersonName: {
             type: String,
             trim: true,
@@ -357,10 +465,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
         // EDUCATION
-        // =====================================================
-
         qualification: {
             type: String,
             trim: true,
@@ -391,10 +496,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
-        // EXCEL DOCUMENT REFERENCES
-        // =====================================================
-
+        // DOCUMENT / KYC
         resume: {
             type: String,
             default: "",
@@ -435,57 +537,20 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
-        // PROFILE IMAGE / CV / DOCUMENTS
-        // =====================================================
-
-        image: {
+        aadharNumber: {
             type: String,
-            default: null,
+            trim: true,
+            default: "",
         },
 
-        cvUrl: {
+        panNumber: {
             type: String,
-            default: null,
+            trim: true,
+            uppercase: true,
+            default: "",
         },
 
-        cvFileName: {
-            type: String,
-            default: null,
-        },
-
-        documents: {
-            type: [
-                {
-                    name: {
-                        type: String,
-                        required: true,
-                    },
-
-                    fileUrl: {
-                        type: String,
-                        required: true,
-                    },
-
-                    fileName: {
-                        type: String,
-                        required: true,
-                    },
-
-                    uploadedAt: {
-                        type: Date,
-                        default: Date.now,
-                    },
-                },
-            ],
-
-            default: [],
-        },
-
-        // =====================================================
         // BANK / STATUTORY
-        // =====================================================
-
         bankAccountNumber: {
             type: String,
             trim: true,
@@ -507,6 +572,7 @@ const employeeSchema = new mongoose.Schema(
         ifscCode: {
             type: String,
             trim: true,
+            uppercase: true,
             default: "",
         },
 
@@ -540,27 +606,7 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
-        // =====================================================
-        // KYC
-        // =====================================================
-
-        aadharNumber: {
-            type: String,
-            trim: true,
-            default: "",
-        },
-
-        panNumber: {
-            type: String,
-            trim: true,
-            uppercase: true,
-            default: "",
-        },
-
-        // =====================================================
-        // PAYROLL
-        // =====================================================
-
+        // SALARY
         basicSalary: {
             type: Number,
             default: null,
@@ -576,10 +622,7 @@ const employeeSchema = new mongoose.Schema(
             default: null,
         },
 
-        // =====================================================
         // PROFILE
-        // =====================================================
-
         bio: {
             type: String,
             default: "",
@@ -590,124 +633,45 @@ const employeeSchema = new mongoose.Schema(
             default: [],
         },
 
-        specialDateMessage: {
+        image: {
             type: String,
-            default: "",
-        },
-
-        specialDateMessageCreatedAt: {
-            type: Date,
             default: null,
         },
 
-        // =====================================================
-        // DYNAMIC EXCEL FIELDS
-        // =====================================================
-        //
-        // Every Excel column that does not have a fixed field
-        // above is automatically stored here.
-        //
-        // Example:
-        //
-        // {
-        //     section: "Employment",
-        //     label: "Project Site",
-        //     key: "employment::project site",
-        //     value: "Site A"
-        // }
-        //
-        // The controller automatically propagates newly discovered
-        // fields to employees created by previous Excel uploads.
-        // =====================================================
+        cvUrl: {
+            type: String,
+            default: null,
+        },
 
-        dynamicFields: {
-            type: [
-                {
-                    section: {
-                        type: String,
-                        default: "Excel Fields",
-                    },
+        cvFileName: {
+            type: String,
+            default: null,
+        },
 
-                    label: {
-                        type: String,
-                        required: true,
-                    },
-
-                    key: {
-                        type: String,
-                        required: true,
-                    },
-
-                    value: {
-                        type: String,
-                        default: "",
-                    },
-                },
-            ],
-
+        documents: {
+            type: [employeeDocumentSchema],
             default: [],
         },
 
-        // =====================================================
-        // CUSTOM FIELDS
-        // =====================================================
+        // FLEXIBLE EXCEL FIELDS
+        dynamicFields: {
+            type: [dynamicFieldSchema],
+            default: [],
+        },
 
         customFields: {
-            type: [
-                {
-                    section: {
-                        type: String,
-                        default: "personal",
-                    },
-
-                    label: {
-                        type: String,
-                        required: true,
-                    },
-
-                    value: {
-                        type: String,
-                        default: "",
-                    },
-                },
-            ],
-
+            type: [customFieldSchema],
             default: [],
         },
 
-        // =====================================================
-        // CUSTOM SECTIONS
-        // =====================================================
-
         customSections: {
-            type: [
-                {
-                    title: {
-                        type: String,
-                        required: true,
-                    },
-
-                    fields: {
-                        type: [
-                            {
-                                label: {
-                                    type: String,
-                                    required: true,
-                                },
-
-                                value: {
-                                    type: String,
-                                    default: "",
-                                },
-                            },
-                        ],
-
-                        default: [],
-                    },
-                },
-            ],
-
+            type: [customSectionSchema],
             default: [],
+        },
+
+        isDeleted: {
+            type: Boolean,
+            default: false,
         },
     },
     {
@@ -715,19 +679,16 @@ const employeeSchema = new mongoose.Schema(
     }
 );
 
-// DO NOT add unique indexes to:
-// userId
-// employeeCode
-// email
-//
-// Excel employees can legitimately have these empty.
-// Old indexes are cleaned by employeeController.js.
+employeeSchema.index({ employeeCode: 1 });
+employeeSchema.index({ email: 1 });
+employeeSchema.index({ aadharNumber: 1 });
+employeeSchema.index({ uanNumber: 1 });
+employeeSchema.index({ bankAccountNumber: 1 });
+employeeSchema.index({ mobileNumber: 1 });
+employeeSchema.index({ phone: 1 });
 
 const Employee =
     mongoose.models.Employee ||
-    mongoose.model(
-        "Employee",
-        employeeSchema
-    );
+    mongoose.model("Employee", employeeSchema);
 
 export default Employee;

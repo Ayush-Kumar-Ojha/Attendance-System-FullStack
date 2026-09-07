@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   PlusIcon,
   Download,
@@ -7,13 +13,8 @@ import {
   Calendar,
   CheckCircle2,
   AlertTriangle,
-  ShieldCheck,
   DollarSign,
   UserCheck,
-  Clock3,
-  XCircle,
-  CalendarDays,
-  TrendingUp,
 } from "lucide-react";
 
 import * as XLSX from "xlsx";
@@ -23,893 +24,1143 @@ import LeaveHistory from "../components/leave/LeaveHistory";
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal";
 import DocumentAttachment from "../components/leave/DocumentAttachment";
 
-import { useAuth } from "../context/AuthContext";
+import {
+  useAuth,
+} from "../context/AuthContext";
+
 import api from "../api/axios";
 import toast from "react-hot-toast";
 
 // ============================================================
-// LEAVE POLICY
+// CONSTANTS
 // ============================================================
 
-const MONTHLY_PAID_LEAVE_LIMIT = 3;
-const ANNUAL_PAID_LEAVE_LIMIT =
-  MONTHLY_PAID_LEAVE_LIMIT * 12;
+const MONTHLY_PAID_LEAVE_LIMIT =
+  3;
+
+const currentDate =
+  new Date();
 
 // ============================================================
-// HELPERS
+// GET LEAVE DAYS
 // ============================================================
 
-const getLeaveDays = (leave) => {
-  /*
-    IMPORTANT:
-
-    1 HALF DAY = 0.5 leave
-
-    Therefore:
-
-    1 half day  = 0.5
-    2 half days = 1
-    3 half days = 1.5
-    4 half days = 2
-  */
-
-  if (leave.type === "HALF_DAY") {
+const getLeaveDays = (
+  leave
+) => {
+  if (
+    leave.type ===
+    "HALF_DAY"
+  ) {
     return 0.5;
   }
 
-  const start = new Date(leave.startDate);
-  const end = new Date(leave.endDate);
+  const start =
+    new Date(
+      leave.startDate
+    );
 
-  return (
+  const end =
+    new Date(
+      leave.endDate
+    );
+
+  if (
+    Number.isNaN(
+      start.getTime()
+    ) ||
+    Number.isNaN(
+      end.getTime()
+    )
+  ) {
+    return 0;
+  }
+
+  const diffDays =
     Math.round(
-      (end.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-    ) + 1
-  );
+      (
+        end.getTime() -
+        start.getTime()
+      ) /
+        (
+          1000 *
+          60 *
+          60 *
+          24
+        )
+    ) + 1;
+
+  return diffDays;
 };
-
-const getLeaveTypeLabel = (type) => {
-  const labels = {
-    SICK: "Sick Leave",
-    CASUAL: "Casual Leave",
-    ANNUAL: "Annual Leave",
-
-    // Keep database value MENSTRUAL,
-    // but show Wellness Leave in UI.
-    MENSTRUAL: "Wellness Leave",
-
-    HALF_DAY: "Half Day",
-    COMPENSATORY: "Compensatory Leave",
-  };
-
-  return labels[type] || type || "";
-};
-
-const currentDate = new Date();
 
 // ============================================================
 // MONTHLY STATS
 // ============================================================
 
-const calculateMonthlyStats = (
-  leavesList,
-  selectedMonth,
-  selectedYear
-) => {
-  const monthNum = selectedMonth
-    ? Number(selectedMonth)
-    : currentDate.getMonth() + 1;
+const calculateMonthlyStats =
+  (
+    leavesList,
+    selectedMonth,
+    selectedYear
+  ) => {
+    const monthNum =
+      selectedMonth
+        ? Number(
+            selectedMonth
+          )
+        : currentDate.getMonth() +
+          1;
 
-  const yearNum = selectedYear
-    ? Number(selectedYear)
-    : currentDate.getFullYear();
+    const yearNum =
+      selectedYear
+        ? Number(
+            selectedYear
+          )
+        : currentDate.getFullYear();
 
-  const monthLeaves = leavesList.filter((leave) => {
-    if (!leave.startDate) {
-      return false;
-    }
+    // ========================================================
+    // FILTER SELECTED MONTH
+    // ========================================================
 
-    const date = new Date(leave.startDate);
+    const monthLeaves =
+      leavesList.filter(
+        (
+          leave
+        ) => {
+          if (
+            !leave.startDate
+          ) {
+            return false;
+          }
 
-    return (
-      date.getMonth() + 1 === monthNum &&
-      date.getFullYear() === yearNum
+          const d =
+            new Date(
+              leave.startDate
+            );
+
+          return (
+            d.getMonth() +
+              1 ===
+              monthNum &&
+            d.getFullYear() ===
+              yearNum
+          );
+        }
+      );
+
+    const approvedLeaves =
+      monthLeaves.filter(
+        (
+          leave
+        ) =>
+          leave.status ===
+          "APPROVED"
+      );
+
+    const pendingLeaves =
+      monthLeaves.filter(
+        (
+          leave
+        ) =>
+          leave.status ===
+          "PENDING"
+      );
+
+    let totalApprovedDays =
+      0;
+
+    let paidApprovedDays =
+      0;
+
+    let lopDays =
+      0;
+
+    let compensatoryDays =
+      0;
+
+    approvedLeaves.forEach(
+      (
+        leave
+      ) => {
+        const days =
+          getLeaveDays(
+            leave
+          );
+
+        totalApprovedDays +=
+          days;
+
+        // COMPENSATORY LEAVE
+        if (
+          leave.type ===
+          "COMPENSATORY"
+        ) {
+          compensatoryDays +=
+            days;
+
+          return;
+        }
+
+        // LOSS OF PAY
+        if (
+          leave.isLop ||
+          leave.paymentType ===
+            "UNPAID"
+        ) {
+          lopDays +=
+            days;
+
+          return;
+        }
+
+        // NORMAL PAID LEAVE
+        paidApprovedDays +=
+          days;
+      }
     );
-  });
 
-  const approvedLeaves = monthLeaves.filter(
-    (leave) => leave.status === "APPROVED"
-  );
+    // ========================================================
+    // PAID LEAVE USED
+    //
+    // Employee has max 3 days in paid monthly pocket.
+    // ========================================================
 
-  const pendingLeaves = monthLeaves.filter(
-    (leave) => leave.status === "PENDING"
-  );
+    const quotaPaidUsed =
+      Math.min(
+        MONTHLY_PAID_LEAVE_LIMIT,
+        paidApprovedDays
+      );
 
-  const rejectedLeaves = monthLeaves.filter(
-    (leave) => leave.status === "REJECTED"
-  );
+    // ========================================================
+    // PAID LEAVE REMAINING
+    // ========================================================
 
-  let totalApprovedDays = 0;
-  let emergencyPaidDays = 0;
-  let lopDays = 0;
-  let standardPaidDays = 0;
-  let pendingDays = 0;
-  let rejectedDays = 0;
+    const quotaPaidRemaining =
+      Math.max(
+        0,
 
-  approvedLeaves.forEach((leave) => {
-    const days = getLeaveDays(leave);
+        MONTHLY_PAID_LEAVE_LIMIT -
+          quotaPaidUsed
+      );
 
-    totalApprovedDays += days;
+    // ========================================================
+    // EXTRA DAYS
+    //
+    // IMPORTANT:
+    //
+    // Extra Days DOES NOT automatically mean LOP.
+    //
+    // It only tells how many approved non-compensatory leave
+    // days crossed the normal 3-day monthly allowance.
+    //
+    // Admin separately decides LOP.
+    // ========================================================
 
-    if (leave.isEmergencyOverride) {
-      emergencyPaidDays += days;
-    } else if (
-      leave.isLop ||
-      leave.paymentType === "UNPAID"
-    ) {
-      lopDays += days;
-    } else if (leave.type !== "COMPENSATORY") {
-      standardPaidDays += days;
-    }
-  });
+    const quotaRelevantApprovedDays =
+      paidApprovedDays +
+      lopDays;
 
-  pendingLeaves.forEach((leave) => {
-    pendingDays += getLeaveDays(leave);
-  });
+    const extraDaysTaken =
+      Math.max(
+        0,
 
-  rejectedLeaves.forEach((leave) => {
-    rejectedDays += getLeaveDays(leave);
-  });
+        quotaRelevantApprovedDays -
+          MONTHLY_PAID_LEAVE_LIMIT
+      );
 
-  /*
-    Compatibility with any older records where
-    normal paid leave exceeded 3 days.
-  */
+    return {
+      monthName:
+        new Date(
+          2000,
+          monthNum - 1
+        ).toLocaleString(
+          "en-IN",
+          {
+            month:
+              "long",
+          }
+        ),
 
-  if (standardPaidDays > MONTHLY_PAID_LEAVE_LIMIT) {
-    const excessDays =
-      standardPaidDays - MONTHLY_PAID_LEAVE_LIMIT;
+      yearNum,
 
-    lopDays += excessDays;
+      totalApprovedDays,
 
-    standardPaidDays =
-      MONTHLY_PAID_LEAVE_LIMIT;
-  }
+      paidApprovedDays,
 
-  const quotaPaidUsed = Math.min(
-    MONTHLY_PAID_LEAVE_LIMIT,
-    standardPaidDays
-  );
+      quotaPaidUsed,
 
-  const quotaPaidRemaining = Math.max(
-    0,
-    MONTHLY_PAID_LEAVE_LIMIT - quotaPaidUsed
-  );
+      quotaPaidRemaining,
 
-  const extraDaysTaken =
-    emergencyPaidDays + lopDays;
+      extraDaysTaken,
 
-  return {
-    monthName: new Date(
-      2000,
-      monthNum - 1
-    ).toLocaleString("en-IN", {
-      month: "long",
-    }),
+      lopDays,
 
-    monthNum,
-    yearNum,
+      compensatoryDays,
 
-    totalApprovedDays,
+      pendingCount:
+        pendingLeaves.length,
 
-    quotaPaidUsed,
-    quotaPaidRemaining,
+      approvedCount:
+        approvedLeaves.length,
 
-    extraDaysTaken,
-
-    emergencyPaidDays,
-    lopDays,
-
-    pendingDays,
-    rejectedDays,
-
-    pendingCount: pendingLeaves.length,
-    approvedCount: approvedLeaves.length,
-    rejectedCount: rejectedLeaves.length,
-
-    totalRequests: monthLeaves.length,
+      totalRequests:
+        monthLeaves.length,
+    };
   };
-};
 
 // ============================================================
-// ANNUAL STATS
+// YEARLY STATS
 // ============================================================
 
-const calculateAnnualStats = (
-  leavesList,
-  selectedYear
-) => {
-  const yearNum = selectedYear
-    ? Number(selectedYear)
-    : currentDate.getFullYear();
+const calculateYearlyStats =
+  (
+    leavesList,
+    selectedYear
+  ) => {
+    const yearNum =
+      selectedYear
+        ? Number(
+            selectedYear
+          )
+        : currentDate.getFullYear();
 
-  const yearLeaves = leavesList.filter((leave) => {
-    if (!leave.startDate) {
-      return false;
-    }
+    const yearLeaves =
+      leavesList.filter(
+        (
+          leave
+        ) => {
+          if (
+            !leave.startDate
+          ) {
+            return false;
+          }
 
-    return (
-      new Date(
-        leave.startDate
-      ).getFullYear() === yearNum
+          return (
+            new Date(
+              leave.startDate
+            ).getFullYear() ===
+            yearNum
+          );
+        }
+      );
+
+    const approvedLeaves =
+      yearLeaves.filter(
+        (
+          leave
+        ) =>
+          leave.status ===
+          "APPROVED"
+      );
+
+    const pendingLeaves =
+      yearLeaves.filter(
+        (
+          leave
+        ) =>
+          leave.status ===
+          "PENDING"
+      );
+
+    const rejectedLeaves =
+      yearLeaves.filter(
+        (
+          leave
+        ) =>
+          leave.status ===
+          "REJECTED"
+      );
+
+    let approvedDays =
+      0;
+
+    let paidDays =
+      0;
+
+    let lopDays =
+      0;
+
+    let compensatoryDays =
+      0;
+
+    approvedLeaves.forEach(
+      (
+        leave
+      ) => {
+        const days =
+          getLeaveDays(
+            leave
+          );
+
+        approvedDays +=
+          days;
+
+        if (
+          leave.type ===
+          "COMPENSATORY"
+        ) {
+          compensatoryDays +=
+            days;
+
+          return;
+        }
+
+        if (
+          leave.isLop ||
+          leave.paymentType ===
+            "UNPAID"
+        ) {
+          lopDays +=
+            days;
+
+          return;
+        }
+
+        paidDays +=
+          days;
+      }
     );
-  });
 
-  const approvedLeaves = yearLeaves.filter(
-    (leave) => leave.status === "APPROVED"
-  );
+    return {
+      yearNum,
 
-  const pendingLeaves = yearLeaves.filter(
-    (leave) => leave.status === "PENDING"
-  );
+      totalRequests:
+        yearLeaves.length,
 
-  const rejectedLeaves = yearLeaves.filter(
-    (leave) => leave.status === "REJECTED"
-  );
+      approvedCount:
+        approvedLeaves.length,
 
-  let normalPaidDays = 0;
-  let emergencyPaidDays = 0;
-  let lopDays = 0;
+      approvedDays,
 
-  let totalApprovedDays = 0;
-  let pendingDays = 0;
-  let rejectedDays = 0;
+      paidDays,
 
-  let sickDays = 0;
-  let casualDays = 0;
-  let annualDays = 0;
-  let wellnessDays = 0;
-  let halfDays = 0;
-  let compensatoryDays = 0;
+      lopDays,
 
-  approvedLeaves.forEach((leave) => {
-    const days = getLeaveDays(leave);
+      compensatoryDays,
 
-    totalApprovedDays += days;
+      pendingCount:
+        pendingLeaves.length,
 
-    if (leave.isEmergencyOverride) {
-      emergencyPaidDays += days;
-    } else if (
-      leave.isLop ||
-      leave.paymentType === "UNPAID"
-    ) {
-      lopDays += days;
-    } else if (leave.type !== "COMPENSATORY") {
-      normalPaidDays += days;
-    }
-
-    switch (leave.type) {
-      case "SICK":
-        sickDays += days;
-        break;
-
-      case "CASUAL":
-        casualDays += days;
-        break;
-
-      case "ANNUAL":
-        annualDays += days;
-        break;
-
-      case "MENSTRUAL":
-        wellnessDays += days;
-        break;
-
-      case "HALF_DAY":
-        halfDays += days;
-        break;
-
-      case "COMPENSATORY":
-        compensatoryDays += days;
-        break;
-
-      default:
-        break;
-    }
-  });
-
-  pendingLeaves.forEach((leave) => {
-    pendingDays += getLeaveDays(leave);
-  });
-
-  rejectedLeaves.forEach((leave) => {
-    rejectedDays += getLeaveDays(leave);
-  });
-
-  const paidRemaining = Math.max(
-    0,
-    ANNUAL_PAID_LEAVE_LIMIT - normalPaidDays
-  );
-
-  return {
-    yearNum,
-
-    annualEntitlement:
-      ANNUAL_PAID_LEAVE_LIMIT,
-
-    paidUsed: normalPaidDays,
-    paidRemaining,
-
-    totalApprovedDays,
-
-    emergencyPaidDays,
-    lopDays,
-
-    pendingDays,
-    rejectedDays,
-
-    totalRequests: yearLeaves.length,
-
-    approvedRequests:
-      approvedLeaves.length,
-
-    pendingRequests:
-      pendingLeaves.length,
-
-    rejectedRequests:
-      rejectedLeaves.length,
-
-    sickDays,
-    casualDays,
-    annualDays,
-
-    wellnessDays,
-
-    halfDays,
-    compensatoryDays,
+      rejectedCount:
+        rejectedLeaves.length,
+    };
   };
-};
 
 // ============================================================
 // COMPONENT
 // ============================================================
 
 const Leave = () => {
-  const { user } = useAuth();
+  const {
+    user,
+  } =
+    useAuth();
 
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
-  const [showModal, setShowModal] =
+  const [
+    leaves,
+    setLeaves,
+  ] =
+    useState([]);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    showModal,
+    setShowModal,
+  ] =
     useState(false);
 
-  const [isDeleted, setIsDeleted] =
+  const [
+    isDeleted,
+    setIsDeleted,
+  ] =
     useState(false);
 
-  const [documents, setDocuments] = useState({
-    HOLIDAY_LIST: null,
-    LEAVE_POLICY: null,
-  });
+  const [
+    documents,
+    setDocuments,
+  ] =
+    useState({
+      HOLIDAY_LIST:
+        null,
+
+      LEAVE_POLICY:
+        null,
+    });
 
   const isAdmin =
-    user?.role === "ADMIN";
+    user?.role ===
+    "ADMIN";
 
-  // ========================================================
-  // ADMIN FILTERS
-  // ========================================================
-
-  const [employees, setEmployees] =
+  const [
+    employees,
+    setEmployees,
+  ] =
     useState([]);
+
+  // ==========================================================
+  // FILTERS
+  // ==========================================================
 
   const [
     filterEmployeeId,
     setFilterEmployeeId,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     filterMonth,
     setFilterMonth,
-  ] = useState(
-    String(
-      currentDate.getMonth() + 1
-    )
-  );
+  ] =
+    useState(
+      String(
+        currentDate.getMonth() +
+          1
+      )
+    );
 
   const [
     filterYear,
     setFilterYear,
-  ] = useState(
-    String(
-      currentDate.getFullYear()
-    )
-  );
+  ] =
+    useState(
+      String(
+        currentDate.getFullYear()
+      )
+    );
 
   const [
     filterStatus,
     setFilterStatus,
-  ] = useState("");
+  ] =
+    useState("");
 
-  const [search] = useState("");
+  // Existing search functionality/state retained.
+  const [
+    search,
+  ] =
+    useState("");
 
-  // ========================================================
+  // ==========================================================
   // FETCH LEAVES
-  // ========================================================
+  // ==========================================================
 
-  const fetchLeaves = useCallback(
-    async () => {
-      try {
-        const params = {};
+  const fetchLeaves =
+    useCallback(
+      async () => {
+        try {
+          const params =
+            {};
 
-        if (isAdmin) {
-          if (filterEmployeeId) {
-            params.employeeId =
-              filterEmployeeId;
+          // Admin filters are sent to backend.
+          if (
+            isAdmin
+          ) {
+            if (
+              filterEmployeeId
+            ) {
+              params.employeeId =
+                filterEmployeeId;
+            }
+
+            if (
+              filterMonth
+            ) {
+              params.month =
+                filterMonth;
+            }
+
+            if (
+              filterYear
+            ) {
+              params.year =
+                filterYear;
+            }
+
+            if (
+              filterStatus
+            ) {
+              params.status =
+                filterStatus;
+            }
           }
 
-          if (filterMonth) {
-            params.month =
-              filterMonth;
+          const res =
+            await api.get(
+              "/leave",
+              {
+                params,
+              }
+            );
+
+          setLeaves(
+            res.data
+              .data ||
+              []
+          );
+
+          if (
+            res.data
+              .employee
+              ?.isDeleted
+          ) {
+            setIsDeleted(
+              true
+            );
+          } else {
+            setIsDeleted(
+              false
+            );
           }
-
-          if (filterYear) {
-            params.year =
-              filterYear;
-          }
-
-          if (filterStatus) {
-            params.status =
-              filterStatus;
-          }
-        }
-
-        const res = await api.get(
-          "/leave",
-          {
-            params,
-          }
-        );
-
-        setLeaves(
-          res.data.data || []
-        );
-
-        if (
-          res.data.employee?.isDeleted
+        } catch (
+          error
         ) {
-          setIsDeleted(true);
-        } else {
-          setIsDeleted(false);
+          toast.error(
+            error
+              ?.response
+              ?.data
+              ?.error ||
+              error.message
+          );
+        } finally {
+          setLoading(
+            false
+          );
         }
-      } catch (error) {
-        toast.error(
-          error?.response?.data?.error ||
-            error.message
-        );
-      } finally {
-        setLoading(false);
-      }
+      },
+      [
+        isAdmin,
+        filterEmployeeId,
+        filterMonth,
+        filterYear,
+        filterStatus,
+      ]
+    );
+
+  // ==========================================================
+  // FETCH DOCUMENTS
+  // ==========================================================
+
+  const fetchDocuments =
+    useCallback(
+      async () => {
+        try {
+          const res =
+            await api.get(
+              "/documents"
+            );
+
+          setDocuments(
+            res.data
+          );
+        } catch (
+          error
+        ) {
+          console.error(
+            "Leave document fetch error:",
+            error
+          );
+        }
+      },
+      []
+    );
+
+  // ==========================================================
+  // INITIAL LOAD / REFRESH
+  // ==========================================================
+
+  useEffect(
+    () => {
+      fetchLeaves();
     },
     [
-      isAdmin,
-      filterEmployeeId,
-      filterMonth,
-      filterYear,
-      filterStatus,
+      fetchLeaves,
     ]
   );
 
-  // ========================================================
-  // FETCH DOCUMENTS
-  // ========================================================
+  useEffect(
+    () => {
+      fetchDocuments();
+    },
+    [
+      fetchDocuments,
+    ]
+  );
 
-  const fetchDocuments =
-    useCallback(async () => {
-      try {
-        const res =
-          await api.get(
-            "/documents"
-          );
+  // ==========================================================
+  // FETCH EMPLOYEES FOR ADMIN FILTER
+  // ==========================================================
 
-        setDocuments(
-          res.data
-        );
-      } catch (error) {
-        console.error(
-          "Leave document fetch error:",
-          error
-        );
+  useEffect(
+    () => {
+      if (
+        !isAdmin
+      ) {
+        return;
       }
-    }, []);
 
-  useEffect(() => {
-    fetchLeaves();
-  }, [fetchLeaves]);
+      api
+        .get(
+          "/employees"
+        )
+        .then(
+          (
+            res
+          ) => {
+            const list =
+              Array.isArray(
+                res.data
+              )
+                ? res.data
+                : [];
 
-  useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]);
-
-  // ========================================================
-  // ADMIN EMPLOYEE LIST
-  // ========================================================
-
-  useEffect(() => {
-    if (!isAdmin) {
-      return;
-    }
-
-    api
-      .get("/employees")
-      .then((res) => {
-        const list =
-          Array.isArray(res.data)
-            ? res.data
-            : [];
-
-        setEmployees(
-          list.filter(
-            (employee) =>
-              !employee.isDeleted
-          )
+            setEmployees(
+              list.filter(
+                (
+                  employee
+                ) =>
+                  !employee.isDeleted
+              )
+            );
+          }
+        )
+        .catch(
+          (
+            error
+          ) => {
+            console.error(
+              "Fetch employees for leave filter error:",
+              error
+            );
+          }
         );
-      })
-      .catch((error) => {
-        console.error(
-          "Fetch employees for leave filter error:",
-          error
-        );
-      });
-  }, [isAdmin]);
+    },
+    [
+      isAdmin,
+    ]
+  );
 
-  // ========================================================
-  // FILTERED LEAVES
-  // ========================================================
+  // ==========================================================
+  // LOCAL SEARCH FILTER
+  // ==========================================================
 
   const filteredLeaves =
-    useMemo(() => {
-      if (
-        !isAdmin ||
-        !search.trim()
-      ) {
-        return leaves;
-      }
-
-      const value =
-        search.toLowerCase();
-
-      return leaves.filter(
-        (leave) => {
-          const employeeName =
-            `${
-              leave.employee?.firstName ||
-              ""
-            } ${
-              leave.employee?.lastName ||
-              ""
-            }`.toLowerCase();
-
-          return (
-            employeeName.includes(
-              value
-            ) ||
-            leave.reason
-              ?.toLowerCase()
-              .includes(value) ||
-            leave.type
-              ?.toLowerCase()
-              .includes(value)
-          );
+    useMemo(
+      () => {
+        if (
+          !isAdmin ||
+          !search.trim()
+        ) {
+          return leaves;
         }
-      );
-    }, [
-      leaves,
-      search,
-      isAdmin,
-    ]);
 
-  // ========================================================
-  // YEARS
-  // ========================================================
+        const value =
+          search.toLowerCase();
+
+        return leaves.filter(
+          (
+            leave
+          ) => {
+            const employeeName =
+              `${
+                leave
+                  .employee
+                  ?.firstName ||
+                ""
+              } ${
+                leave
+                  .employee
+                  ?.lastName ||
+                ""
+              }`.toLowerCase();
+
+            return (
+              employeeName.includes(
+                value
+              ) ||
+              leave.reason
+                ?.toLowerCase()
+                .includes(
+                  value
+                ) ||
+              leave.type
+                ?.toLowerCase()
+                .includes(
+                  value
+                )
+            );
+          }
+        );
+      },
+      [
+        leaves,
+        search,
+        isAdmin,
+      ]
+    );
+
+  // ==========================================================
+  // AVAILABLE YEARS
+  // ==========================================================
 
   const availableYears =
     Array.from(
       {
-        length: 6,
+        length:
+          6,
       },
-      (_, index) =>
+
+      (
+        _,
+        index
+      ) =>
         currentDate.getFullYear() -
         index
     );
 
-  // ========================================================
+  // ==========================================================
   // SELECTED ADMIN EMPLOYEE
-  // ========================================================
+  // ==========================================================
 
   const selectedEmployeeObj =
-    useMemo(() => {
-      if (
-        !isAdmin ||
-        !filterEmployeeId
-      ) {
-        return null;
-      }
+    useMemo(
+      () => {
+        if (
+          !isAdmin ||
+          !filterEmployeeId
+        ) {
+          return null;
+        }
 
-      return employees.find(
-        (employee) =>
-          String(
-            employee._id ||
-              employee.id
-          ) ===
-          String(
-            filterEmployeeId
-          )
-      );
-    }, [
-      isAdmin,
-      filterEmployeeId,
-      employees,
-    ]);
+        return employees.find(
+          (
+            employee
+          ) =>
+            String(
+              employee._id ||
+                employee.id
+            ) ===
+            String(
+              filterEmployeeId
+            )
+        );
+      },
+      [
+        isAdmin,
+        filterEmployeeId,
+        employees,
+      ]
+    );
 
-  // ========================================================
-  // MONTHLY STATS
-  // ========================================================
+  // ==========================================================
+  // MONTHLY STATISTICS
+  // ==========================================================
 
   const monthlyStats =
-    useMemo(() => {
-      return calculateMonthlyStats(
+    useMemo(
+      () =>
+        calculateMonthlyStats(
+          filteredLeaves,
+          filterMonth,
+          filterYear
+        ),
+      [
         filteredLeaves,
         filterMonth,
-        filterYear
-      );
-    }, [
-      filteredLeaves,
-      filterMonth,
-      filterYear,
-    ]);
+        filterYear,
+      ]
+    );
 
-  // ========================================================
-  // ANNUAL STATS
-  // ========================================================
+  // ==========================================================
+  // YEARLY STATISTICS
+  // ==========================================================
 
-  const annualStats =
-    useMemo(() => {
-      return calculateAnnualStats(
-        leaves,
-        filterYear
-      );
-    }, [
-      leaves,
-      filterYear,
-    ]);
+  const yearlyStats =
+    useMemo(
+      () =>
+        calculateYearlyStats(
+          filteredLeaves,
+          filterYear
+        ),
+      [
+        filteredLeaves,
+        filterYear,
+      ]
+    );
 
-  // ========================================================
-  // EXPORT
-  // ========================================================
+  // ==========================================================
+  // EXPORT LEAVE REPORT
+  // ==========================================================
 
-  const exportLeaves = () => {
-    if (
-      filteredLeaves.length ===
-      0
-    ) {
-      toast.error(
-        "No leave records to export"
-      );
+  const exportLeaves =
+    () => {
+      if (
+        filteredLeaves.length ===
+        0
+      ) {
+        toast.error(
+          "No leave records to export"
+        );
 
-      return;
-    }
+        return;
+      }
 
-    const rows =
-      filteredLeaves.map(
-        (leave) => ({
-          Employee:
-            `${
-              leave.employee?.firstName ||
-              ""
-            } ${
-              leave.employee?.lastName ||
-              ""
-            }`.trim(),
+      const rows =
+        filteredLeaves.map(
+          (
+            leave
+          ) => ({
+            Employee:
+              `${
+                leave
+                  .employee
+                  ?.firstName ||
+                ""
+              } ${
+                leave
+                  .employee
+                  ?.lastName ||
+                ""
+              }`.trim(),
 
-          Type:
-            getLeaveTypeLabel(
+            Type:
               leave.type
-            ),
-
-          "Worked Extra Date":
-            leave.workedDate
-              ? new Date(
-                  leave.workedDate
-                ).toLocaleDateString(
-                  "en-IN"
-                )
-              : "-",
-
-          "Half Day Period":
-            leave.halfDayPeriod
-              ? leave.halfDayPeriod.replace(
+                ?.replaceAll(
                   "_",
                   " "
-                )
-              : "",
+                ) ||
+              "",
 
-          "Start Date":
-            leave.startDate
-              ? new Date(
-                  leave.startDate
-                ).toLocaleDateString(
-                  "en-IN"
-                )
-              : "",
+            "Worked Extra Date":
+              leave.workedDate
+                ? new Date(
+                    leave.workedDate
+                  ).toLocaleDateString(
+                    "en-IN"
+                  )
+                : "-",
 
-          "End Date":
-            leave.endDate
-              ? new Date(
-                  leave.endDate
-                ).toLocaleDateString(
-                  "en-IN"
-                )
-              : "",
+            "Half Day Period":
+              leave.halfDayPeriod
+                ? leave.halfDayPeriod.replaceAll(
+                    "_",
+                    " "
+                  )
+                : "",
 
-          "Total Days":
-            getLeaveDays(
-              leave
-            ),
+            "Start Date":
+              leave.startDate
+                ? new Date(
+                    leave.startDate
+                  ).toLocaleDateString(
+                    "en-IN"
+                  )
+                : "",
 
-          "Emergency Paid Override":
-            leave.isEmergencyOverride
-              ? "YES"
-              : "NO",
+            "End Date":
+              leave.endDate
+                ? new Date(
+                    leave.endDate
+                  ).toLocaleDateString(
+                    "en-IN"
+                  )
+                : "",
 
-          "LOP Leave":
-            leave.isLop ||
-            leave.paymentType ===
-              "UNPAID"
-              ? "YES"
-              : "NO",
+            "Total Days":
+              getLeaveDays(
+                leave
+              ),
 
-          "Payment Type":
-            leave.paymentType ||
-            "",
+            "Payment Decision":
+              leave.status !==
+              "APPROVED"
+                ? "-"
+                : leave.isLop ||
+                  leave.paymentType ===
+                    "UNPAID"
+                ? "LOSS OF PAY"
+                : "PAID",
 
-          Reason:
-            leave.reason || "",
+            Reason:
+              leave.reason ||
+              "",
 
-          Status:
-            leave.status,
+            "Admin Remark":
+              leave.adminRemark ||
+              "",
 
-          "Admin Remark":
-            leave.adminRemark ||
-            "",
-        })
+            Status:
+              leave.status,
+          })
+        );
+
+      const worksheet =
+        XLSX.utils.json_to_sheet(
+          rows
+        );
+
+      worksheet[
+        "!cols"
+      ] =
+        Object.keys(
+          rows[0]
+        ).map(
+          (
+            key
+          ) => ({
+            wch:
+              Math.max(
+                key.length,
+                16
+              ),
+          })
+        );
+
+      const workbook =
+        XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Leave Records"
       );
 
-    const worksheet =
-      XLSX.utils.json_to_sheet(
-        rows
-      );
+      const parts = [
+        "leave_records",
+      ];
 
-    worksheet["!cols"] =
-      Object.keys(
-        rows[0]
-      ).map((key) => ({
-        wch: Math.max(
-          key.length,
-          16
-        ),
-      }));
+      if (
+        filterStatus
+      ) {
+        parts.push(
+          filterStatus.toLowerCase()
+        );
+      }
 
-    const workbook =
-      XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      "Leave Records"
-    );
-
-    const parts = [
-      "leave_records",
-    ];
-
-    if (filterStatus) {
-      parts.push(
-        filterStatus.toLowerCase()
-      );
-    }
-
-    if (filterMonth) {
-      parts.push(
-        new Date(
-          2000,
-          Number(
-            filterMonth
-          ) - 1
-        )
-          .toLocaleString(
-            "en-IN",
-            {
-              month: "short",
-            }
+      if (
+        filterMonth
+      ) {
+        parts.push(
+          new Date(
+            2000,
+            Number(
+              filterMonth
+            ) - 1
           )
-          .toLowerCase()
-      );
-    }
+            .toLocaleString(
+              "en-IN",
+              {
+                month:
+                  "short",
+              }
+            )
+            .toLowerCase()
+        );
+      }
 
-    if (filterYear) {
-      parts.push(
+      if (
         filterYear
+      ) {
+        parts.push(
+          filterYear
+        );
+      }
+
+      XLSX.writeFile(
+        workbook,
+
+        `${parts.join(
+          "_"
+        )}.xlsx`
       );
-    }
+    };
 
-    XLSX.writeFile(
-      workbook,
-      `${parts.join(
-        "_"
-      )}.xlsx`
+  // ==========================================================
+  // LOADING
+  // ==========================================================
+
+  if (
+    loading
+  ) {
+    return (
+      <Loading />
     );
-  };
-
-  if (loading) {
-    return <Loading />;
   }
+
+  // ==========================================================
+  // UI
+  // ==========================================================
 
   return (
     <div className="animate-fade-in space-y-6">
+      {/* =====================================================
+          PAGE HEADER
+      ===================================================== */}
 
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="page-title">
-            Leave Management
+            Leave
+            Management
           </h1>
 
           <p className="page-subtitle">
             {isAdmin
               ? "Manage leave applications and employee monthly reports"
-              : "Your monthly and annual leave tracker and history"}
+              : "Your monthly leave tracker and history"}
           </p>
         </div>
+
+        {/* EMPLOYEE APPLY */}
 
         {!isAdmin &&
           !isDeleted && (
             <button
               onClick={() =>
-                setShowModal(true)
+                setShowModal(
+                  true
+                )
               }
-              className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"
+              className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
             >
-              <PlusIcon className="h-4 w-4" />
+              <PlusIcon className="w-4 h-4" />
 
-              Apply for Leave
+              Apply
+              for
+              Leave
             </button>
           )}
+
+        {/* ADMIN DOWNLOAD */}
 
         {isAdmin && (
           <button
             onClick={
               exportLeaves
             }
-            className="btn-secondary flex w-full items-center justify-center gap-2 sm:w-auto"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
             type="button"
           >
-            <Download className="h-4 w-4" />
+            <Download className="w-4 h-4" />
 
             Download
           </button>
         )}
-
       </div>
 
-      {/* =================================================
-          DOCUMENTS
-      ================================================= */}
+      {/* =====================================================
+          HOLIDAY LIST + LEAVE POLICY
+      ===================================================== */}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DocumentAttachment
           type="HOLIDAY_LIST"
           label="Holiday List"
@@ -937,106 +1188,128 @@ const Leave = () => {
             fetchDocuments
           }
         />
-
       </div>
 
-      {/* =================================================
-          CLIENT LOCATION NOTICE
-      ================================================= */}
+      {/* =====================================================
+          CLIENT LOCATION NOTE
+      ===================================================== */}
 
-      <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 shadow-xs">
-
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+      <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 shadow-xs">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
 
         <p className="leading-relaxed">
-
           <strong className="font-semibold text-amber-950">
-            Engineers working in client location:
-          </strong>
+            Engineers
+            working
+            in
+            client
+            location:
+          </strong>{" "}
 
-          {" "}
-
-          Leaves and holidays for
-          on-site / client-deployed
-          employees are applicable
-          as per the respective
-          client's location
-          guidelines and project
+          Leaves
+          and
+          holidays
+          for
+          on-site
+          /
+          client-deployed
+          employees
+          are
+          applicable
+          as
+          per
+          the
+          respective
+          client's
+          location
+          guidelines
+          and
+          project
           schedule.
-
         </p>
-
       </div>
 
-      {/* =================================================
-          EMPLOYEE PORTAL
-      ================================================= */}
+      {/* =====================================================
+          EMPLOYEE MONTHLY SUMMARY
+      ===================================================== */}
 
       {!isAdmin && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          {/* HEADER */}
 
-        <div className="space-y-6">
-
-          {/* =========================================
-              MONTHLY LEAVE SUMMARY
-          ========================================= */}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
-            {/* MONTHLY HEADER */}
-
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-
-              <div className="flex items-center gap-3">
-
-                <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
-                  <Calendar size={20} />
-                </div>
-
-                <div>
-
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Monthly Leave Summary
-                  </h2>
-
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {monthlyStats.monthName}{" "}
-                    {monthlyStats.yearNum}
-                    {" • "}
-                    Paid leave allowance:{" "}
-                    {MONTHLY_PAID_LEAVE_LIMIT} days
-                  </p>
-
-                </div>
-
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                <Calendar
+                  size={
+                    20
+                  }
+                />
               </div>
 
-              {/* Wider filters */}
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Monthly
+                  Leave
+                  Summary
+                </h2>
 
-              <div className="flex flex-wrap items-center gap-3">
-
-                <select
-                  value={
-                    filterMonth
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {
+                    monthlyStats.monthName
+                  }{" "}
+                  {
+                    monthlyStats.yearNum
                   }
-                  onChange={(event) =>
-                    setFilterMonth(
-                      event.target.value
-                    )
-                  }
-                  className="min-w-[170px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                >
 
-                  {Array.from(
-                    {
-                      length: 12,
-                    },
-                    (
-                      _,
-                      index
-                    ) =>
-                      index + 1
-                  ).map((month) => (
+                  {" • "}
 
+                  Paid
+                  leave
+                  allowance:{" "}
+
+                  {
+                    MONTHLY_PAID_LEAVE_LIMIT
+                  }{" "}
+                  days
+                </p>
+              </div>
+            </div>
+
+            {/* MONTH + YEAR */}
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <select
+                value={
+                  filterMonth
+                }
+                onChange={(
+                  e
+                ) =>
+                  setFilterMonth(
+                    e
+                      .target
+                      .value
+                  )
+                }
+                className="min-w-[170px] px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+              >
+                {Array.from(
+                  {
+                    length:
+                      12,
+                  },
+
+                  (
+                    _,
+                    index
+                  ) =>
+                    index +
+                    1
+                ).map(
+                  (
+                    month
+                  ) => (
                     <option
                       key={
                         month
@@ -1047,7 +1320,8 @@ const Leave = () => {
                     >
                       {new Date(
                         2000,
-                        month - 1
+                        month -
+                          1
                       ).toLocaleString(
                         "en-IN",
                         {
@@ -1056,657 +1330,397 @@ const Leave = () => {
                         }
                       )}
                     </option>
+                  )
+                )}
+              </select>
 
-                  ))}
-
-                </select>
-
-                <select
-                  value={
-                    filterYear
-                  }
-                  onChange={(event) =>
-                    setFilterYear(
-                      event.target.value
-                    )
-                  }
-                  className="min-w-[120px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                >
-
-                  {availableYears.map(
-                    (year) => (
-
-                      <option
-                        key={
-                          year
-                        }
-                        value={
-                          year
-                        }
-                      >
-                        {
-                          year
-                        }
-                      </option>
-
-                    )
-                  )}
-
-                </select>
-
-              </div>
-
+              <select
+                value={
+                  filterYear
+                }
+                onChange={(
+                  e
+                ) =>
+                  setFilterYear(
+                    e
+                      .target
+                      .value
+                  )
+                }
+                className="min-w-[120px] px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+              >
+                {availableYears.map(
+                  (
+                    year
+                  ) => (
+                    <option
+                      key={
+                        year
+                      }
+                      value={
+                        year
+                      }
+                    >
+                      {
+                        year
+                      }
+                    </option>
+                  )
+                )}
+              </select>
             </div>
-
-            {/* =========================================
-                MONTHLY CARDS - SAME BOX
-            ========================================= */}
-
-            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-
-              {/* PAID REMAINING */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Paid Remaining
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-emerald-600">
-                      {
-                        monthlyStats.quotaPaidRemaining
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        / 3
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600">
-                    <CheckCircle2
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* PAID USED */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Paid Used
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-indigo-600">
-                      {
-                        monthlyStats.quotaPaidUsed
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        / 3
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600">
-                    <Calendar
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* APPROVED */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Approved Days
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-slate-900">
-                      {
-                        monthlyStats.totalApprovedDays
-                      }
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-slate-200/70 p-2 text-slate-600">
-                    <TrendingUp
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* PENDING */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Pending
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-blue-600">
-                      {
-                        monthlyStats.pendingDays
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        days
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-blue-100 p-2 text-blue-600">
-                    <Clock3
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* EXTRA DAYS */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Extra Days
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-amber-700">
-                      {
-                        monthlyStats.extraDaysTaken
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        days
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-amber-100 p-2 text-amber-600">
-                    <AlertTriangle
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* EMERGENCY */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Emergency Paid
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-emerald-700">
-                      {
-                        monthlyStats.emergencyPaidDays
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        days
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600">
-                    <ShieldCheck
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* LOP */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      LOP
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-red-600">
-                      {
-                        monthlyStats.lopDays
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        days
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-red-100 p-2 text-red-600">
-                    <DollarSign
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* REJECTED */}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-
-                <div className="flex items-start justify-between gap-2">
-
-                  <div>
-
-                    <p className="text-xs font-semibold text-slate-500">
-                      Rejected
-                    </p>
-
-                    <p className="mt-2 text-xl font-bold text-red-600">
-                      {
-                        monthlyStats.rejectedCount
-                      }
-
-                      <span className="ml-1 text-xs font-medium text-slate-400">
-                        requests
-                      </span>
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-lg bg-red-100 p-2 text-red-600">
-                    <XCircle
-                      size={
-                        18
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
           </div>
 
-          {/* =========================================
-              ANNUAL TRACKER
-          ========================================= */}
+          {/* =================================================
+              MONTHLY CARDS
+          ================================================= */}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mt-5">
+            {/* PAID REMAINING */}
 
-            <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Paid
+                    Leave
+                    Remaining
+                  </p>
 
-              <div className="flex items-center gap-3">
+                  <p className="text-xl font-bold text-emerald-600 mt-2">
+                    {
+                      monthlyStats.quotaPaidRemaining
+                    }
 
-                <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
-                  <CalendarDays
+                    <span className="text-xs font-medium text-slate-400 ml-1">
+                      /{" "}
+                      {
+                        MONTHLY_PAID_LEAVE_LIMIT
+                      }
+                    </span>
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600">
+                  <CheckCircle2
                     size={
-                      20
+                      18
                     }
                   />
                 </div>
+              </div>
+            </div>
 
+            {/* PAID USED */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Annual Leave Tracker —{" "}
-                    {
-                      annualStats.yearNum
-                    }
-                  </h2>
-
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Complete yearly leave usage,
-                    balance and approval history
+                  <p className="text-xs font-semibold text-slate-500">
+                    Paid
+                    Leave
+                    Used
                   </p>
 
+                  <p className="text-xl font-bold text-indigo-600 mt-2">
+                    {
+                      monthlyStats.quotaPaidUsed
+                    }
+
+                    <span className="text-xs font-medium text-slate-400 ml-1">
+                      /{" "}
+                      {
+                        MONTHLY_PAID_LEAVE_LIMIT
+                      }
+                    </span>
+                  </p>
                 </div>
 
+                <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
+                  <Calendar
+                    size={
+                      18
+                    }
+                  />
+                </div>
               </div>
-
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">
-                Annual Paid Entitlement:{" "}
-                {
-                  annualStats.annualEntitlement
-                }{" "}
-                Days
-              </div>
-
             </div>
 
-            {/* ANNUAL MAIN STATS */}
+            {/* EXTRA DAYS */}
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Extra
+                    Days
+                    Taken
+                  </p>
 
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                  <p className="text-xl font-bold text-amber-700 mt-2">
+                    {
+                      monthlyStats.extraDaysTaken
+                    }
 
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Paid Used
-                </p>
+                    <span className="text-xs font-medium text-slate-400 ml-1">
+                      days
+                    </span>
+                  </p>
+                </div>
 
-                <p className="mt-1 text-xl font-bold text-indigo-600">
-                  {
-                    annualStats.paidUsed
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  of{" "}
-                  {
-                    annualStats.annualEntitlement
-                  }{" "}
-                  days
-                </p>
-
+                <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+                  <AlertTriangle
+                    size={
+                      18
+                    }
+                  />
+                </div>
               </div>
-
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Paid Remaining
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-emerald-600">
-                  {
-                    annualStats.paidRemaining
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  days available
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Total Approved
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-slate-900">
-                  {
-                    annualStats.totalApprovedDays
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  leave days
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Pending Days
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-blue-600">
-                  {
-                    annualStats.pendingDays
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  {
-                    annualStats.pendingRequests
-                  }{" "}
-                  request(s)
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Emergency Paid
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-emerald-700">
-                  {
-                    annualStats.emergencyPaidDays
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  days
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-red-50/60 p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  LOP
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-red-600">
-                  {
-                    annualStats.lopDays
-                  }
-                </p>
-
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  unpaid days
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-emerald-100 bg-white p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Approved Requests
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-emerald-700">
-                  {
-                    annualStats.approvedRequests
-                  }
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-white p-4">
-
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Rejected Requests
-                </p>
-
-                <p className="mt-1 text-xl font-bold text-red-600">
-                  {
-                    annualStats.rejectedRequests
-                  }
-                </p>
-
-              </div>
-
             </div>
 
-            {/* =====================================
-                LEAVE TYPE BREAKDOWN
-            ===================================== */}
+            {/* LOP */}
 
-            <div className="mt-5 border-t border-slate-100 pt-4">
-
-              <h3 className="mb-3 text-xs font-bold text-slate-700">
-                Leave Type Breakdown
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Sick
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    LOP
+                    (Loss
+                    of
+                    Pay)
                   </p>
 
-                  <p className="mt-1 text-lg font-bold text-slate-800">
+                  <p className="text-xl font-bold text-red-600 mt-2">
                     {
-                      annualStats.sickDays
+                      monthlyStats.lopDays
                     }
-                  </p>
 
+                    <span className="text-xs font-medium text-slate-400 ml-1">
+                      days
+                    </span>
+                  </p>
                 </div>
 
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Casual
-                  </p>
-
-                  <p className="mt-1 text-lg font-bold text-slate-800">
-                    {
-                      annualStats.casualDays
+                <div className="p-2 rounded-lg bg-red-100 text-red-600">
+                  <DollarSign
+                    size={
+                      18
                     }
-                  </p>
-
+                  />
                 </div>
-
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Annual
-                  </p>
-
-                  <p className="mt-1 text-lg font-bold text-slate-800">
-                    {
-                      annualStats.annualDays
-                    }
-                  </p>
-
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Wellness Leave
-                  </p>
-
-                  <p className="mt-1 text-lg font-bold text-slate-800">
-                    {
-                      annualStats.wellnessDays
-                    }
-                  </p>
-
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Half Day
-                  </p>
-
-                  <p className="mt-1 text-lg font-bold text-slate-800">
-                    {
-                      annualStats.halfDays
-                    }
-                  </p>
-
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-3">
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Comp Off
-                  </p>
-
-                  <p className="mt-1 text-lg font-bold text-slate-800">
-                    {
-                      annualStats.compensatoryDays
-                    }
-                  </p>
-
-                </div>
-
               </div>
-
             </div>
 
+            {/* PENDING */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Pending
+                    Requests
+                  </p>
+
+                  <p className="text-xl font-bold text-blue-600 mt-2">
+                    {
+                      monthlyStats.pendingCount
+                    }
+
+                    <span className="text-xs font-medium text-slate-400 ml-1">
+                      request(s)
+                    </span>
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                  <AlertTriangle
+                    size={
+                      18
+                    }
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-
         </div>
-
       )}
 
-      {/* =================================================
-          ADMIN PORTAL
-      ================================================= */}
+      {/* =====================================================
+          EMPLOYEE YEARLY SUMMARY
+      ===================================================== */}
+
+      {!isAdmin && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Yearly
+                Leave
+                Summary
+              </h2>
+
+              <p className="text-xs text-slate-500 mt-0.5">
+                Overall
+                leave
+                usage
+                for{" "}
+                {
+                  yearlyStats.yearNum
+                }
+              </p>
+            </div>
+
+            <select
+              value={
+                filterYear
+              }
+              onChange={(
+                e
+              ) =>
+                setFilterYear(
+                  e
+                    .target
+                    .value
+                )
+              }
+              className="min-w-[120px] px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition"
+            >
+              {availableYears.map(
+                (
+                  year
+                ) => (
+                  <option
+                    key={
+                      year
+                    }
+                    value={
+                      year
+                    }
+                  >
+                    {
+                      year
+                    }
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-5">
+            {/* TOTAL REQUESTS */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Total
+                Requests
+              </p>
+
+              <p className="text-xl font-bold text-slate-900 mt-2">
+                {
+                  yearlyStats.totalRequests
+                }
+              </p>
+            </div>
+
+            {/* APPROVED */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Approved
+                Leave
+              </p>
+
+              <p className="text-xl font-bold text-emerald-700 mt-2">
+                {
+                  yearlyStats.approvedDays
+                }
+
+                <span className="text-xs font-medium text-slate-400 ml-1">
+                  days
+                </span>
+              </p>
+            </div>
+
+            {/* PAID */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Paid
+                Leave
+              </p>
+
+              <p className="text-xl font-bold text-indigo-600 mt-2">
+                {
+                  yearlyStats.paidDays
+                }
+
+                <span className="text-xs font-medium text-slate-400 ml-1">
+                  days
+                </span>
+              </p>
+            </div>
+
+            {/* LOP */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Loss
+                of
+                Pay
+              </p>
+
+              <p className="text-xl font-bold text-red-600 mt-2">
+                {
+                  yearlyStats.lopDays
+                }
+
+                <span className="text-xs font-medium text-slate-400 ml-1">
+                  days
+                </span>
+              </p>
+            </div>
+
+            {/* PENDING */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Pending
+                Requests
+              </p>
+
+              <p className="text-xl font-bold text-blue-600 mt-2">
+                {
+                  yearlyStats.pendingCount
+                }
+              </p>
+            </div>
+
+            {/* REJECTED */}
+
+            <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500">
+                Rejected
+                Requests
+              </p>
+
+              <p className="text-xl font-bold text-red-500 mt-2">
+                {
+                  yearlyStats.rejectedCount
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          ADMIN FILTERS
+      ===================================================== */}
 
       {isAdmin && (
-
         <div className="space-y-4">
-
-          {/* FILTERS */}
-
           <div className="card p-4">
-
-            <div className="mb-4 flex items-center gap-2">
-
+            <div className="flex items-center gap-2 mb-4">
               <Filter
                 size={
                   18
@@ -1715,32 +1729,42 @@ const Leave = () => {
               />
 
               <h2 className="text-sm font-semibold text-slate-900">
-                Filter & Generate Employee Monthly Report
+                Filter
+                &
+                Generate
+                Employee
+                Monthly
+                Report
               </h2>
-
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {/* EMPLOYEE */}
 
               <select
                 value={
                   filterEmployeeId
                 }
-                onChange={(event) =>
+                onChange={(
+                  e
+                ) =>
                   setFilterEmployeeId(
-                    event.target.value
+                    e
+                      .target
+                      .value
                   )
                 }
                 className="text-xs"
               >
-
                 <option value="">
-                  All Employees
+                  All
+                  Employees
                 </option>
 
                 {employees.map(
-                  (employee) => (
-
+                  (
+                    employee
+                  ) => (
                     <option
                       key={
                         employee._id ||
@@ -1758,78 +1782,93 @@ const Leave = () => {
                         employee.lastName
                       }
                     </option>
-
                   )
                 )}
-
               </select>
+
+              {/* MONTH */}
 
               <select
                 value={
                   filterMonth
                 }
-                onChange={(event) =>
+                onChange={(
+                  e
+                ) =>
                   setFilterMonth(
-                    event.target.value
+                    e
+                      .target
+                      .value
                   )
                 }
                 className="text-xs"
               >
-
                 <option value="">
-                  All Months
+                  All
+                  Months
                 </option>
 
                 {Array.from(
                   {
-                    length: 12,
+                    length:
+                      12,
                   },
+
                   (
                     _,
                     index
                   ) =>
-                    index + 1
-                ).map((month) => (
-
-                  <option
-                    key={
-                      month
-                    }
-                    value={
-                      month
-                    }
-                  >
-                    {new Date(
-                      2000,
-                      month - 1
-                    ).toLocaleString(
-                      "en-IN",
-                      {
-                        month:
-                          "long",
+                    index +
+                    1
+                ).map(
+                  (
+                    month
+                  ) => (
+                    <option
+                      key={
+                        month
                       }
-                    )}
-                  </option>
-
-                ))}
-
+                      value={
+                        month
+                      }
+                    >
+                      {new Date(
+                        2000,
+                        month -
+                          1
+                      ).toLocaleString(
+                        "en-IN",
+                        {
+                          month:
+                            "long",
+                        }
+                      )}
+                    </option>
+                  )
+                )}
               </select>
+
+              {/* YEAR */}
 
               <select
                 value={
                   filterYear
                 }
-                onChange={(event) =>
+                onChange={(
+                  e
+                ) =>
                   setFilterYear(
-                    event.target.value
+                    e
+                      .target
+                      .value
                   )
                 }
                 className="text-xs"
               >
-
                 {availableYears.map(
-                  (year) => (
-
+                  (
+                    year
+                  ) => (
                     <option
                       key={
                         year
@@ -1842,26 +1881,30 @@ const Leave = () => {
                         year
                       }
                     </option>
-
                   )
                 )}
-
               </select>
+
+              {/* STATUS */}
 
               <select
                 value={
                   filterStatus
                 }
-                onChange={(event) =>
+                onChange={(
+                  e
+                ) =>
                   setFilterStatus(
-                    event.target.value
+                    e
+                      .target
+                      .value
                   )
                 }
                 className="text-xs"
               >
-
                 <option value="">
-                  All Status
+                  All
+                  Status
                 </option>
 
                 <option value="PENDING">
@@ -1875,24 +1918,21 @@ const Leave = () => {
                 <option value="REJECTED">
                   Rejected
                 </option>
-
               </select>
-
             </div>
-
           </div>
 
-          {/* ADMIN MONTHLY EMPLOYEE REPORT */}
+          {/* =================================================
+              ADMIN SELECTED EMPLOYEE REPORT
+          ================================================= */}
 
           {selectedEmployeeObj && (
+            <div className="bg-gradient-to-r from-indigo-50/90 via-white to-purple-50/90 border border-indigo-100 rounded-2xl p-5 shadow-xs">
+              {/* REPORT HEADER */}
 
-            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/90 via-white to-purple-50/90 p-5 shadow-xs">
-
-              <div className="flex flex-col justify-between gap-4 border-b border-indigo-100 pb-3 sm:flex-row sm:items-center">
-
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-indigo-100">
                 <div className="flex items-center gap-3">
-
-                  <div className="rounded-xl bg-indigo-600 p-2.5 text-white">
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white">
                     <UserCheck
                       size={
                         20
@@ -1901,9 +1941,10 @@ const Leave = () => {
                   </div>
 
                   <div>
-
                     <h3 className="text-sm font-bold text-slate-900">
-                      Monthly Report —{" "}
+                      Monthly
+                      Report
+                      —{" "}
                       {
                         selectedEmployeeObj.firstName
                       }{" "}
@@ -1912,8 +1953,7 @@ const Leave = () => {
                       }
                     </h3>
 
-                    <p className="mt-0.5 text-xs text-slate-500">
-
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {selectedEmployeeObj.position ||
                         "Employee"}
 
@@ -1925,15 +1965,11 @@ const Leave = () => {
                       {
                         monthlyStats.yearNum
                       }
-
                     </p>
-
                   </div>
-
                 </div>
 
-                <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700">
-
+                <div className="flex items-center gap-2 bg-white border border-indigo-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-indigo-700">
                   <Calendar
                     size={
                       14
@@ -1941,140 +1977,150 @@ const Leave = () => {
                   />
 
                   <span>
-                    Quota Limit: 3 Paid Leaves / Month
+                    Quota
+                    Limit:{" "}
+                    {
+                      MONTHLY_PAID_LEAVE_LIMIT
+                    }{" "}
+                    Paid
+                    Leaves
+                    /
+                    Month
                   </span>
-
                 </div>
-
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-7">
+              {/* =================================================
+                  ADMIN REPORT CARDS
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  Existing report kept and expanded.
+              ================================================= */}
 
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Total Approved
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4 text-xs">
+                {/* TOTAL APPROVED */}
+
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
+                    Total
+                    Approved
                   </p>
 
-                  <p className="mt-0.5 text-lg font-bold text-slate-900">
+                  <p className="text-lg font-bold text-slate-900 mt-0.5">
                     {
                       monthlyStats.totalApprovedDays
                     }
 
-                    <span className="ml-1 text-[10px] font-normal text-slate-400">
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">
                       days
                     </span>
                   </p>
-
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                {/* PAID REMAINING */}
 
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Paid Quota Used
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
+                    Paid
+                    Remaining
                   </p>
 
-                  <p className="mt-0.5 text-lg font-bold text-indigo-600">
-                    {
-                      monthlyStats.quotaPaidUsed
-                    }{" "}
-                    / 3
-                  </p>
-
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Paid Remaining
-                  </p>
-
-                  <p className="mt-0.5 text-lg font-bold text-emerald-600">
+                  <p className="text-lg font-bold text-emerald-600 mt-0.5">
                     {
                       monthlyStats.quotaPaidRemaining
                     }{" "}
-                    / 3
-                  </p>
 
+                    /{" "}
+
+                    {
+                      MONTHLY_PAID_LEAVE_LIMIT
+                    }
+                  </p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                {/* PAID USED */}
 
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Emergency Paid
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
+                    Paid
+                    Quota
+                    Used
                   </p>
 
-                  <p className="mt-0.5 text-lg font-bold text-emerald-600">
+                  <p className="text-lg font-bold text-indigo-600 mt-0.5">
                     {
-                      monthlyStats.emergencyPaidDays
+                      monthlyStats.quotaPaidUsed
+                    }{" "}
+
+                    /{" "}
+
+                    {
+                      MONTHLY_PAID_LEAVE_LIMIT
+                    }
+                  </p>
+                </div>
+
+                {/* EXTRA */}
+
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
+                    Extra
+                    Days
+                  </p>
+
+                  <p className="text-lg font-bold text-amber-600 mt-0.5">
+                    {
+                      monthlyStats.extraDaysTaken
                     }
 
-                    <span className="ml-1 text-[10px] font-normal text-slate-400">
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">
                       days
                     </span>
                   </p>
-
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                {/* LOP */}
 
-                  <p className="text-[11px] font-semibold text-slate-500">
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
                     LOP
+                    (Unpaid)
                   </p>
 
-                  <p className="mt-0.5 text-lg font-bold text-red-600">
+                  <p className="text-lg font-bold text-red-600 mt-0.5">
                     {
                       monthlyStats.lopDays
                     }
 
-                    <span className="ml-1 text-[10px] font-normal text-slate-400">
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">
                       days
                     </span>
                   </p>
-
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                {/* PENDING */}
 
-                  <p className="text-[11px] font-semibold text-slate-500">
+                <div className="bg-white border border-slate-200 rounded-xl p-3">
+                  <p className="text-slate-500 font-semibold text-[11px]">
                     Pending
                   </p>
 
-                  <p className="mt-0.5 text-lg font-bold text-blue-600">
+                  <p className="text-lg font-bold text-blue-600 mt-0.5">
                     {
                       monthlyStats.pendingCount
                     }
                   </p>
-
                 </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Rejected
-                  </p>
-
-                  <p className="mt-0.5 text-lg font-bold text-red-600">
-                    {
-                      monthlyStats.rejectedCount
-                    }
-                  </p>
-
-                </div>
-
               </div>
-
             </div>
-
           )}
-
         </div>
-
       )}
 
-      {/* =================================================
+      {/* =====================================================
           LEAVE HISTORY
-      ================================================= */}
+
+          EXISTING FUNCTIONALITY RETAINED
+      ===================================================== */}
 
       <LeaveHistory
         leaves={
@@ -2088,9 +2134,13 @@ const Leave = () => {
         }
       />
 
-      {/* =================================================
+      {/* =====================================================
           APPLY LEAVE MODAL
-      ================================================= */}
+
+          Existing modal retained.
+          Current leave list is passed so it can show the
+          3-day paid-leave warning.
+      ===================================================== */}
 
       <ApplyLeaveModal
         open={
@@ -2108,7 +2158,6 @@ const Leave = () => {
           leaves
         }
       />
-
     </div>
   );
 };
