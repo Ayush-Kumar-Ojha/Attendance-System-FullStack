@@ -1,4 +1,4 @@
-import {
+import{
     useEffect,
     useMemo,
     useState,
@@ -47,7 +47,6 @@ const APPROVAL_COLUMNS = [
     "Approved By",
     "Authorised By",
     "MTL Issued By",
-    "Received By",
 ];
 
 const emptyApprovalRow = () =>
@@ -2609,28 +2608,23 @@ const GatePass = () => {
                     <div className="gate-pass-section approval-matrix-section mt-4">
                         <table className="gate-pass-table text-[10px]">
                             <colgroup>
-                                <col
-                                    style={{
-                                        width:
-                                            "12%",
-                                    }}
-                                />
-
-                                {APPROVAL_COLUMNS.map(
-                                    (
-                                        column
-                                    ) => (
-                                        <col
-                                            key={
-                                                column
-                                            }
-                                            style={{
-                                                width:
-                                                    "17.6%",
-                                            }}
-                                        />
-                                    )
-                                )}
+                                {Array.from({
+                                    length:
+                                        APPROVAL_COLUMNS.length +
+                                        1,
+                                }).map((_, index) => (
+                                    <col
+                                        key={
+                                            index
+                                        }
+                                        style={{
+                                            width:
+                                                `${100 /
+                                                (APPROVAL_COLUMNS.length +
+                                                    1)}%`,
+                                        }}
+                                    />
+                                ))}
                             </colgroup>
 
                             <thead>
