@@ -2,7 +2,6 @@ import { Router } from "express";
 
 import {
     createEmployee,
-    deleteEmployee,
     getEmployees,
     getEmployeeById,
     updateEmployee,
@@ -15,6 +14,13 @@ import {
 } from "../controllers/employeeController.js";
 
 import {
+    getDeletedEmployees,
+    softDeleteEmployee,
+    restoreEmployee,
+    permanentlyHideDeletedEmployees,
+} from "../controllers/deletedEmployeeController.js";
+
+import {
     protect,
     protectAdmin,
 } from "../middleware/auth.js";
@@ -25,7 +31,10 @@ import {
 
 const employeesRouter = Router();
 
-// Download/export employees
+// =====================================================
+// EXPORT
+// =====================================================
+
 employeesRouter.get(
     "/export",
     protect,
@@ -33,8 +42,10 @@ employeesRouter.get(
     exportEmployees
 );
 
-// IMPORTANT:
-// Must remain ABOVE "/:id"
+// =====================================================
+// EXCEL BULK UPLOAD
+// =====================================================
+
 employeesRouter.post(
     "/bulk-upload",
     protect,
@@ -43,14 +54,45 @@ employeesRouter.post(
     bulkUploadEmployees
 );
 
-// Employee directory
+// =====================================================
+// DIRECTORY
+// =====================================================
+
 employeesRouter.get(
     "/directory",
     protect,
     getEmployeeDirectory
 );
 
-// Employees
+// =====================================================
+// DELETED EMPLOYEES
+// =====================================================
+
+employeesRouter.get(
+    "/deleted",
+    protect,
+    protectAdmin,
+    getDeletedEmployees
+);
+
+/*
+    Removes selected deleted employees from the
+    Deleted Employees PORTAL ONLY.
+
+    MongoDB Employee records are NOT deleted.
+*/
+
+employeesRouter.patch(
+    "/deleted/permanent-hide",
+    protect,
+    protectAdmin,
+    permanentlyHideDeletedEmployees
+);
+
+// =====================================================
+// NORMAL EMPLOYEES
+// =====================================================
+
 employeesRouter.get(
     "/",
     protect,
@@ -65,7 +107,21 @@ employeesRouter.post(
     createEmployee
 );
 
-// Employee documents
+// =====================================================
+// RESTORE
+// =====================================================
+
+employeesRouter.patch(
+    "/:id/restore",
+    protect,
+    protectAdmin,
+    restoreEmployee
+);
+
+// =====================================================
+// DOCUMENTS
+// =====================================================
+
 employeesRouter.get(
     "/:id/documents",
     protect,
@@ -80,20 +136,30 @@ employeesRouter.get(
     downloadEmployeeDocument
 );
 
-// Public profile
+// =====================================================
+// PROFILE
+// =====================================================
+
 employeesRouter.get(
     "/:id/profile",
     protect,
     getEmployeePublicProfile
 );
 
-// Single employee
+// =====================================================
+// EMPLOYEE BY ID
+// =====================================================
+
 employeesRouter.get(
     "/:id",
     protect,
     protectAdmin,
     getEmployeeById
 );
+
+// =====================================================
+// UPDATE
+// =====================================================
 
 employeesRouter.put(
     "/:id",
@@ -102,11 +168,15 @@ employeesRouter.put(
     updateEmployee
 );
 
+// =====================================================
+// SOFT DELETE
+// =====================================================
+
 employeesRouter.delete(
     "/:id",
     protect,
     protectAdmin,
-    deleteEmployee
+    softDeleteEmployee
 );
 
 export default employeesRouter;

@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 import GatePass from "../models/GatePass.js";
 import Employee from "../models/Employee.js";
 import GatePassItemMaster from "../models/GatePassItemMaster.js";
@@ -28,6 +30,15 @@ const escapeRegex = (value) =>
         /[.*+?^${}()|[\]\\]/g,
         "\\$&"
     );
+
+// ============================================================
+// NORMALIZE STRING
+// ============================================================
+
+const normalizeString = (value) =>
+    String(value || "")
+        .trim()
+        .toLowerCase();
 
 // ============================================================
 // FIND LOGGED-IN EMPLOYEE
@@ -76,18 +87,47 @@ const getEmployeeDisplayName = (
         return "";
     }
 
-    return `${
-        employee.firstName || ""
-    } ${
+    return `${employee.firstName || ""} ${
         employee.lastName || ""
     }`.trim();
 };
 
 // ============================================================
-// SHYAM SPECIAL ACCESS
+// EMPLOYEE DESIGNATION
+//
+// Your Employee model generally uses "position".
+// "designation" is also checked for compatibility.
 // ============================================================
 
-const isShyamEmployee = (
+const getEmployeeDesignation = (
+    employee
+) => {
+    if (!employee) {
+        return "";
+    }
+
+    return (
+        employee.position ||
+        employee.designation ||
+        ""
+    );
+};
+
+// ============================================================
+// IS SYAM - MANAGER
+//
+// IMPORTANT:
+//
+// Actual required employee:
+//      Name        -> Syam
+//      Designation -> Manager
+//
+// We intentionally do NOT use "Shyam" here.
+//
+// Only that employee receives Gate Pass approval rights.
+// ============================================================
+
+const isSyamManager = (
     employee
 ) => {
     if (!employee) {
@@ -95,22 +135,73 @@ const isShyamEmployee = (
     }
 
     const firstName =
-        String(
-            employee.firstName || ""
-        )
-            .trim()
-            .toLowerCase();
+        normalizeString(
+            employee.firstName
+        );
 
     const fullName =
-        getEmployeeDisplayName(
-            employee
-        )
-            .trim()
-            .toLowerCase();
+        normalizeString(
+            getEmployeeDisplayName(
+                employee
+            )
+        );
+
+    const designation =
+        normalizeString(
+            getEmployeeDesignation(
+                employee
+            )
+        );
+
+    const isSyam =
+        firstName === "syam" ||
+        fullName === "syam";
+
+    const isManager =
+        designation === "manager";
 
     return (
-        firstName === "shyam" ||
-        fullName === "shyam"
+        isSyam &&
+        isManager
+    );
+};
+
+// ============================================================
+// FIND THE ACTUAL SYAM MANAGER EMPLOYEE
+//
+// This is used whenever a new Gate Pass is sent for approval.
+//
+// We first search using likely indexed/normal fields and then
+// verify using isSyamManager().
+//
+// This prevents some random "Syam" employee who is NOT Manager
+// from becoming the Gate Pass approver.
+// ============================================================
+
+const findSyamManager = async () => {
+    const candidates =
+        await Employee.find({
+            isDeleted: {
+                $ne: true,
+            },
+
+            firstName: {
+                $regex:
+                    /^syam$/i,
+            },
+        });
+
+    const syamManager =
+        candidates.find(
+            (employee) =>
+                isSyamManager(
+                    employee
+                )
+        );
+
+    return (
+        syamManager ||
+        null
     );
 };
 
@@ -132,26 +223,195 @@ const getAccessInfo = async (
             req
         );
 
-    const canViewAll =
-        role === "ADMIN" ||
-        isShyamEmployee(
+    const isGatePassApprover =
+        isSyamManager(
             employee
         );
+
+    // Existing admin visibility remains.
+    //
+    // Syam can also view the Gate Passes so that his
+    // Pending Approvals section can be populated.
+    const canViewAll =
+        role === "ADMIN" ||
+        isGatePassApprover;
 
     return {
         role,
         userId,
         employee,
         canViewAll,
+        isGatePassApprover,
+    };
+};
+
+// ============================================================
+// CAN PRINT
+//
+// Historical Gate Pass:
+//      approvalRequired !== true
+//      -> printable
+//
+// New Gate Pass:
+//      must be APPROVED
+// ============================================================
+
+const getCanPrint = (
+    gatePass
+) => {
+    if (
+        gatePass?.approvalRequired !==
+        true
+    ) {
+        return true;
+    }
+
+    return (
+        String(
+            gatePass?.approvalStatus ||
+            ""
+        ).toUpperCase() ===
+        "APPROVED"
+    );
+};
+
+// ============================================================
+// CAN CURRENT EMPLOYEE APPROVE THIS PASS
+// ============================================================
+
+const getCanApprove = (
+    gatePass,
+    employee
+) => {
+    if (
+        !gatePass ||
+        !employee ||
+        !isSyamManager(
+            employee
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        gatePass.approvalRequired !==
+        true
+    ) {
+        return false;
+    }
+
+    if (
+        String(
+            gatePass.approvalStatus
+        ).toUpperCase() !==
+        "PENDING"
+    ) {
+        return false;
+    }
+
+    if (
+        !gatePass.approverEmployeeId
+    ) {
+        return false;
+    }
+
+    return (
+        String(
+            gatePass.approverEmployeeId
+        ) ===
+        String(
+            employee._id
+        )
+    );
+};
+
+// ============================================================
+// NORMALIZE GATE PASS RESPONSE
+//
+// Frontend receives:
+//      id
+//      canPrint
+//      canApprove
+//      approvalStatus
+//      approver info
+// ============================================================
+
+const normalizeGatePassForResponse = (
+    gatePass,
+    employee = null
+) => {
+    const plain =
+        typeof gatePass?.toObject ===
+        "function"
+            ? gatePass.toObject()
+            : {
+                ...gatePass,
+            };
+
+    const id =
+        plain?._id
+            ? String(
+                plain._id
+            )
+            : plain?.id
+                ? String(
+                    plain.id
+                )
+                : "";
+
+    // Old historical Gate Passes should behave as approved
+    // from the frontend's point of view.
+    const frontendApprovalStatus =
+        plain.approvalRequired ===
+        true
+            ? String(
+                plain.approvalStatus ||
+                "PENDING"
+            ).toUpperCase()
+            : "APPROVED";
+
+    return {
+        ...plain,
+
+        id,
+
+        approvalStatus:
+            frontendApprovalStatus,
+
+        canPrint:
+            getCanPrint(
+                plain
+            ),
+
+        canApprove:
+            getCanApprove(
+                plain,
+                employee
+            ),
     };
 };
 
 // ============================================================
 // GET GATE PASS HISTORY
 //
-// ADMIN  -> ALL
-// SHYAM  -> ALL
-// OTHERS -> OWN
+// ADMIN
+//      -> all
+//
+// SYAM - MANAGER
+//      -> all, including pending approval requests
+//
+// OTHER EMPLOYEES
+//      -> only their own
+//
+// Frontend can use:
+//
+// response.data.isGatePassApprover
+//
+// to show:
+//
+//      Pending Approvals
+//
+// only in Syam's portal.
 // ============================================================
 
 export const getGatePasses = async (
@@ -163,6 +423,7 @@ export const getGatePasses = async (
             userId,
             employee,
             canViewAll,
+            isGatePassApprover,
         } =
             await getAccessInfo(
                 req
@@ -218,18 +479,53 @@ export const getGatePasses = async (
 
         const data =
             gatePasses.map(
-                (pass) => ({
-                    ...pass,
-
-                    id:
-                        pass._id.toString(),
-                })
+                (pass) =>
+                    normalizeGatePassForResponse(
+                        pass,
+                        employee
+                    )
             );
+
+        // ====================================================
+        // PENDING APPROVALS
+        //
+        // Returned only for Syam - Manager.
+        //
+        // This makes frontend implementation very easy:
+        //
+        // if (isGatePassApprover) {
+        //     show pendingApprovals
+        // }
+        // ====================================================
+
+        const pendingApprovals =
+            isGatePassApprover
+                ? data.filter(
+                    (pass) =>
+                        pass.approvalRequired ===
+                            true &&
+                        pass.approvalStatus ===
+                            "PENDING" &&
+                        String(
+                            pass.approverEmployeeId
+                        ) ===
+                            String(
+                                employee._id
+                            )
+                )
+                : [];
 
         return res.json({
             success: true,
 
             canViewAll,
+
+            isGatePassApprover,
+
+            pendingApprovalCount:
+                pendingApprovals.length,
+
+            pendingApprovals,
 
             data,
         });
@@ -267,7 +563,7 @@ export const getGatePassItemDetails =
                 String(
                     req.query
                         .whPartNo ||
-                        ""
+                    ""
                 ).trim();
 
             if (!whPartNo) {
@@ -358,7 +654,7 @@ export const saveGatePassItemMaster =
             const normalizedWhPartNo =
                 String(
                     whPartNo ||
-                        ""
+                    ""
                 )
                     .trim()
                     .toUpperCase();
@@ -366,7 +662,7 @@ export const saveGatePassItemMaster =
             const normalizedUom =
                 String(
                     uom ||
-                        ""
+                    ""
                 )
                     .trim()
                     .toUpperCase();
@@ -404,7 +700,7 @@ export const saveGatePassItemMaster =
                             idNo:
                                 String(
                                     idNo ||
-                                        ""
+                                    ""
                                 ).trim(),
 
                             whPartNo:
@@ -413,13 +709,13 @@ export const saveGatePassItemMaster =
                             description:
                                 String(
                                     description ||
-                                        ""
+                                    ""
                                 ).trim(),
 
                             manufacturerPartNo:
                                 String(
                                     manufacturerPartNo ||
-                                        ""
+                                    ""
                                 ).trim(),
 
                             uom:
@@ -465,9 +761,9 @@ export const saveGatePassItemMaster =
 // RESOLVE UOM
 //
 // First checks the CURRENT WH Part No. in Item Master.
-// This prevents an old UOM remaining when WH Part No. changes.
 //
-// Existing UOM is used only as a backward-compatibility fallback.
+// Existing UOM is used only as a backward compatibility
+// fallback.
 // ============================================================
 
 const resolveItemUom = async (
@@ -476,7 +772,7 @@ const resolveItemUom = async (
     const partNo =
         String(
             item?.partNo ||
-                ""
+            ""
         ).trim();
 
     if (partNo) {
@@ -509,9 +805,8 @@ const resolveItemUom = async (
                 .toUpperCase();
         }
 
-        // WH Part No. was entered but no
-        // Item Master record exists.
-        // Do not accidentally retain another item's UOM.
+        // WH Part No. was entered but no matching
+        // Item Master exists.
         return "";
     }
 
@@ -519,7 +814,7 @@ const resolveItemUom = async (
     if (
         String(
             item?.uom ||
-                ""
+            ""
         ).trim()
     ) {
         return String(
@@ -533,7 +828,26 @@ const resolveItemUom = async (
 };
 
 // ============================================================
-// CREATE GATE PASS
+// CREATE / SEND GATE PASS TO SYAM
+//
+// THIS IS THE IMPORTANT NEW WORKFLOW.
+//
+// User fills your SAME existing Gate Pass form.
+//
+// When frontend clicks:
+//
+//      Send to Syam for Approval
+//
+// POST /gate-passes
+//
+// Backend:
+//      1. Finds Syam - Manager
+//      2. Saves Gate Pass
+//      3. Sets status PENDING
+//      4. Assigns it to Syam's Employee _id
+//      5. DOES NOT approve
+//
+// Frontend must NOT call window.print() after this.
 // ============================================================
 
 export const createGatePass = async (
@@ -546,6 +860,7 @@ export const createGatePass = async (
             userId,
             employee,
             canViewAll,
+            isGatePassApprover,
         } =
             await getAccessInfo(
                 req
@@ -570,6 +885,22 @@ export const createGatePass = async (
                 .json({
                     error:
                         "Employee profile not found for logged-in user",
+                });
+        }
+
+        // ====================================================
+        // FIND SYAM - MANAGER
+        // ====================================================
+
+        const syamManager =
+            await findSyamManager();
+
+        if (!syamManager) {
+            return res
+                .status(404)
+                .json({
+                    error:
+                        'Gate Pass approver not found. Please make sure employee "Syam" exists with designation "Manager".',
                 });
         }
 
@@ -606,8 +937,8 @@ export const createGatePass = async (
         const createdByName =
             employee
                 ? getEmployeeDisplayName(
-                      employee
-                  )
+                    employee
+                )
                 : "Admin";
 
         const incomingItems =
@@ -636,15 +967,12 @@ export const createGatePass = async (
                         return {
                             ...item,
 
-                            // Automatic:
-                            // 1, 2, 3...
                             itemNo:
                                 String(
                                     index +
-                                        1
+                                    1
                                 ),
 
-                            // From Item Master
                             uom:
                                 uom ||
                                 "",
@@ -652,6 +980,10 @@ export const createGatePass = async (
                     }
                 )
             );
+
+        // ====================================================
+        // SAVE PENDING GATE PASS
+        // ====================================================
 
         const gatePass =
             await GatePass.create(
@@ -691,12 +1023,16 @@ export const createGatePass = async (
                     gatePassDate:
                         gatePassDate
                             ? new Date(
-                                  `${gatePassDate}T00:00:00`
-                              )
+                                `${gatePassDate}T00:00:00`
+                            )
                             : new Date(),
 
                     items:
                         preparedItems,
+
+                    // =========================================
+                    // ORIGINAL PRINT MATRIX
+                    // =========================================
 
                     approvalName:
                         approvalName &&
@@ -718,6 +1054,46 @@ export const createGatePass = async (
                             "object"
                             ? approvalDept
                             : {},
+
+                    // =========================================
+                    // NEW APPROVAL WORKFLOW
+                    // =========================================
+
+                    approvalRequired:
+                        true,
+
+                    approvalStatus:
+                        "PENDING",
+
+                    approverEmployeeId:
+                        syamManager._id,
+
+                    approverName:
+                        getEmployeeDisplayName(
+                            syamManager
+                        ) ||
+                        "Syam",
+
+                    approverDesignation:
+                        getEmployeeDesignation(
+                            syamManager
+                        ) ||
+                        "Manager",
+
+                    approvalActionByEmployeeId:
+                        null,
+
+                    approvalActionByName:
+                        "",
+
+                    approvalRemark:
+                        "",
+
+                    approvedAt:
+                        null,
+
+                    rejectedAt:
+                        null,
                 }
             );
 
@@ -726,14 +1102,18 @@ export const createGatePass = async (
             .json({
                 success: true,
 
+                message:
+                    "Gate Pass sent to Syam (Manager) for approval.",
+
                 canViewAll,
 
-                data: {
-                    ...gatePass.toObject(),
+                isGatePassApprover,
 
-                    id:
-                        gatePass._id.toString(),
-                },
+                data:
+                    normalizeGatePassForResponse(
+                        gatePass,
+                        employee
+                    ),
             });
     } catch (error) {
         console.error(
@@ -750,3 +1130,335 @@ export const createGatePass = async (
             });
     }
 };
+
+// ============================================================
+// APPROVE / REJECT GATE PASS
+//
+// ONLY:
+//
+//      Employee Name: Syam
+//      Designation:   Manager
+//
+// can do this.
+//
+// Even Admin cannot approve unless Admin's logged-in employee
+// profile itself is Syam Manager.
+//
+// Additionally, the Gate Pass must actually be assigned to
+// Syam's employee _id.
+// ============================================================
+
+export const updateGatePassApproval =
+    async (
+        req,
+        res
+    ) => {
+        try {
+            const {
+                userId,
+                employee,
+                isGatePassApprover,
+            } =
+                await getAccessInfo(
+                    req
+                );
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({
+                        error:
+                            "User authentication failed. Please login again.",
+                    });
+            }
+
+            // =================================================
+            // ONLY SYAM MANAGER
+            // =================================================
+
+            if (
+                !employee ||
+                !isGatePassApprover ||
+                !isSyamManager(
+                    employee
+                )
+            ) {
+                return res
+                    .status(403)
+                    .json({
+                        error:
+                            "Only Syam (Manager) can approve or reject Gate Passes.",
+                    });
+            }
+
+            const gatePassId =
+                req.params.id;
+
+            if (
+                !mongoose.Types.ObjectId.isValid(
+                    gatePassId
+                )
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Invalid Gate Pass ID",
+                    });
+            }
+
+            const gatePass =
+                await GatePass.findById(
+                    gatePassId
+                );
+
+            if (!gatePass) {
+                return res
+                    .status(404)
+                    .json({
+                        error:
+                            "Gate Pass not found",
+                    });
+            }
+
+            // =================================================
+            // OLD RECORDS DO NOT REQUIRE THIS WORKFLOW
+            // =================================================
+
+            if (
+                gatePass.approvalRequired !==
+                true
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "This historical Gate Pass does not require approval.",
+                    });
+            }
+
+            // =================================================
+            // VERIFY IT WAS ASSIGNED TO THIS EXACT EMPLOYEE
+            // =================================================
+
+            if (
+                !gatePass.approverEmployeeId ||
+                String(
+                    gatePass.approverEmployeeId
+                ) !==
+                    String(
+                        employee._id
+                    )
+            ) {
+                return res
+                    .status(403)
+                    .json({
+                        error:
+                            "This Gate Pass is not assigned to you for approval.",
+                    });
+            }
+
+            // =================================================
+            // ONLY PENDING CAN BE ACTIONED
+            // =================================================
+
+            if (
+                String(
+                    gatePass.approvalStatus
+                ).toUpperCase() !==
+                "PENDING"
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            `This Gate Pass is already ${gatePass.approvalStatus}.`,
+                    });
+            }
+
+            const requestedStatus =
+                String(
+                    req.body?.status ||
+                    ""
+                )
+                    .trim()
+                    .toUpperCase();
+
+            if (
+                ![
+                    "APPROVED",
+                    "REJECTED",
+                ].includes(
+                    requestedStatus
+                )
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            'Status must be either "APPROVED" or "REJECTED".',
+                    });
+            }
+
+            const remark =
+                String(
+                    req.body?.remark ||
+                    ""
+                ).trim();
+
+            const actionByName =
+                getEmployeeDisplayName(
+                    employee
+                ) ||
+                "Syam";
+
+            // =================================================
+            // APPROVE
+            // =================================================
+
+            if (
+                requestedStatus ===
+                "APPROVED"
+            ) {
+                gatePass.approvalStatus =
+                    "APPROVED";
+
+                gatePass.approvedAt =
+                    new Date();
+
+                gatePass.rejectedAt =
+                    null;
+
+                gatePass.approvalActionByEmployeeId =
+                    employee._id;
+
+                gatePass.approvalActionByName =
+                    actionByName;
+
+                gatePass.approvalRemark =
+                    remark;
+
+                // =============================================
+                // ALSO UPDATE YOUR EXISTING PRINT APPROVAL
+                // MATRIX SO "Approved By" CAN SHOW SYAM.
+                // =============================================
+
+                const approvalName =
+                    gatePass.approvalName &&
+                    typeof gatePass.approvalName ===
+                        "object"
+                        ? {
+                            ...gatePass.approvalName,
+                        }
+                        : {};
+
+                approvalName[
+                    "Approved By"
+                ] =
+                    actionByName;
+
+                gatePass.approvalName =
+                    approvalName;
+
+                const approvalEmpNo =
+                    gatePass.approvalEmpNo &&
+                    typeof gatePass.approvalEmpNo ===
+                        "object"
+                        ? {
+                            ...gatePass.approvalEmpNo,
+                        }
+                        : {};
+
+                if (
+                    employee.employeeCode
+                ) {
+                    approvalEmpNo[
+                        "Approved By"
+                    ] =
+                        employee.employeeCode;
+                }
+
+                gatePass.approvalEmpNo =
+                    approvalEmpNo;
+
+                const approvalDept =
+                    gatePass.approvalDept &&
+                    typeof gatePass.approvalDept ===
+                        "object"
+                        ? {
+                            ...gatePass.approvalDept,
+                        }
+                        : {};
+
+                if (
+                    employee.department
+                ) {
+                    approvalDept[
+                        "Approved By"
+                    ] =
+                        employee.department;
+                }
+
+                gatePass.approvalDept =
+                    approvalDept;
+            }
+
+            // =================================================
+            // REJECT
+            // =================================================
+
+            if (
+                requestedStatus ===
+                "REJECTED"
+            ) {
+                gatePass.approvalStatus =
+                    "REJECTED";
+
+                gatePass.rejectedAt =
+                    new Date();
+
+                gatePass.approvedAt =
+                    null;
+
+                gatePass.approvalActionByEmployeeId =
+                    employee._id;
+
+                gatePass.approvalActionByName =
+                    actionByName;
+
+                gatePass.approvalRemark =
+                    remark;
+            }
+
+            await gatePass.save();
+
+            return res.json({
+                success: true,
+
+                message:
+                    requestedStatus ===
+                    "APPROVED"
+                        ? "Gate Pass approved successfully. The requester can now print it."
+                        : "Gate Pass rejected successfully.",
+
+                data:
+                    normalizeGatePassForResponse(
+                        gatePass,
+                        employee
+                    ),
+            });
+        } catch (error) {
+            console.error(
+                "Update Gate Pass Approval Error:",
+                error
+            );
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        error.message ||
+                        "Failed to update Gate Pass approval",
+                });
+        }
+    };

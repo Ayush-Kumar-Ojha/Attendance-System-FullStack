@@ -71,6 +71,10 @@ const gatePassItemSchema = new mongoose.Schema(
 
 const gatePassSchema = new mongoose.Schema(
     {
+        // =====================================================
+        // CREATOR
+        // =====================================================
+
         creatorUserId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -94,6 +98,10 @@ const gatePassSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+
+        // =====================================================
+        // GATE PASS
+        // =====================================================
 
         gatePassNo: {
             type: String,
@@ -134,6 +142,12 @@ const gatePassSchema = new mongoose.Schema(
             default: [],
         },
 
+        // =====================================================
+        // EXISTING PRINT APPROVAL MATRIX
+        //
+        // These are kept exactly for your Gate Pass document.
+        // =====================================================
+
         approvalName: {
             type: mongoose.Schema.Types.Mixed,
             default: {},
@@ -148,11 +162,105 @@ const gatePassSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.Mixed,
             default: {},
         },
+
+        // =====================================================
+        // NEW SYAM APPROVAL WORKFLOW
+        //
+        // IMPORTANT:
+        // approvalRequired defaults to false so OLD Gate Passes
+        // remain printable.
+        //
+        // Every NEW Gate Pass created by the controller sets
+        // approvalRequired = true.
+        // =====================================================
+
+        approvalRequired: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
+
+        approvalStatus: {
+            type: String,
+            enum: [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+            ],
+            default: "PENDING",
+            index: true,
+        },
+
+        // =====================================================
+        // ASSIGNED APPROVER
+        //
+        // This will always point to the actual Employee record
+        // of Syam - Manager.
+        // =====================================================
+
+        approverEmployeeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Employee",
+            default: null,
+            index: true,
+        },
+
+        approverName: {
+            type: String,
+            default: "",
+        },
+
+        approverDesignation: {
+            type: String,
+            default: "",
+        },
+
+        // =====================================================
+        // APPROVAL ACTION
+        // =====================================================
+
+        approvalActionByEmployeeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Employee",
+            default: null,
+        },
+
+        approvalActionByName: {
+            type: String,
+            default: "",
+        },
+
+        approvalRemark: {
+            type: String,
+            default: "",
+        },
+
+        approvedAt: {
+            type: Date,
+            default: null,
+        },
+
+        rejectedAt: {
+            type: Date,
+            default: null,
+        },
     },
     {
         timestamps: true,
     }
 );
+
+// Useful indexes
+gatePassSchema.index({
+    creatorEmployeeId: 1,
+    createdAt: -1,
+});
+
+gatePassSchema.index({
+    approverEmployeeId: 1,
+    approvalStatus: 1,
+    createdAt: -1,
+});
 
 const GatePass =
     mongoose.models.GatePass ||

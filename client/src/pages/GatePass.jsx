@@ -15,6 +15,7 @@ import {
     Eye,
     Clock,
     CheckCircle2,
+    XCircle,
 } from "lucide-react";
 
 import { format } from "date-fns";
@@ -238,6 +239,60 @@ const normalizeGatePass = (
     approvalDept:
         pass.approvalDept ||
         emptyApprovalRow(),
+
+    approvalRequired:
+        pass.approvalRequired === true,
+
+    approvalStatus:
+        pass.approvalRequired === true
+            ? String(
+                pass.approvalStatus ||
+                "PENDING"
+            ).toUpperCase()
+            : "APPROVED",
+
+    approverEmployeeId:
+        pass.approverEmployeeId ||
+        null,
+
+    approverName:
+        pass.approverName ||
+        "",
+
+    approverDesignation:
+        pass.approverDesignation ||
+        "",
+
+    approvalActionByName:
+        pass.approvalActionByName ||
+        "",
+
+    approvalRemark:
+        pass.approvalRemark ||
+        "",
+
+    approvedAt:
+        pass.approvedAt ||
+        null,
+
+    rejectedAt:
+        pass.rejectedAt ||
+        null,
+
+    canPrint:
+        typeof pass.canPrint ===
+            "boolean"
+            ? pass.canPrint
+            : pass.approvalRequired !==
+                true ||
+                String(
+                    pass.approvalStatus ||
+                    ""
+                ).toUpperCase() ===
+                "APPROVED",
+
+    canApprove:
+        pass.canApprove === true,
 });
 
 // ============================================================
@@ -286,6 +341,71 @@ const GatePass = () => {
         setSavedPassId,
     ] = useState(
         null
+    );
+
+    // ========================================================
+    // APPROVAL WORKFLOW
+    // ========================================================
+
+    const [
+        isGatePassApprover,
+        setIsGatePassApprover,
+    ] = useState(
+        false
+    );
+
+    const [
+        pendingApprovals,
+        setPendingApprovals,
+    ] = useState([]);
+
+    const [
+        currentApprovalRequired,
+        setCurrentApprovalRequired,
+    ] = useState(
+        false
+    );
+
+    const [
+        currentApprovalStatus,
+        setCurrentApprovalStatus,
+    ] = useState(
+        "DRAFT"
+    );
+
+    const [
+        currentApproverName,
+        setCurrentApproverName,
+    ] = useState(
+        "Syam"
+    );
+
+    const [
+        currentApproverDesignation,
+        setCurrentApproverDesignation,
+    ] = useState(
+        "Manager"
+    );
+
+    const [
+        currentCanPrint,
+        setCurrentCanPrint,
+    ] = useState(
+        false
+    );
+
+    const [
+        currentCanApprove,
+        setCurrentCanApprove,
+    ] = useState(
+        false
+    );
+
+    const [
+        updatingApproval,
+        setUpdatingApproval,
+    ] = useState(
+        false
     );
 
     // ========================================================
@@ -433,6 +553,24 @@ const GatePass = () => {
                         Boolean(
                             response.data
                                 ?.canViewAll
+                        )
+                    );
+
+                    setIsGatePassApprover(
+                        Boolean(
+                            response.data
+                                ?.isGatePassApprover
+                        )
+                    );
+
+                    const pendingData =
+                        response.data
+                            ?.pendingApprovals ||
+                        [];
+
+                    setPendingApprovals(
+                        pendingData.map(
+                            normalizeGatePass
                         )
                     );
                 } catch (error) {
@@ -755,29 +893,152 @@ const GatePass = () => {
                 null
             );
 
+            setCurrentApprovalRequired(
+                false
+            );
+
+            setCurrentApprovalStatus(
+                "DRAFT"
+            );
+
+            setCurrentApproverName(
+                "Syam"
+            );
+
+            setCurrentApproverDesignation(
+                "Manager"
+            );
+
+            setCurrentCanPrint(
+                false
+            );
+
+            setCurrentCanApprove(
+                false
+            );
+
             setView(
                 "create"
             );
         };
 
     // ========================================================
-    // SAVE + PRINT
+    // SEND TO SYAM FOR APPROVAL
     // ========================================================
 
-    const handleSaveAndPrint =
+    const handleSendForApproval =
         async () => {
+            if (savedPassId) {
+                return;
+            }
+
             try {
-                if (!savedPassId) {
-                    setSavingGatePass(
-                        true
+                setSavingGatePass(
+                    true
+                );
+
+                const preparedItems =
+                    items.map(
+                        (
+                            item,
+                            index
+                        ) => ({
+                            ...item,
+
+                            itemNo:
+                                String(
+                                    index +
+                                    1
+                                ),
+                        })
                     );
 
-                    const preparedItems =
-                        items.map(
+                const response =
+                    await api.post(
+                        "/gate-passes",
+                        {
+                            gatePassNo,
+
+                            passType,
+
+                            to,
+
+                            modeOfTransport,
+
+                            purpose,
+
+                            gatePassDate,
+
+                            items:
+                                preparedItems,
+
+                            approvalName,
+
+                            approvalEmpNo,
+
+                            approvalDept,
+                        }
+                    );
+
+                const savedPass =
+                    normalizeGatePass(
+                        response.data
+                            ?.data ||
+                        {}
+                    );
+
+                if (
+                    savedPass.id
+                ) {
+                    setSavedPassId(
+                        savedPass.id
+                    );
+                }
+
+                setCurrentApprovalRequired(
+                    savedPass.approvalRequired ===
+                    true
+                );
+
+                setCurrentApprovalStatus(
+                    savedPass.approvalStatus ||
+                    "PENDING"
+                );
+
+                setCurrentApproverName(
+                    savedPass.approverName ||
+                    "Syam"
+                );
+
+                setCurrentApproverDesignation(
+                    savedPass.approverDesignation ||
+                    "Manager"
+                );
+
+                setCurrentCanPrint(
+                    Boolean(
+                        savedPass.canPrint
+                    )
+                );
+
+                setCurrentCanApprove(
+                    Boolean(
+                        savedPass.canApprove
+                    )
+                );
+
+                if (
+                    savedPass.items
+                        ?.length
+                ) {
+                    setItems(
+                        savedPass.items.map(
                             (
                                 item,
                                 index
                             ) => ({
+                                ...emptyItem(),
+
                                 ...item,
 
                                 itemNo:
@@ -786,126 +1047,53 @@ const GatePass = () => {
                                         1
                                     ),
                             })
-                        );
-
-                    const response =
-                        await api.post(
-                            "/gate-passes",
-                            {
-                                gatePassNo,
-
-                                passType,
-
-                                to,
-
-                                modeOfTransport,
-
-                                purpose,
-
-                                gatePassDate,
-
-                                items:
-                                    preparedItems,
-
-                                approvalName,
-
-                                approvalEmpNo,
-
-                                approvalDept,
-                            }
-                        );
-
-                    const savedPass =
-                        normalizeGatePass(
-                            response.data
-                                ?.data ||
-                            {}
-                        );
-
-                    if (
-                        savedPass.id
-                    ) {
-                        setSavedPassId(
-                            savedPass.id
-                        );
-                    }
-
-                    // Backend returns the final UOM.
-                    if (
-                        savedPass.items
-                            ?.length
-                    ) {
-                        setItems(
-                            savedPass.items.map(
-                                (
-                                    item,
-                                    index
-                                ) => ({
-                                    ...emptyItem(),
-
-                                    ...item,
-
-                                    itemNo:
-                                        String(
-                                            index +
-                                            1
-                                        ),
-                                })
-                            )
-                        );
-                    }
-
-                    setPastPasses(
-                        (
-                            previous
-                        ) => {
-                            const withoutDuplicate =
-                                previous.filter(
-                                    (
-                                        pass
-                                    ) =>
-                                        String(
-                                            pass.id
-                                        ) !==
-                                        String(
-                                            savedPass.id
-                                        )
-                                );
-
-                            return savedPass.id
-                                ? [
-                                    savedPass,
-
-                                    ...withoutDuplicate,
-                                ]
-                                : previous;
-                        }
+                        )
                     );
-
-                    if (
-                        response.data
-                            ?.canViewAll !==
-                        undefined
-                    ) {
-                        setCanViewAll(
-                            Boolean(
-                                response
-                                    .data
-                                    .canViewAll
-                            )
-                        );
-                    }
                 }
 
-                setTimeout(
-                    () => {
-                        window.print();
-                    },
-                    150
+                setPastPasses(
+                    (previous) => {
+                        const withoutDuplicate =
+                            previous.filter(
+                                (pass) =>
+                                    String(
+                                        pass.id
+                                    ) !==
+                                    String(
+                                        savedPass.id
+                                    )
+                            );
+
+                        return savedPass.id
+                            ? [
+                                savedPass,
+                                ...withoutDuplicate,
+                            ]
+                            : previous;
+                    }
+                );
+
+                if (
+                    response.data
+                        ?.canViewAll !==
+                    undefined
+                ) {
+                    setCanViewAll(
+                        Boolean(
+                            response.data
+                                .canViewAll
+                        )
+                    );
+                }
+
+                alert(
+                    response.data
+                        ?.message ||
+                    "Gate Pass sent to Syam (Manager) for approval."
                 );
             } catch (error) {
                 console.error(
-                    "Generate Gate Pass Error:",
+                    "Send Gate Pass For Approval Error:",
                     error
                 );
 
@@ -913,13 +1101,187 @@ const GatePass = () => {
                     error.response
                         ?.data
                         ?.error ||
-                    "Failed to save gate pass. Please try again."
+                    "Failed to send gate pass for approval. Please try again."
                 );
             } finally {
                 setSavingGatePass(
                     false
                 );
             }
+        };
+
+    // ========================================================
+    // APPROVE / REJECT
+    // ========================================================
+
+    const handleApprovalDecision =
+        async (
+            pass,
+            status
+        ) => {
+            const passId =
+                pass?.id ||
+                pass?._id;
+
+            if (!passId) {
+                return;
+            }
+
+            try {
+                setUpdatingApproval(
+                    true
+                );
+
+                const response =
+                    await api.patch(
+                        `/gate-passes/${passId}/approval`,
+                        {
+                            status,
+                        }
+                    );
+
+                const updatedPass =
+                    normalizeGatePass(
+                        response.data
+                            ?.data ||
+                        {}
+                    );
+
+                setPastPasses(
+                    (previous) =>
+                        previous.map(
+                            (item) =>
+                                String(
+                                    item.id
+                                ) ===
+                                String(
+                                    updatedPass.id
+                                )
+                                    ? updatedPass
+                                    : item
+                        )
+                );
+
+                setPendingApprovals(
+                    (previous) =>
+                        previous.filter(
+                            (item) =>
+                                String(
+                                    item.id
+                                ) !==
+                                String(
+                                    updatedPass.id
+                                )
+                        )
+                );
+
+                if (
+                    String(
+                        savedPassId
+                    ) ===
+                    String(
+                        updatedPass.id
+                    )
+                ) {
+                    setCurrentApprovalRequired(
+                        updatedPass.approvalRequired ===
+                        true
+                    );
+
+                    setCurrentApprovalStatus(
+                        updatedPass.approvalStatus
+                    );
+
+                    setCurrentCanPrint(
+                        Boolean(
+                            updatedPass.canPrint
+                        )
+                    );
+
+                    setCurrentCanApprove(
+                        Boolean(
+                            updatedPass.canApprove
+                        )
+                    );
+
+                    setApprovalName(
+                        updatedPass.approvalName ||
+                        emptyApprovalRow()
+                    );
+
+                    setApprovalEmpNo(
+                        updatedPass.approvalEmpNo ||
+                        emptyApprovalRow()
+                    );
+
+                    setApprovalDept(
+                        updatedPass.approvalDept ||
+                        emptyApprovalRow()
+                    );
+                }
+
+                alert(
+                    response.data
+                        ?.message ||
+                    (status ===
+                    "APPROVED"
+                        ? "Gate Pass approved successfully."
+                        : "Gate Pass rejected successfully.")
+                );
+            } catch (error) {
+                console.error(
+                    "Update Gate Pass Approval Error:",
+                    error
+                );
+
+                alert(
+                    error.response
+                        ?.data
+                        ?.error ||
+                    "Failed to update Gate Pass approval."
+                );
+            } finally {
+                setUpdatingApproval(
+                    false
+                );
+            }
+        };
+
+    // ========================================================
+    // PRINT CURRENT GATE PASS
+    // ========================================================
+
+    const handlePrintCurrentGatePass =
+        () => {
+            if (!savedPassId) {
+                alert(
+                    "Please send the Gate Pass to Syam for approval first."
+                );
+
+                return;
+            }
+
+            if (
+                currentApprovalRequired &&
+                currentApprovalStatus !==
+                    "APPROVED"
+            ) {
+                alert(
+                    currentApprovalStatus ===
+                        "REJECTED"
+                        ? "This Gate Pass was rejected and cannot be printed."
+                        : "This Gate Pass is waiting for approval from Syam (Manager)."
+                );
+
+                return;
+            }
+
+            setTimeout(
+                () => {
+                    window.print();
+                },
+                150
+            );
         };
 
     // ========================================================
@@ -1021,6 +1383,41 @@ const GatePass = () => {
         setSavedPassId(
             pass.id ||
             pass._id
+        );
+
+        setCurrentApprovalRequired(
+            pass.approvalRequired ===
+            true
+        );
+
+        setCurrentApprovalStatus(
+            pass.approvalStatus ||
+            (pass.approvalRequired ===
+                true
+                ? "PENDING"
+                : "APPROVED")
+        );
+
+        setCurrentApproverName(
+            pass.approverName ||
+            "Syam"
+        );
+
+        setCurrentApproverDesignation(
+            pass.approverDesignation ||
+            "Manager"
+        );
+
+        setCurrentCanPrint(
+            pass.canPrint ===
+                true ||
+            pass.approvalRequired !==
+                true
+        );
+
+        setCurrentCanApprove(
+            pass.canApprove ===
+            true
         );
 
         setView(
@@ -1144,6 +1541,123 @@ const GatePass = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* SYAM ONLY - PENDING APPROVALS */}
+
+                    {isGatePassApprover && (
+                        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+                            <div className="flex items-center justify-between border-b border-amber-100 bg-amber-50 px-5 py-4">
+                                <div>
+                                    <h2 className="font-bold text-slate-900">
+                                        Pending Approvals
+                                    </h2>
+
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Gate Passes waiting for your approval
+                                    </p>
+                                </div>
+
+                                <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white">
+                                    {pendingApprovals.length}
+                                </span>
+                            </div>
+
+                            {pendingApprovals.length === 0 ? (
+                                <div className="px-5 py-8 text-center text-sm text-slate-500">
+                                    No pending Gate Pass approvals.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <tr>
+                                                <th className="px-5 py-3">Gate Pass No.</th>
+                                                <th className="px-5 py-3">Requested By</th>
+                                                <th className="px-5 py-3">Date</th>
+                                                <th className="px-5 py-3">Recipient / To</th>
+                                                <th className="px-5 py-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-100">
+                                            {pendingApprovals.map((pass) => (
+                                                <tr
+                                                    key={pass.id}
+                                                    className="hover:bg-slate-50"
+                                                >
+                                                    <td className="px-5 py-3.5 font-semibold text-slate-800">
+                                                        {pass.gatePassNo || "—"}
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5 text-slate-700">
+                                                        {pass.createdByName || "—"}
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5 text-slate-600">
+                                                        {pass.createdAt
+                                                            ? format(
+                                                                new Date(pass.createdAt),
+                                                                "dd MMM yyyy"
+                                                            )
+                                                            : "—"}
+                                                    </td>
+
+                                                    <td className="max-w-[260px] truncate px-5 py-3.5 text-slate-600">
+                                                        {pass.to || "—"}
+                                                    </td>
+
+                                                    <td className="px-5 py-3.5">
+                                                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openExistingPass(pass)
+                                                                }
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                            >
+                                                                <Eye size={14} />
+                                                                View
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleApprovalDecision(
+                                                                        pass,
+                                                                        "APPROVED"
+                                                                    )
+                                                                }
+                                                                disabled={updatingApproval}
+                                                                className="inline-flex items-center gap-1.5 rounded-lg bg-green-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                <CheckCircle2 size={14} />
+                                                                Approve
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleApprovalDecision(
+                                                                        pass,
+                                                                        "REJECTED"
+                                                                    )
+                                                                }
+                                                                disabled={updatingApproval}
+                                                                className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                <XCircle size={14} />
+                                                                Reject
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* FILTERS */}
 
@@ -1381,11 +1895,19 @@ const GatePass = () => {
                                                 Purpose
                                             </th>
 
+                                            <th className="px-5 py-3">
+                                                Status
+                                            </th>
+
                                             {canViewAll && (
                                                 <th className="px-5 py-3">
                                                     Generated By
                                                 </th>
                                             )}
+
+                                            <th className="px-5 py-3 text-right">
+                                                Action
+                                            </th>
                                         </tr>
                                     </thead>
 
@@ -1440,12 +1962,64 @@ const GatePass = () => {
                                                             "—"}
                                                     </td>
 
+                                                    <td className="px-5 py-3.5">
+                                                        <span
+                                                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${pass.approvalStatus ===
+                                                                "APPROVED"
+                                                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                                : pass.approvalStatus ===
+                                                                    "REJECTED"
+                                                                    ? "border-rose-200 bg-rose-50 text-rose-700"
+                                                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                                                }`}
+                                                        >
+                                                            {pass.approvalStatus ===
+                                                                "APPROVED"
+                                                                ? "Approved"
+                                                                : pass.approvalStatus ===
+                                                                    "REJECTED"
+                                                                    ? "Rejected"
+                                                                    : "Pending Approval"}
+                                                        </span>
+                                                    </td>
+
                                                     {canViewAll && (
                                                         <td className="px-5 py-3.5 text-slate-600">
                                                             {pass.createdByName ||
                                                                 "Admin"}
                                                         </td>
                                                     )}
+
+                                                    <td className="px-5 py-3.5">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openExistingPass(pass)
+                                                                }
+                                                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                            >
+                                                                <Eye size={14} />
+                                                                View
+                                                            </button>
+
+                                                            {pass.canPrint && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        openExistingPass(pass);
+                                                                        setTimeout(() => {
+                                                                            window.print();
+                                                                        }, 250);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                                >
+                                                                    <Printer size={14} />
+                                                                    Print
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             )
                                         )}
@@ -1666,6 +2240,9 @@ const GatePass = () => {
 
     .gate-pass-document {
         width: 100% !important;
+        min-height: calc(297mm - 12mm) !important;
+        position: relative !important;
+        padding-bottom: 18mm !important;
         max-width: none !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -1948,25 +2525,110 @@ const GatePass = () => {
                         </button>
                     </div>
 
-                    <button
-                        onClick={
-                            handleSaveAndPrint
-                        }
-                        disabled={
-                            savingGatePass
-                        }
-                        className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <Printer
-                            size={
-                                17
-                            }
-                        />
+                    <div className="flex items-center gap-2">
+                        {!savedPassId && (
+                            <button
+                                type="button"
+                                onClick={
+                                    handleSendForApproval
+                                }
+                                disabled={
+                                    savingGatePass
+                                }
+                                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <FileText
+                                    size={17}
+                                />
 
-                        {savingGatePass
-                            ? "Saving..."
-                            : "Download / Print"}
-                    </button>
+                                {savingGatePass
+                                    ? "Sending..."
+                                    : "Send to Syam for Approval"}
+                            </button>
+                        )}
+
+                        {savedPassId &&
+                            currentApprovalRequired &&
+                            currentApprovalStatus ===
+                                "PENDING" &&
+                            !currentCanApprove && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700">
+                                    Pending approval from {currentApproverName ||
+                                        "Syam"} ({currentApproverDesignation ||
+                                        "Manager"})
+                                </div>
+                            )}
+
+                        {savedPassId &&
+                            currentApprovalRequired &&
+                            currentApprovalStatus ===
+                                "PENDING" &&
+                            currentCanApprove && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            handleApprovalDecision(
+                                                { id: savedPassId },
+                                                "APPROVED"
+                                            )
+                                        }
+                                        disabled={
+                                            updatingApproval
+                                        }
+                                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <CheckCircle2 size={16} />
+                                        Approve
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            handleApprovalDecision(
+                                                { id: savedPassId },
+                                                "REJECTED"
+                                            )
+                                        }
+                                        disabled={
+                                            updatingApproval
+                                        }
+                                        className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <XCircle size={16} />
+                                        Reject
+                                    </button>
+                                </>
+                            )}
+
+                        {savedPassId &&
+                            (currentApprovalStatus ===
+                                "APPROVED" ||
+                                !currentApprovalRequired) && (
+                                <button
+                                    type="button"
+                                    onClick={
+                                        handlePrintCurrentGatePass
+                                    }
+                                    disabled={
+                                        !currentCanPrint
+                                    }
+                                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <Printer size={17} />
+                                    Download / Print
+                                </button>
+                            )}
+
+                        {savedPassId &&
+                            currentApprovalStatus ===
+                                "REJECTED" && (
+                                <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700">
+                                    Rejected by {currentApproverName ||
+                                        "Syam"}
+                                </div>
+                            )}
+                    </div>
                 </div>
 
                 {/* DOCUMENT */}
@@ -1999,6 +2661,12 @@ const GatePass = () => {
 
                         <p className="text-[11px] font-medium text-slate-900">
                             Ph No.: +91 8867590544
+                        </p>
+
+                        <p className="text-[10px] font-medium text-slate-700">
+                            CIN: U46909TN2024PTC17326
+                            &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;
+                            GSTIN: 29AADCW9221H1Z2
                         </p>
 
                         <h2 className="mt-2 text-[13px] font-bold">
@@ -2800,22 +3468,10 @@ const GatePass = () => {
 
                     {/* NOTE */}
 
-                    <p className="mt-3 text-center text-[10px] text-slate-700">
+                    <p className="gate-pass-bottom-note mt-3 text-center text-[10px] text-slate-700 print:absolute print:bottom-[8mm] print:left-0 print:right-0 print:mt-0">
                         Note: This is a computer-generated gate pass; therefore, a signature is not required.
                     </p>
 
-                    {/* FOOTER */}
-
-                    <div className="mt-3 border-t border-slate-300 pt-1.5 text-center text-[9px] text-slate-500">
-                        CIN: U46909TN2024PTC17326
-
-                        &nbsp;&nbsp;&nbsp;
-                        |
-                        &nbsp;&nbsp;&nbsp;
-
-                        GSTIN: 29AADCW9221H1Z2
-
-                    </div>
                 </div>
             </div>
         </>

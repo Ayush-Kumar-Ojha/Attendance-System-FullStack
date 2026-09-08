@@ -1,21 +1,14 @@
-import {
-    useEffect,
-    useState,
-} from "react";
-
+import { useEffect, useState } from "react";
 import {
     Loader2Icon,
     Plus,
+    Trash2,
     X,
 } from "lucide-react";
-
 import toast from "react-hot-toast";
 
 import api from "../api/axios";
-
-import {
-    useDepartments,
-} from "../hooks/useDepartments";
+import { useDepartments } from "../hooks/useDepartments";
 
 const genId = () =>
     `${Date.now()}-${Math.random()
@@ -23,105 +16,42 @@ const genId = () =>
         .slice(2, 9)}`;
 
 const fmtDate = (value) => {
-    if (!value) {
+    if (!value) return "";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
         return "";
     }
 
-    const date =
-        new Date(value);
-
-    return Number.isNaN(
-        date.getTime()
-    )
-        ? ""
-        : date
-              .toISOString()
-              .split("T")[0];
+    return date.toISOString().split("T")[0];
 };
 
 const sectionConfig = [
     {
-        title:
-            "Personal Details",
-
+        title: "Personal Details",
         fields: [
-            [
-                "employeeName",
-                "Name",
-                "text",
-            ],
-
-            [
-                "fatherName",
-                "Father's Name",
-                "text",
-            ],
-
+            ["employeeName", "Name", "text"],
+            ["fatherName", "Father's Name", "text"],
             [
                 "gender",
                 "Gender",
                 "select",
-                [
-                    "MALE",
-                    "FEMALE",
-                    "OTHER",
-                ],
+                ["", "MALE", "FEMALE", "OTHER"],
             ],
-
-            [
-                "bloodGroup",
-                "Blood Group",
-                "text",
-            ],
-
-            [
-                "dateOfBirth",
-                "Date of Birth",
-                "date",
-            ],
-
-            [
-                "birthPlace",
-                "Birth Place",
-                "text",
-            ],
-
-            [
-                "nationality",
-                "Nationality",
-                "text",
-            ],
-
-            [
-                "motherTongue",
-                "Mother Tongue",
-                "text",
-            ],
-
-            [
-                "languages",
-                "Language",
-                "text",
-            ],
-
-            [
-                "phone",
-                "Phone Number",
-                "text",
-            ],
-
-            [
-                "passportNumber",
-                "Passport Number",
-                "text",
-            ],
-
+            ["bloodGroup", "Blood Group", "text"],
+            ["dateOfBirth", "Date of Birth", "date"],
+            ["birthPlace", "Birth Place", "text"],
+            ["nationality", "Nationality", "text"],
+            ["motherTongue", "Mother Tongue", "text"],
+            ["languages", "Language", "text"],
+            ["phone", "Phone Number", "text"],
+            ["passportNumber", "Passport Number", "text"],
             [
                 "identificationMark",
                 "Identification Mark",
                 "text",
             ],
-
             [
                 "maritalStatus",
                 "Marital Status",
@@ -134,7 +64,6 @@ const sectionConfig = [
                     "WIDOWED",
                 ],
             ],
-
             [
                 "numberOfChildren",
                 "Number of Children",
@@ -144,161 +73,54 @@ const sectionConfig = [
     },
 
     {
-        title:
-            "Employment Details",
-
+        title: "Employment Details",
         fields: [
-            [
-                "joinDate",
-                "Date of Joining",
-                "date",
-            ],
-
-            [
-                "manpowerType",
-                "Manpower Type",
-                "text",
-            ],
-
-            [
-                "vendorCode",
-                "Vendor Code",
-                "text",
-            ],
-
-            [
-                "employeeCode",
-                "Employee Code",
-                "text",
-            ],
-
-            [
-                "email",
-                "Employee Email ID",
-                "email",
-            ],
-
-            [
-                "department",
-                "Department",
-                "department",
-            ],
-
-            [
-                "position",
-                "Designation",
-                "text",
-            ],
-
-            [
-                "basicSalary",
-                "Basic Salary",
-                "number",
-            ],
-
-            [
-                "allowances",
-                "Allowances",
-                "number",
-            ],
-
-            [
-                "deductions",
-                "Deductions",
-                "number",
-            ],
-
+            ["joinDate", "Date of Joining", "date"],
+            ["manpowerType", "Manpower Type", "text"],
+            ["vendorCode", "Vendor Code", "text"],
+            ["employeeCode", "Employee Code", "text"],
+            ["email", "Employee Email ID", "email"],
+            ["department", "Department", "department"],
+            ["position", "Designation", "text"],
+            ["basicSalary", "Basic Salary", "number"],
+            ["allowances", "Allowances", "number"],
+            ["deductions", "Deductions", "number"],
             [
                 "confirmationDate",
                 "Confirmation Date",
                 "date",
             ],
-
             [
                 "anniversaryDate",
                 "Anniversary Date",
                 "date",
             ],
-
-            [
-                "aadharNumber",
-                "Aadhaar Number",
-                "text",
-            ],
-
-            [
-                "panNumber",
-                "PAN Number",
-                "text",
-            ],
-
-            [
-                "bio",
-                "Bio",
-                "textarea",
-            ],
+            ["aadharNumber", "Aadhaar Number", "text"],
+            ["panNumber", "PAN Number", "text"],
+            ["bio", "Bio", "textarea"],
         ],
     },
 
     {
-        title:
-            "Safety / PPE Details",
-
+        title: "Safety / PPE Details",
         fields: [
             [
                 "safetyIssued",
                 "Safety Issued or Not",
                 "text",
             ],
-
-            [
-                "shoeSize",
-                "Shoe Size",
-                "text",
-            ],
-
-            [
-                "shoeIssueDate",
-                "Shoe Issue Date",
-                "date",
-            ],
-
-            [
-                "safetyHelmet",
-                "Safety Helmet",
-                "text",
-            ],
-
-            [
-                "helmetColor",
-                "Helmet Color",
-                "text",
-            ],
-
+            ["shoeSize", "Shoe Size", "text"],
+            ["shoeIssueDate", "Shoe Issue Date", "date"],
+            ["safetyHelmet", "Safety Helmet", "text"],
+            ["helmetColor", "Helmet Color", "text"],
             [
                 "helmetIssueDate",
                 "Helmet Issue Date",
                 "date",
             ],
-
-            [
-                "jacket",
-                "Jacket",
-                "text",
-            ],
-
-            [
-                "jacketIssueDate",
-                "Jacket Issue Date",
-                "date",
-            ],
-
-            [
-                "jacketSize",
-                "Jacket Size",
-                "text",
-            ],
-
+            ["jacket", "Jacket", "text"],
+            ["jacketIssueDate", "Jacket Issue Date", "date"],
+            ["jacketSize", "Jacket Size", "text"],
             [
                 "eyeProtectionEquipment",
                 "Eye Protection Equipment",
@@ -308,40 +130,25 @@ const sectionConfig = [
     },
 
     {
-        title:
-            "Permanent Address",
-
+        title: "Permanent Address",
         fields: [
             [
                 "permanentAddressLine1",
                 "Permanent Address Line 1",
                 "text",
             ],
-
             [
                 "permanentAddressLine2",
                 "Permanent Address Line 2",
                 "text",
             ],
-
-            [
-                "permanentCity",
-                "Permanent City",
-                "text",
-            ],
-
+            ["permanentCity", "Permanent City", "text"],
             [
                 "permanentCountry",
                 "Permanent Country",
                 "text",
             ],
-
-            [
-                "permanentState",
-                "Permanent State",
-                "text",
-            ],
-
+            ["permanentState", "Permanent State", "text"],
             [
                 "permanentPinCode",
                 "Permanent Pin Code",
@@ -351,83 +158,45 @@ const sectionConfig = [
     },
 
     {
-        title:
-            "Present Address",
-
+        title: "Present Address",
         fields: [
             [
                 "presentAddressLine1",
                 "Present Address Line 1",
                 "text",
             ],
-
             [
                 "presentAddressLine2",
                 "Present Address Line 2",
                 "text",
             ],
-
-            [
-                "presentCity",
-                "Present City",
-                "text",
-            ],
-
-            [
-                "village",
-                "Present Village",
-                "text",
-            ],
-
-            [
-                "presentCountry",
-                "Present Country",
-                "text",
-            ],
-
-            [
-                "presentState",
-                "Present State",
-                "text",
-            ],
-
-            [
-                "presentPinCode",
-                "Present Pin Code",
-                "text",
-            ],
-
-            [
-                "mobileNumber",
-                "Mobile Number",
-                "text",
-            ],
+            ["presentCity", "Present City", "text"],
+            ["village", "Present Village", "text"],
+            ["presentCountry", "Present Country", "text"],
+            ["presentState", "Present State", "text"],
+            ["presentPinCode", "Present Pin Code", "text"],
+            ["mobileNumber", "Mobile Number", "text"],
         ],
     },
 
     {
-        title:
-            "Emergency Contact",
-
+        title: "Emergency Contact",
         fields: [
             [
                 "emergencyContactPersonName",
                 "Emergency Contact Person Name",
                 "text",
             ],
-
             [
                 "emergencyContactPersonRelation",
                 "Emergency Contact Person Relation",
                 "text",
             ],
-
             [
                 "emergencyContactPersonAddress",
                 "Emergency Contact Person Address",
                 "textarea",
             ],
-
             [
                 "emergencyMobileNumber",
                 "Emergency Mobile Number",
@@ -438,87 +207,53 @@ const sectionConfig = [
 
     {
         title: "Education",
-
         fields: [
-            [
-                "qualification",
-                "Qualification",
-                "text",
-            ],
-
-            [
-                "specialization",
-                "Specialization",
-                "text",
-            ],
-
+            ["qualification", "Qualification", "text"],
+            ["specialization", "Specialization", "text"],
             [
                 "collegeSchoolName",
                 "College / School Name",
                 "text",
             ],
-
             [
                 "boardUniversityName",
                 "Board / University Name",
                 "text",
             ],
-
-            [
-                "yearOfPassing",
-                "Year of Passing",
-                "text",
-            ],
+            ["yearOfPassing", "Year of Passing", "text"],
         ],
     },
 
     {
-        title:
-            "Document References",
-
+        title: "Document References",
         fields: [
-            [
-                "resume",
-                "Resume",
-                "text",
-            ],
-
+            ["resume", "Resume", "text"],
             [
                 "appointmentLetter",
                 "Appointment Letter",
                 "text",
             ],
-
             [
                 "degreeCertificate",
                 "Degree Certificate",
                 "text",
             ],
-
-            [
-                "kycDocument",
-                "KYC Document",
-                "text",
-            ],
-
+            ["kycDocument", "KYC Document", "text"],
             [
                 "medicalCertificate",
                 "Medical Certificate",
                 "text",
             ],
-
             [
                 "previousEmploymentAppointmentLetter",
                 "Previous Employment Appointment Letter",
                 "text",
             ],
-
             [
                 "previousEmploymentRelevantExperienceLetter",
                 "Previous Employment Relevant Experience Letter",
                 "text",
             ],
-
             [
                 "policeVerification",
                 "Police Verification",
@@ -528,63 +263,29 @@ const sectionConfig = [
     },
 
     {
-        title:
-            "Bank & Statutory Details",
-
+        title: "Bank & Statutory Details",
         fields: [
             [
                 "bankAccountNumber",
                 "Bank Account Number",
                 "text",
             ],
-
             [
                 "bankAccountName",
                 "Bank Account Name",
                 "text",
             ],
-
             [
                 "bankAccountType",
                 "Bank Account Type",
                 "text",
             ],
-
-            [
-                "ifscCode",
-                "IFSC Code",
-                "text",
-            ],
-
-            [
-                "bankName",
-                "Bank Name",
-                "text",
-            ],
-
-            [
-                "branchName",
-                "Branch Name",
-                "text",
-            ],
-
-            [
-                "uanNumber",
-                "UAN Number",
-                "text",
-            ],
-
-            [
-                "pfNumber",
-                "PF Number",
-                "text",
-            ],
-
-            [
-                "esiNumber",
-                "ESI Number",
-                "text",
-            ],
+            ["ifscCode", "IFSC Code", "text"],
+            ["bankName", "Bank Name", "text"],
+            ["branchName", "Branch Name", "text"],
+            ["uanNumber", "UAN Number", "text"],
+            ["pfNumber", "PF Number", "text"],
+            ["esiNumber", "ESI Number", "text"],
         ],
     },
 ];
@@ -594,42 +295,21 @@ const EmployeeForm = ({
     onSuccess,
     onCancel,
 }) => {
-    const {
-        departments,
-    } = useDepartments();
+    const { departments } = useDepartments();
 
-    const isEditMode =
-        !!initialData;
+    const isEditMode = Boolean(initialData);
 
-    const [
-        loading,
-        setLoading,
-    ] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const [
-        customFields,
-        setCustomFields,
-    ] = useState([]);
+    const [customFields, setCustomFields] = useState([]);
+    const [customSections, setCustomSections] = useState([]);
+    const [dynamicFields, setDynamicFields] = useState([]);
 
-    const [
-        customSections,
-        setCustomSections,
-    ] = useState([]);
+    const [addingSection, setAddingSection] =
+        useState(false);
 
-    const [
-        dynamicFields,
-        setDynamicFields,
-    ] = useState([]);
-
-    const [
-        addingSection,
-        setAddingSection,
-    ] = useState(false);
-
-    const [
-        newSectionTitle,
-        setNewSectionTitle,
-    ] = useState("");
+    const [newSectionTitle, setNewSectionTitle] =
+        useState("");
 
     const [
         addingFieldForSectionId,
@@ -641,106 +321,105 @@ const EmployeeForm = ({
         setNewSectionFieldLabel,
     ] = useState("");
 
-    useEffect(() => {
-        setCustomFields(
-            Array.isArray(
-                initialData
-                    ?.customFields
-            )
-                ? initialData.customFields.map(
-                      (
-                          field
-                      ) => ({
-                          ...field,
+    const [
+        addingFieldForFixedSection,
+        setAddingFieldForFixedSection,
+    ] = useState(null);
 
-                          id:
-                              genId(),
-                      })
-                  )
-                : []
+    const [
+        newFixedFieldLabel,
+        setNewFixedFieldLabel,
+    ] = useState("");
+
+    useEffect(() => {
+        const incomingCustomFields = Array.isArray(
+            initialData?.customFields
+        )
+            ? initialData.customFields
+            : [];
+
+        const incomingCustomSections = Array.isArray(
+            initialData?.customSections
+        )
+            ? initialData.customSections
+            : [];
+
+        const incomingDynamicFields = Array.isArray(
+            initialData?.dynamicFields
+        )
+            ? initialData.dynamicFields
+            : [];
+
+        setCustomFields(
+            incomingCustomFields.map((field) => ({
+                ...field,
+                id: field.id || field._id || genId(),
+            }))
         );
 
         setCustomSections(
-            Array.isArray(
-                initialData
-                    ?.customSections
-            )
-                ? initialData.customSections.map(
-                      (
-                          section
-                      ) => ({
-                          ...section,
+            incomingCustomSections.map((section) => ({
+                ...section,
 
-                          id:
-                              genId(),
+                id:
+                    section.id ||
+                    section._id ||
+                    genId(),
 
-                          fields:
-                              (
-                                  section.fields ||
-                                  []
-                              ).map(
-                                  (
-                                      field
-                                  ) => ({
-                                      ...field,
+                fields: Array.isArray(section.fields)
+                    ? section.fields.map((field) => ({
+                        ...field,
 
-                                      id:
-                                          genId(),
-                                  })
-                              ),
-                      })
-                  )
-                : []
+                        id:
+                            field.id ||
+                            field._id ||
+                            genId(),
+                    }))
+                    : [],
+            }))
         );
 
         setDynamicFields(
-            Array.isArray(
-                initialData
-                    ?.dynamicFields
-            )
-                ? initialData.dynamicFields.map(
-                      (
-                          field
-                      ) => ({
-                          ...field,
+            incomingDynamicFields.map((field) => ({
+                ...field,
 
-                          id:
-                              genId(),
-                      })
-                  )
-                : []
+                id:
+                    field.id ||
+                    field._id ||
+                    genId(),
+            }))
         );
+
+        setAddingSection(false);
+        setNewSectionTitle("");
+
+        setAddingFieldForSectionId(null);
+        setNewSectionFieldLabel("");
+
+        setAddingFieldForFixedSection(null);
+        setNewFixedFieldLabel("");
     }, [initialData]);
 
-    const employeeName =
-        initialData
-            ? `${initialData.firstName || ""} ${
-                  initialData.lastName ||
-                  ""
-              }`.trim()
-            : "";
+    const employeeName = initialData
+        ? (
+            initialData.name ||
+            `${initialData.firstName || ""} ${
+                initialData.lastName || ""
+            }`
+        )
+            .trim()
+            .replace(/\s+/g, " ")
+        : "";
 
-    const defaultValueFor = (
-        name
-    ) => {
-        if (
-            name ===
-            "employeeName"
-        ) {
+    const defaultValueFor = (name) => {
+        if (name === "employeeName") {
             return employeeName;
         }
 
-        const value =
-            initialData?.[name];
+        const value = initialData?.[name];
 
-        if (
-            name
-                .toLowerCase()
-                .includes("date")
-        ) {
-            return fmtDate(
-                value
-            );
+        if (name.toLowerCase().includes("date")) {
+            return fmtDate(value);
         }
 
         return value ?? "";
@@ -754,87 +433,55 @@ const EmployeeForm = ({
     ]) => {
         const common = {
             name,
-
-            defaultValue:
-                defaultValueFor(
-                    name
-                ),
-
-            className:
-                "w-full",
+            defaultValue: defaultValueFor(name),
+            className: "w-full",
         };
 
-        if (
-            type === "select"
-        ) {
+        if (type === "select") {
             return (
                 <div key={name}>
-                    <label className="block mb-2">
+                    <label className="mb-2 block">
                         {label}
                     </label>
 
-                    <select
-                        {...common}
-                    >
-                        {(
-                            options ||
-                            []
-                        ).map(
-                            (
-                                option
-                            ) => (
-                                <option
-                                    key={
-                                        option ||
-                                        "blank"
-                                    }
-                                    value={
-                                        option
-                                    }
-                                >
-                                    {option ||
-                                        "Select"}
-                                </option>
-                            )
-                        )}
+                    <select {...common}>
+                        {(options || []).map((option) => (
+                            <option
+                                key={option || "blank"}
+                                value={option}
+                            >
+                                {option || "Select"}
+                            </option>
+                        ))}
                     </select>
                 </div>
             );
         }
 
-        if (
-            type ===
-            "department"
-        ) {
+        if (type === "department") {
+            const departmentOptions =
+                Array.isArray(departments)
+                    ? departments
+                    : [];
+
             return (
                 <div key={name}>
-                    <label className="block mb-2">
+                    <label className="mb-2 block">
                         {label}
                     </label>
 
-                    <select
-                        {...common}
-                    >
+                    <select {...common}>
                         <option value="">
-                            Select
-                            Department
+                            Select Department
                         </option>
 
-                        {departments.map(
-                            (
-                                department
-                            ) => (
+                        {departmentOptions.map(
+                            (department) => (
                                 <option
-                                    key={
-                                        department
-                                    }
-                                    value={
-                                        department
-                                    }
+                                    key={department}
+                                    value={department}
                                 >
-                                    {
-                                        department
-                                    }
+                                    {department}
                                 </option>
                             )
                         )}
@@ -843,18 +490,13 @@ const EmployeeForm = ({
             );
         }
 
-        if (
-            type ===
-            "textarea"
-        ) {
+        if (type === "textarea") {
             return (
                 <div
-                    key={
-                        name
-                    }
+                    key={name}
                     className="sm:col-span-2"
                 >
-                    <label className="block mb-2">
+                    <label className="mb-2 block">
                         {label}
                     </label>
 
@@ -869,7 +511,7 @@ const EmployeeForm = ({
 
         return (
             <div key={name}>
-                <label className="block mb-2">
+                <label className="mb-2 block">
                     {label}
                 </label>
 
@@ -877,8 +519,7 @@ const EmployeeForm = ({
                     {...common}
                     type={type}
                     step={
-                        type ===
-                        "number"
+                        type === "number"
                             ? "any"
                             : undefined
                     }
@@ -887,867 +528,910 @@ const EmployeeForm = ({
         );
     };
 
-    const handleSubmit =
-        async (event) => {
-            event.preventDefault();
+    const getFieldsForFixedSection = (
+        sectionTitle
+    ) =>
+        customFields.filter(
+            (field) =>
+                String(field.section || "")
+                    .trim()
+                    .toLowerCase() ===
+                String(sectionTitle)
+                    .trim()
+                    .toLowerCase()
+        );
 
-            setLoading(
-                true
-            );
+    const addFieldToFixedSection = (
+        sectionTitle
+    ) => {
+        const label = newFixedFieldLabel.trim();
 
-            try {
-                const data =
-                    Object.fromEntries(
-                        new FormData(
-                            event.currentTarget
-                        ).entries()
-                    );
-
-                const fullName =
-                    String(
-                        data.employeeName ||
-                            ""
-                    )
-                        .trim()
-                        .replace(
-                            /\s+/g,
-                            " "
-                        );
-
-                const parts =
-                    fullName
-                        ? fullName.split(
-                              " "
-                          )
-                        : [
-                              "Employee",
-                          ];
-
-                data.firstName =
-                    parts[0] ||
-                    "Employee";
-
-                data.lastName =
-                    parts
-                        .slice(1)
-                        .join(" ") ||
-                    "-";
-
-                delete data.employeeName;
-
-                [
-                    "basicSalary",
-                    "allowances",
-                    "deductions",
-                    "numberOfChildren",
-                ].forEach(
-                    (key) => {
-                        data[key] =
-                            Number(
-                                data[
-                                    key
-                                ]
-                            ) ||
-                            0;
-                    }
-                );
-
-                // Existing manual-form behavior preserved.
-                if (
-                    !data.employeeCode
-                ) {
-                    data.employeeCode =
-                        initialData
-                            ?.employeeCode ||
-                        `EMP${Date.now()}`;
-                }
-
-                if (
-                    !data.email
-                ) {
-                    data.email =
-                        initialData
-                            ?.email ||
-                        `${data.employeeCode.toLowerCase()}@placeholder.local`;
-                }
-
-                if (
-                    !data.position
-                ) {
-                    data.position =
-                        "Employee";
-                }
-
-                if (
-                    !data.gender
-                ) {
-                    data.gender =
-                        "OTHER";
-                }
-
-                if (
-                    !isEditMode &&
-                    !data.password
-                ) {
-                    data.password =
-                        `Temp@${data.employeeCode}`;
-                }
-
-                if (
-                    isEditMode &&
-                    !data.password
-                ) {
-                    delete data.password;
-                }
-
-                data.dynamicFields =
-                    dynamicFields.map(
-                        ({
-                            section,
-                            label,
-                            key,
-                            value,
-                        }) => ({
-                            section:
-                                section ||
-                                "Excel Fields",
-
-                            label,
-
-                            key,
-
-                            value:
-                                value ??
-                                "",
-                        })
-                    );
-
-                data.customFields =
-                    customFields.map(
-                        ({
-                            section,
-                            label,
-                            value,
-                        }) => ({
-                            section,
-
-                            label,
-
-                            value,
-                        })
-                    );
-
-                data.customSections =
-                    customSections.map(
-                        ({
-                            title,
-                            fields,
-                        }) => ({
-                            title,
-
-                            fields:
-                                (
-                                    fields ||
-                                    []
-                                ).map(
-                                    ({
-                                        label,
-                                        value,
-                                    }) => ({
-                                        label,
-
-                                        value,
-                                    })
-                                ),
-                        })
-                    );
-
-                const url =
-                    isEditMode
-                        ? `/employees/${
-                              initialData._id ||
-                              initialData.id
-                          }`
-                        : "/employees";
-
-                await api[
-                    isEditMode
-                        ? "put"
-                        : "post"
-                ](
-                    url,
-                    data
-                );
-
-                toast.success(
-                    isEditMode
-                        ? "Employee updated successfully"
-                        : "Employee created successfully"
-                );
-
-                onSuccess?.();
-            } catch (error) {
-                console.error(
-                    "Employee submit error:",
-                    error
-                );
-
-                toast.error(
-                    error.response
-                        ?.data
-                        ?.error ||
-                        error.message ||
-                        "Something went wrong"
-                );
-            } finally {
-                setLoading(
-                    false
-                );
-            }
-        };
-
-    const addSection = () => {
-        const title =
-            newSectionTitle.trim();
-
-        if (!title) {
-            return toast.error(
-                "Enter a section name"
-            );
+        if (!label) {
+            toast.error("Enter a field name");
+            return;
         }
 
-        setCustomSections(
-            (
-                previous
-            ) => [
-                ...previous,
-
-                {
-                    id:
-                        genId(),
-
-                    title,
-
-                    fields:
-                        [],
-                },
-            ]
+        const alreadyExists = customFields.some(
+            (field) =>
+                String(field.section || "")
+                    .trim()
+                    .toLowerCase() ===
+                    String(sectionTitle)
+                        .trim()
+                        .toLowerCase() &&
+                String(field.label || "")
+                    .trim()
+                    .toLowerCase() ===
+                    label.toLowerCase()
         );
 
-        setNewSectionTitle(
-            ""
-        );
+        if (alreadyExists) {
+            toast.error(
+                "This field already exists in this section"
+            );
+            return;
+        }
 
-        setAddingSection(
-            false
+        setCustomFields((previous) => [
+            ...previous,
+            {
+                id: genId(),
+                section: sectionTitle,
+                label,
+                value: "",
+            },
+        ]);
+
+        setNewFixedFieldLabel("");
+        setAddingFieldForFixedSection(null);
+    };
+
+    const updateFixedSectionField = (
+        fieldId,
+        value
+    ) => {
+        setCustomFields((previous) =>
+            previous.map((field) =>
+                field.id === fieldId
+                    ? {
+                        ...field,
+                        value,
+                    }
+                    : field
+            )
         );
     };
 
-    const addFieldToSection = (
-        sectionId
+    const removeFixedSectionField = (
+        fieldId
     ) => {
+        setCustomFields((previous) =>
+            previous.filter(
+                (field) => field.id !== fieldId
+            )
+        );
+    };
+
+    const addSection = () => {
+        const title = newSectionTitle.trim();
+
+        if (!title) {
+            toast.error("Enter a section name");
+            return;
+        }
+
+        const alreadyExists = customSections.some(
+            (section) =>
+                String(section.title || "")
+                    .trim()
+                    .toLowerCase() ===
+                title.toLowerCase()
+        );
+
+        if (alreadyExists) {
+            toast.error(
+                "A section with this name already exists"
+            );
+            return;
+        }
+
+        setCustomSections((previous) => [
+            ...previous,
+            {
+                id: genId(),
+                title,
+                fields: [],
+            },
+        ]);
+
+        setNewSectionTitle("");
+        setAddingSection(false);
+
+        toast.success("Section created");
+    };
+
+    const removeSection = (sectionId) => {
+        setCustomSections((previous) =>
+            previous.filter(
+                (section) =>
+                    section.id !== sectionId
+            )
+        );
+
+        if (
+            addingFieldForSectionId === sectionId
+        ) {
+            setAddingFieldForSectionId(null);
+            setNewSectionFieldLabel("");
+        }
+    };
+
+    const addFieldToSection = (sectionId) => {
         const label =
             newSectionFieldLabel.trim();
 
         if (!label) {
-            return toast.error(
-                "Enter a field name"
-            );
+            toast.error("Enter a field name");
+            return;
         }
 
-        setCustomSections(
-            (
-                previous
-            ) =>
-                previous.map(
-                    (
-                        section
-                    ) =>
-                        section.id ===
-                        sectionId
-                            ? {
-                                  ...section,
+        const targetSection =
+            customSections.find(
+                (section) =>
+                    section.id === sectionId
+            );
 
-                                  fields: [
-                                      ...(section.fields ||
-                                          []),
+        const alreadyExists =
+            targetSection?.fields?.some(
+                (field) =>
+                    String(field.label || "")
+                        .trim()
+                        .toLowerCase() ===
+                    label.toLowerCase()
+            );
 
-                                      {
-                                          id:
-                                              genId(),
+        if (alreadyExists) {
+            toast.error(
+                "This field already exists in this section"
+            );
+            return;
+        }
 
-                                          label,
+        setCustomSections((previous) =>
+            previous.map((section) =>
+                section.id === sectionId
+                    ? {
+                        ...section,
 
-                                          value:
-                                              "",
-                                      },
-                                  ],
-                              }
-                            : section
-                )
+                        fields: [
+                            ...(section.fields || []),
+
+                            {
+                                id: genId(),
+                                label,
+                                value: "",
+                            },
+                        ],
+                    }
+                    : section
+            )
         );
 
-        setNewSectionFieldLabel(
-            ""
-        );
+        setNewSectionFieldLabel("");
+        setAddingFieldForSectionId(null);
+    };
 
-        setAddingFieldForSectionId(
-            null
+    const updateSectionField = (
+        sectionId,
+        fieldId,
+        value
+    ) => {
+        setCustomSections((previous) =>
+            previous.map((section) =>
+                section.id === sectionId
+                    ? {
+                        ...section,
+
+                        fields: (
+                            section.fields || []
+                        ).map((field) =>
+                            field.id === fieldId
+                                ? {
+                                    ...field,
+                                    value,
+                                }
+                                : field
+                        ),
+                    }
+                    : section
+            )
         );
+    };
+
+    const removeSectionField = (
+        sectionId,
+        fieldId
+    ) => {
+        setCustomSections((previous) =>
+            previous.map((section) =>
+                section.id === sectionId
+                    ? {
+                        ...section,
+
+                        fields: (
+                            section.fields || []
+                        ).filter(
+                            (field) =>
+                                field.id !== fieldId
+                        ),
+                    }
+                    : section
+            )
+        );
+    };
+
+    const updateDynamicField = (
+        fieldId,
+        value
+    ) => {
+        setDynamicFields((previous) =>
+            previous.map((field) =>
+                field.id === fieldId
+                    ? {
+                        ...field,
+                        value,
+                    }
+                    : field
+            )
+        );
+    };
+
+    const removeDynamicField = (fieldId) => {
+        setDynamicFields((previous) =>
+            previous.filter(
+                (field) => field.id !== fieldId
+            )
+        );
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (loading) return;
+
+        setLoading(true);
+
+        try {
+            const form = event.currentTarget;
+
+            const data = Object.fromEntries(
+                new FormData(form).entries()
+            );
+
+            const fullName = String(
+                data.employeeName || ""
+            )
+                .trim()
+                .replace(/\s+/g, " ");
+
+            if (!fullName) {
+                toast.error(
+                    "Employee name is required"
+                );
+                return;
+            }
+
+            const parts = fullName.split(" ");
+
+            data.name = fullName;
+            data.firstName = parts[0] || "";
+            data.lastName =
+                parts.slice(1).join(" ");
+
+            delete data.employeeName;
+
+            [
+                "basicSalary",
+                "allowances",
+                "deductions",
+                "numberOfChildren",
+            ].forEach((key) => {
+                const value = String(
+                    data[key] ?? ""
+                ).trim();
+
+                if (!value) {
+                    data[key] = null;
+                    return;
+                }
+
+                const number = Number(value);
+
+                data[key] = Number.isFinite(number)
+                    ? number
+                    : null;
+            });
+
+            data.employeeCode = String(
+                data.employeeCode || ""
+            ).trim();
+
+            data.email = String(
+                data.email || ""
+            )
+                .trim()
+                .toLowerCase();
+
+            data.position = String(
+                data.position || ""
+            ).trim();
+
+            data.gender = String(
+                data.gender || ""
+            ).trim();
+
+            data.dynamicFields =
+                dynamicFields.map(
+                    ({
+                        section,
+                        label,
+                        key,
+                        value,
+                    }) => ({
+                        section:
+                            section ||
+                            "Excel Fields",
+
+                        label: label || "",
+                        key: key || "",
+                        value: value ?? "",
+                    })
+                );
+
+            data.customFields =
+                customFields.map(
+                    ({
+                        section,
+                        label,
+                        value,
+                    }) => ({
+                        section:
+                            section ||
+                            "Additional Details",
+
+                        label: label || "",
+                        value: value ?? "",
+                    })
+                );
+
+            data.customSections =
+                customSections.map(
+                    ({
+                        title,
+                        fields,
+                    }) => ({
+                        title: title || "",
+
+                        fields: Array.isArray(
+                            fields
+                        )
+                            ? fields.map(
+                                ({
+                                    label,
+                                    value,
+                                }) => ({
+                                    label:
+                                        label ||
+                                        "",
+
+                                    value:
+                                        value ??
+                                        "",
+                                })
+                            )
+                            : [],
+                    })
+                );
+
+            const employeeId =
+                initialData?._id ||
+                initialData?.id;
+
+            if (
+                isEditMode &&
+                !employeeId
+            ) {
+                throw new Error(
+                    "Employee ID is missing"
+                );
+            }
+
+            if (isEditMode) {
+                await api.put(
+                    `/employees/${employeeId}`,
+                    data
+                );
+            } else {
+                const response =
+                    await api.post(
+                        "/employees",
+                        data
+                    );
+
+                const temporaryPassword =
+                    response?.data
+                        ?.temporaryPassword;
+
+                if (temporaryPassword) {
+                    toast.success(
+                        `Employee created. Temporary password: ${temporaryPassword}`,
+                        {
+                            duration: 8000,
+                        }
+                    );
+                }
+            }
+
+            if (isEditMode) {
+                toast.success(
+                    "Employee updated successfully"
+                );
+            } else {
+                toast.success(
+                    "Employee created successfully"
+                );
+            }
+
+            onSuccess?.();
+        } catch (error) {
+            console.error(
+                "Employee submit error:",
+                error
+            );
+
+            toast.error(
+                error?.response?.data?.error ||
+                error?.message ||
+                "Something went wrong"
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <form
-            onSubmit={
-                handleSubmit
-            }
-            className="space-y-6 max-w-4xl animate-fade-in pb-8"
+            onSubmit={handleSubmit}
+            className="space-y-6"
         >
-            {sectionConfig.map(
-                (
-                    section
-                ) => (
-                    <div
-                        key={
-                            section.title
-                        }
-                        className="card p-5 sm:p-6"
+            {sectionConfig.map((section) => {
+                const sectionCustomFields =
+                    getFieldsForFixedSection(
+                        section.title
+                    );
+
+                const isAddingField =
+                    addingFieldForFixedSection ===
+                    section.title;
+
+                return (
+                    <section
+                        key={section.title}
+                        className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"
                     >
-                        <h3 className="font-medium mb-6 pb-4 border-b border-slate-100">
-                            {
-                                section.title
-                            }
-                        </h3>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm text-slate-700">
-                            {section.fields.map(
-                                renderField
-                            )}
-                        </div>
-                    </div>
-                )
-            )}
-
-            <div className="card p-5 sm:p-6">
-                <h3 className="font-medium mb-6 pb-4 border-b border-slate-100">
-                    Account Setup
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm text-slate-700">
-                    <div>
-                        <label className="block mb-2">
-                            Temporary
-                            Password
-                        </label>
-
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder={
-                                isEditMode
-                                    ? "Leave blank to keep current"
-                                    : "Blank = auto-generated"
-                            }
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block mb-2">
-                            System Role
-                        </label>
-
-                        <select
-                            name="role"
-                            defaultValue={
-                                initialData
-                                    ?.user
-                                    ?.role ||
-                                "EMPLOYEE"
-                            }
-                        >
-                            <option value="EMPLOYEE">
-                                Employee
-                            </option>
-
-                            <option value="ADMIN">
-                                Admin
-                            </option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {dynamicFields.length >
-                0 && (
-                <div className="card p-5 sm:p-6 border-indigo-100">
-                    <div className="mb-6 pb-4 border-b border-slate-100">
-                        <h3 className="font-medium">
-                            Excel Dynamic
-                            Fields
-                        </h3>
-
-                        <p className="text-xs text-slate-500 mt-1">
-                            These fields
-                            were detected
-                            automatically
-                            from uploaded
-                            Excel files.
-                        </p>
-                    </div>
-
-                    {Object.entries(
-                        dynamicFields.reduce(
-                            (
-                                groups,
-                                field
-                            ) => {
-                                const section =
-                                    field.section ||
-                                    "Excel Fields";
-
-                                if (
-                                    !groups[
-                                        section
-                                    ]
-                                ) {
-                                    groups[
-                                        section
-                                    ] =
-                                        [];
-                                }
-
-                                groups[
-                                    section
-                                ].push(
-                                    field
-                                );
-
-                                return groups;
-                            },
-                            {}
-                        )
-                    ).map(
-                        ([
-                            section,
-                            fields,
-                        ]) => (
-                            <div
-                                key={
-                                    section
-                                }
-                                className="mb-6 last:mb-0"
-                            >
-                                <h4 className="text-sm font-semibold text-slate-700 mb-3">
-                                    {
-                                        section
-                                    }
-                                </h4>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                    {fields.map(
-                                        (
-                                            field
-                                        ) => (
-                                            <div
-                                                key={
-                                                    field.id ||
-                                                    field.key ||
-                                                    field.label
-                                                }
-                                            >
-                                                <label className="block mb-2">
-                                                    {
-                                                        field.label
-                                                    }
-                                                </label>
-
-                                                <input
-                                                    value={
-                                                        field.value ??
-                                                        ""
-                                                    }
-                                                    onChange={(
-                                                        event
-                                                    ) =>
-                                                        setDynamicFields(
-                                                            (
-                                                                previous
-                                                            ) =>
-                                                                previous.map(
-                                                                    (
-                                                                        item
-                                                                    ) =>
-                                                                        item.id ===
-                                                                        field.id
-                                                                            ? {
-                                                                                  ...item,
-
-                                                                                  value:
-                                                                                      event
-                                                                                          .target
-                                                                                          .value,
-                                                                              }
-                                                                            : item
-                                                                )
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    )}
-                </div>
-            )}
-
-            {customFields.length >
-                0 && (
-                <div className="card p-5 sm:p-6">
-                    <h3 className="font-medium mb-6 pb-4 border-b border-slate-100">
-                        Existing Custom
-                        Fields
-                    </h3>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        {customFields.map(
-                            (
-                                field
-                            ) => (
-                                <div
-                                    key={
-                                        field.id
-                                    }
-                                >
-                                    <label className="flex items-center justify-between mb-2">
-                                        <span>
-                                            {
-                                                field.label
-                                            }
-                                        </span>
-
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setCustomFields(
-                                                    (
-                                                        previous
-                                                    ) =>
-                                                        previous.filter(
-                                                            (
-                                                                item
-                                                            ) =>
-                                                                item.id !==
-                                                                field.id
-                                                        )
-                                                )
-                                            }
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </label>
-
-                                    <input
-                                        value={
-                                            field.value ||
-                                            ""
-                                        }
-                                        onChange={(
-                                            event
-                                        ) =>
-                                            setCustomFields(
-                                                (
-                                                    previous
-                                                ) =>
-                                                    previous.map(
-                                                        (
-                                                            item
-                                                        ) =>
-                                                            item.id ===
-                                                            field.id
-                                                                ? {
-                                                                      ...item,
-
-                                                                      value:
-                                                                          event
-                                                                              .target
-                                                                              .value,
-                                                                  }
-                                                                : item
-                                                    )
-                                            )
-                                        }
-                                    />
-                                </div>
-                            )
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {customSections.map(
-                (
-                    section
-                ) => (
-                    <div
-                        key={
-                            section.id
-                        }
-                        className="card p-5 sm:p-6 border-indigo-100"
-                    >
-                        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-                            <h3 className="font-semibold">
-                                {
-                                    section.title
-                                }
+                        <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                            <h3 className="text-lg font-semibold text-slate-900">
+                                {section.title}
                             </h3>
 
                             <button
                                 type="button"
-                                onClick={() =>
-                                    setCustomSections(
-                                        (
-                                            previous
-                                        ) =>
-                                            previous.filter(
-                                                (
-                                                    item
-                                                ) =>
-                                                    item.id !==
-                                                    section.id
-                                            )
-                                    )
-                                }
-                                className="text-slate-400 hover:text-rose-500 flex items-center gap-1"
-                            >
-                                <X className="w-4 h-4" />
+                                onClick={() => {
+                                    if (
+                                        isAddingField
+                                    ) {
+                                        setAddingFieldForFixedSection(
+                                            null
+                                        );
 
-                                Remove
-                                Section
+                                        setNewFixedFieldLabel(
+                                            ""
+                                        );
+
+                                        return;
+                                    }
+
+                                    setAddingFieldForFixedSection(
+                                        section.title
+                                    );
+
+                                    setNewFixedFieldLabel(
+                                        ""
+                                    );
+                                }}
+                                className="inline-flex w-fit items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
+                            >
+                                {isAddingField ? (
+                                    <X className="h-4 w-4" />
+                                ) : (
+                                    <Plus className="h-4 w-4" />
+                                )}
+
+                                {isAddingField
+                                    ? "Cancel"
+                                    : "Add Field"}
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            {(
-                                section.fields ||
-                                []
-                            ).map(
-                                (
-                                    field
-                                ) => (
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                            {section.fields.map(
+                                renderField
+                            )}
+
+                            {sectionCustomFields.map(
+                                (field) => (
                                     <div
-                                        key={
-                                            field.id
-                                        }
+                                        key={field.id}
                                     >
-                                        <label className="block mb-2">
-                                            {
-                                                field.label
-                                            }
-                                        </label>
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                            <label>
+                                                {
+                                                    field.label
+                                                }
+                                            </label>
+
+                                            <button
+                                                type="button"
+                                                title="Remove field"
+                                                onClick={() =>
+                                                    removeFixedSectionField(
+                                                        field.id
+                                                    )
+                                                }
+                                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
 
                                         <input
+                                            type="text"
                                             value={
-                                                field.value ||
+                                                field.value ??
                                                 ""
                                             }
                                             onChange={(
                                                 event
                                             ) =>
-                                                setCustomSections(
-                                                    (
-                                                        previous
-                                                    ) =>
-                                                        previous.map(
-                                                            (
-                                                                item
-                                                            ) =>
-                                                                item.id ===
-                                                                section.id
-                                                                    ? {
-                                                                          ...item,
-
-                                                                          fields:
-                                                                              item.fields.map(
-                                                                                  (
-                                                                                      itemField
-                                                                                  ) =>
-                                                                                      itemField.id ===
-                                                                                      field.id
-                                                                                          ? {
-                                                                                                ...itemField,
-
-                                                                                                value:
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                            }
-                                                                                          : itemField
-                                                                              ),
-                                                                      }
-                                                                    : item
-                                                        )
+                                                updateFixedSectionField(
+                                                    field.id,
+                                                    event
+                                                        .target
+                                                        .value
                                                 )
                                             }
+                                            placeholder={`Enter ${field.label}`}
+                                            className="w-full"
                                         />
                                     </div>
                                 )
                             )}
                         </div>
 
-                        <div className="mt-4">
-                            {addingFieldForSectionId ===
-                            section.id ? (
-                                <div className="flex gap-2">
+                        {isAddingField && (
+                            <div className="mt-6 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row">
                                     <input
+                                        type="text"
                                         value={
-                                            newSectionFieldLabel
+                                            newFixedFieldLabel
                                         }
                                         onChange={(
                                             event
                                         ) =>
-                                            setNewSectionFieldLabel(
+                                            setNewFixedFieldLabel(
                                                 event
                                                     .target
                                                     .value
                                             )
                                         }
-                                        placeholder="New field name"
+                                        onKeyDown={(
+                                            event
+                                        ) => {
+                                            if (
+                                                event.key ===
+                                                "Enter"
+                                            ) {
+                                                event.preventDefault();
+
+                                                addFieldToFixedSection(
+                                                    section.title
+                                                );
+                                            }
+                                        }}
+                                        placeholder="Enter field name"
+                                        className="flex-1"
                                     />
 
                                     <button
                                         type="button"
-                                        className="btn-primary"
                                         onClick={() =>
-                                            addFieldToSection(
-                                                section.id
+                                            addFieldToFixedSection(
+                                                section.title
                                             )
                                         }
+                                        className="btn-primary inline-flex items-center justify-center gap-2"
                                     >
-                                        Add
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="btn-secondary"
-                                        onClick={() =>
-                                            setAddingFieldForSectionId(
-                                                null
-                                            )
-                                        }
-                                    >
-                                        Cancel
+                                        <Plus className="h-4 w-4" />
+                                        Create Field
                                     </button>
                                 </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    className="text-indigo-600 flex items-center gap-1"
-                                    onClick={() =>
-                                        setAddingFieldForSectionId(
-                                            section.id
-                                        )
-                                    }
-                                >
-                                    <Plus className="w-4 h-4" />
+                            </div>
+                        )}
+                    </section>
+                );
+            })}
 
-                                    Add Field
-                                </button>
-                            )}
-                        </div>
+            {dynamicFields.length > 0 && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                        {dynamicFields.map(
+                            (field) => (
+                                <div
+                                    key={field.id}
+                                >
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                        <label>
+                                            {
+                                                field.label
+                                            }
+                                        </label>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                removeDynamicField(
+                                                    field.id
+                                                )
+                                            }
+                                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+
+                                    <input
+                                        type="text"
+                                        value={
+                                            field.value ??
+                                            ""
+                                        }
+                                        onChange={(
+                                            event
+                                        ) =>
+                                            updateDynamicField(
+                                                field.id,
+                                                event
+                                                    .target
+                                                    .value
+                                            )
+                                        }
+                                        placeholder={`Enter ${field.label}`}
+                                        className="w-full"
+                                    />
+                                </div>
+                            )
+                        )}
                     </div>
-                )
+                </section>
             )}
 
-            {addingSection ? (
-                <div className="card p-5 sm:p-6 flex gap-2 items-end">
-                    <div className="flex-1">
-                        <label className="block mb-2">
-                            New Section
-                            Name
-                        </label>
+            {customSections.map((section) => (
+                <section
+                    key={section.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"
+                >
+                    <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <h3 className="text-lg font-semibold text-slate-900">
+                            {section.title}
+                        </h3>
 
-                        <input
-                            value={
-                                newSectionTitle
-                            }
-                            onChange={(
-                                event
-                            ) =>
-                                setNewSectionTitle(
-                                    event
-                                        .target
-                                        .value
-                                )
-                            }
-                        />
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAddingFieldForSectionId(
+                                        section.id
+                                    );
+
+                                    setNewSectionFieldLabel(
+                                        ""
+                                    );
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-600"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add Field
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    removeSection(
+                                        section.id
+                                    )
+                                }
+                                className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Remove Section
+                            </button>
+                        </div>
                     </div>
 
-                    <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={
-                            addSection
-                        }
-                    >
-                        Add Section
-                    </button>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                        {(section.fields || []).map(
+                            (field) => (
+                                <div
+                                    key={field.id}
+                                >
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <label>
+                                            {
+                                                field.label
+                                            }
+                                        </label>
 
-                    <button
-                        type="button"
-                        className="btn-secondary"
-                        onClick={() =>
-                            setAddingSection(
-                                false
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                removeSectionField(
+                                                    section.id,
+                                                    field.id
+                                                )
+                                            }
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+
+                                    <input
+                                        type="text"
+                                        value={
+                                            field.value ??
+                                            ""
+                                        }
+                                        onChange={(
+                                            event
+                                        ) =>
+                                            updateSectionField(
+                                                section.id,
+                                                field.id,
+                                                event
+                                                    .target
+                                                    .value
+                                            )
+                                        }
+                                        className="w-full"
+                                    />
+                                </div>
                             )
-                        }
-                    >
-                        Cancel
-                    </button>
-                </div>
+                        )}
+                    </div>
+
+                    {addingFieldForSectionId ===
+                        section.id && (
+                        <div className="mt-5 flex gap-3">
+                            <input
+                                type="text"
+                                value={
+                                    newSectionFieldLabel
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    setNewSectionFieldLabel(
+                                        event
+                                            .target
+                                            .value
+                                    )
+                                }
+                                placeholder="Enter field name"
+                                className="flex-1"
+                            />
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    addFieldToSection(
+                                        section.id
+                                    )
+                                }
+                                className="btn-primary"
+                            >
+                                Create Field
+                            </button>
+                        </div>
+                    )}
+                </section>
+            ))}
+
+            {addingSection ? (
+                <section className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 p-5">
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={newSectionTitle}
+                            onChange={(event) =>
+                                setNewSectionTitle(
+                                    event.target.value
+                                )
+                            }
+                            placeholder="Enter section name"
+                            className="flex-1"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={addSection}
+                            className="btn-primary inline-flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Section
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setAddingSection(false);
+                                setNewSectionTitle("");
+                            }}
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </section>
             ) : (
                 <button
                     type="button"
                     onClick={() =>
-                        setAddingSection(
-                            true
-                        )
+                        setAddingSection(true)
                     }
-                    className="btn-secondary flex items-center gap-2"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-5 py-5 text-sm font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600"
                 >
-                    <Plus className="w-4 h-4" />
-
-                    Add New
-                    Section
+                    <Plus className="h-4 w-4" />
+                    Add New Section
                 </button>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={
-                        onCancel
-                    }
-                >
-                    Cancel
-                </button>
+            <div className="sticky bottom-0 z-20 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg">
+                {onCancel && (
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={loading}
+                        className="btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                )}
 
                 <button
                     type="submit"
-                    disabled={
-                        loading
-                    }
-                    className="btn-primary flex items-center justify-center"
+                    disabled={loading}
+                    className="btn-primary inline-flex min-w-[150px] items-center justify-center gap-2"
                 >
                     {loading && (
-                        <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
                     )}
 
-                    {isEditMode
-                        ? "Update Employee"
-                        : "Create Employee"}
+                    {loading
+                        ? isEditMode
+                            ? "Updating..."
+                            : "Creating..."
+                        : isEditMode
+                            ? "Update Employee"
+                            : "Create Employee"}
                 </button>
             </div>
         </form>

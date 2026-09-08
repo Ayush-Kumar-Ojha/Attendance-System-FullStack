@@ -13,6 +13,9 @@ import {
   Upload,
   FileSpreadsheet,
   Loader2,
+  Trash2,
+  ArchiveRestore,
+  RotateCcw,
 } from "lucide-react";
 
 import toast from "react-hot-toast";
@@ -73,6 +76,50 @@ const Employees = () => {
     setUploadingExcel,
   ] = useState(false);
 
+  const [
+    selectedEmployeeIds,
+    setSelectedEmployeeIds,
+  ] = useState([]);
+
+  const [
+    deletingSelected,
+    setDeletingSelected,
+  ] = useState(false);
+
+  const [
+    showDeletedEmployees,
+    setShowDeletedEmployees,
+  ] = useState(false);
+
+  const [
+    deletedEmployees,
+    setDeletedEmployees,
+  ] = useState([]);
+
+  const [
+    loadingDeletedEmployees,
+    setLoadingDeletedEmployees,
+  ] = useState(false);
+
+  const [
+    restoringEmployeeId,
+    setRestoringEmployeeId,
+  ] = useState("");
+
+  // =================================================
+  // DELETED EMPLOYEE SELECTION
+  // =================================================
+
+  const [
+    selectedDeletedEmployeeIds,
+    setSelectedDeletedEmployeeIds,
+  ] = useState([]);
+
+  const [
+    permanentlyDeletingEmployees,
+    setPermanentlyDeletingEmployees,
+  ] = useState(false);
+
   const fileInputRef =
     useRef(null);
 
@@ -82,15 +129,24 @@ const Employees = () => {
   } = useDepartments();
 
   // =================================================
+  // EMPLOYEE ID
+  // =================================================
+
+  const getEmployeeId = (employee) =>
+    String(
+      employee?._id ||
+      employee?.id ||
+      ""
+    );
+
+  // =================================================
   // FETCH EMPLOYEES
   // =================================================
 
   const fetchEmployees =
     useCallback(
       async () => {
-        setLoading(
-          true
-        );
+        setLoading(true);
 
         try {
           const url =
@@ -101,9 +157,7 @@ const Employees = () => {
               : "/employees";
 
           const response =
-            await api.get(
-              url
-            );
+            await api.get(url);
 
           setEmployees(
             Array.isArray(
@@ -112,9 +166,7 @@ const Employees = () => {
               ? response.data
               : []
           );
-        } catch (
-        error
-        ) {
+        } catch (error) {
           console.error(
             "Failed to fetch employees:",
             error
@@ -127,17 +179,172 @@ const Employees = () => {
             "Failed to fetch employees"
           );
         } finally {
-          setLoading(
-            false
-          );
+          setLoading(false);
         }
       },
       [selectedDept]
     );
 
+  // =================================================
+  // FETCH DELETED EMPLOYEES
+  // =================================================
+
+  const fetchDeletedEmployees =
+    useCallback(
+      async () => {
+        setLoadingDeletedEmployees(
+          true
+        );
+
+        try {
+          const response =
+            await api.get(
+              "/employees/deleted"
+            );
+
+          const data =
+            Array.isArray(
+              response.data
+            )
+              ? response.data
+              : [];
+
+          setDeletedEmployees(
+            data
+          );
+
+          /*
+           * Remove selections that no longer exist
+           * in the Deleted Employees response.
+           */
+          const availableIds =
+            new Set(
+              data
+                .map(
+                  (employee) =>
+                    String(
+                      employee?._id ||
+                      employee?.id ||
+                      ""
+                    )
+                )
+                .filter(Boolean)
+            );
+
+          setSelectedDeletedEmployeeIds(
+            (current) =>
+              current.filter(
+                (id) =>
+                  availableIds.has(
+                    id
+                  )
+              )
+          );
+        } catch (error) {
+          console.error(
+            "Failed to fetch deleted employees:",
+            error
+          );
+
+          toast.error(
+            error.response?.data?.error ||
+            "Failed to fetch deleted employees"
+          );
+        } finally {
+          setLoadingDeletedEmployees(
+            false
+          );
+        }
+      },
+      []
+    );
+
+  // =================================================
+  // RESTORE EMPLOYEE
+  // =================================================
+
+  const handleRestoreEmployee =
+    async (employee) => {
+      const employeeId =
+        getEmployeeId(
+          employee
+        );
+
+      if (!employeeId) {
+        toast.error(
+          "Employee ID not found"
+        );
+
+        return;
+      }
+
+      const employeeName =
+        employee?.name ||
+        `${employee?.firstName || ""} ${employee?.lastName || ""
+          }`.trim() ||
+        "this employee";
+
+      const confirmed =
+        window.confirm(
+          `Restore ${employeeName} to the Employees page?`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setRestoringEmployeeId(
+        employeeId
+      );
+
+      try {
+        const response =
+          await api.patch(
+            `/employees/${employeeId}/restore`
+          );
+
+        toast.success(
+          response.data?.message ||
+          "Employee restored successfully"
+        );
+
+        // Remove restored employee
+        // from deleted selection.
+        setSelectedDeletedEmployeeIds(
+          (current) =>
+            current.filter(
+              (id) =>
+                id !== employeeId
+            )
+        );
+
+        await fetchEmployees();
+        await fetchDeletedEmployees();
+      } catch (error) {
+        console.error(
+          "Restore employee error:",
+          error
+        );
+
+        toast.error(
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to restore employee"
+        );
+      } finally {
+        setRestoringEmployeeId(
+          ""
+        );
+      }
+    };
+
   useEffect(() => {
     fetchEmployees();
-  }, [fetchEmployees]);
+    fetchDeletedEmployees();
+  }, [
+    fetchEmployees,
+    fetchDeletedEmployees,
+  ]);
 
   // =================================================
   // SEARCH
@@ -263,6 +470,314 @@ const Employees = () => {
         );
       }
     );
+
+  // =================================================
+  // EMPLOYEE CARD SELECTION / MULTI DELETE
+  // =================================================
+
+  const toggleEmployeeSelection = (
+    employeeId
+  ) => {
+    const id = String(
+      employeeId || ""
+    );
+
+    if (!id) return;
+
+    setSelectedEmployeeIds(
+      (current) =>
+        current.includes(id)
+          ? current.filter(
+            (item) =>
+              item !== id
+          )
+          : [
+            ...current,
+            id,
+          ]
+    );
+  };
+
+  const visibleEmployeeIds =
+    filtered
+      .map(getEmployeeId)
+      .filter(Boolean);
+
+  const allVisibleSelected =
+    visibleEmployeeIds.length >
+    0 &&
+    visibleEmployeeIds.every(
+      (id) =>
+        selectedEmployeeIds.includes(
+          id
+        )
+    );
+
+  const toggleSelectAllVisible =
+    () => {
+      setSelectedEmployeeIds(
+        (current) => {
+          if (
+            allVisibleSelected
+          ) {
+            return current.filter(
+              (id) =>
+                !visibleEmployeeIds.includes(
+                  id
+                )
+            );
+          }
+
+          return Array.from(
+            new Set([
+              ...current,
+              ...visibleEmployeeIds,
+            ])
+          );
+        }
+      );
+    };
+
+  const handleDeleteSelected =
+    async () => {
+      if (
+        selectedEmployeeIds.length ===
+        0
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          `Are you sure you want to delete ${selectedEmployeeIds.length
+          } selected employee card${selectedEmployeeIds.length ===
+            1
+            ? ""
+            : "s"
+          }?`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setDeletingSelected(true);
+
+      try {
+        const results =
+          await Promise.allSettled(
+            selectedEmployeeIds.map(
+              (employeeId) =>
+                api.delete(
+                  `/employees/${employeeId}`
+                )
+            )
+          );
+
+        const deletedCount =
+          results.filter(
+            (result) =>
+              result.status ===
+              "fulfilled"
+          ).length;
+
+        const failedCount =
+          results.length -
+          deletedCount;
+
+        if (
+          deletedCount > 0
+        ) {
+          toast.success(
+            `${deletedCount} employee card${deletedCount === 1
+              ? ""
+              : "s"
+            } deleted`
+          );
+        }
+
+        if (
+          failedCount > 0
+        ) {
+          toast.error(
+            `${failedCount} employee card${failedCount === 1
+              ? ""
+              : "s"
+            } could not be deleted`
+          );
+        }
+
+        setSelectedEmployeeIds(
+          []
+        );
+
+        await fetchEmployees();
+        await fetchDeletedEmployees();
+      } catch (error) {
+        console.error(
+          "Delete selected employees error:",
+          error
+        );
+
+        toast.error(
+          error.response?.data
+            ?.error ||
+          error.message ||
+          "Failed to delete selected employees"
+        );
+      } finally {
+        setDeletingSelected(
+          false
+        );
+      }
+    };
+
+  // =================================================
+  // DELETED EMPLOYEE SELECTION
+  // =================================================
+
+  const toggleDeletedEmployeeSelection = (
+    employeeId
+  ) => {
+    const id = String(
+      employeeId || ""
+    );
+
+    if (!id) {
+      return;
+    }
+
+    setSelectedDeletedEmployeeIds(
+      (current) =>
+        current.includes(id)
+          ? current.filter(
+            (item) =>
+              item !== id
+          )
+          : [
+            ...current,
+            id,
+          ]
+    );
+  };
+
+  const deletedEmployeeIds =
+    deletedEmployees
+      .map(getEmployeeId)
+      .filter(Boolean);
+
+  const allDeletedEmployeesSelected =
+    deletedEmployeeIds.length >
+    0 &&
+    deletedEmployeeIds.every(
+      (id) =>
+        selectedDeletedEmployeeIds.includes(
+          id
+        )
+    );
+
+  const toggleSelectAllDeletedEmployees =
+    () => {
+      setSelectedDeletedEmployeeIds(
+        (current) => {
+          if (
+            allDeletedEmployeesSelected
+          ) {
+            return current.filter(
+              (id) =>
+                !deletedEmployeeIds.includes(
+                  id
+                )
+            );
+          }
+
+          return Array.from(
+            new Set([
+              ...current,
+              ...deletedEmployeeIds,
+            ])
+          );
+        }
+      );
+    };
+
+  // =================================================
+  // PERMANENTLY REMOVE DELETED EMPLOYEES
+  // FROM PORTAL ONLY
+  // =================================================
+
+  const handlePermanentlyDeleteSelected =
+    async () => {
+      if (
+        selectedDeletedEmployeeIds.length ===
+        0
+      ) {
+        toast.error(
+          "Please select at least one employee"
+        );
+
+        return;
+      }
+
+      const count =
+        selectedDeletedEmployeeIds.length;
+
+      const confirmed =
+        window.confirm(
+          `Permanently remove ${count} selected employee${count === 1
+            ? ""
+            : "s"
+          } from the Deleted Employees portal?\n\nThe employee data will remain in the database.`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setPermanentlyDeletingEmployees(
+        true
+      );
+
+      try {
+        const response =
+          await api.patch(
+            "/employees/deleted/permanent-hide",
+            {
+              employeeIds:
+                selectedDeletedEmployeeIds,
+            }
+          );
+
+        toast.success(
+          response.data?.message ||
+          `${count} employee${count === 1
+            ? ""
+            : "s"
+          } removed from Deleted Employees`
+        );
+
+        setSelectedDeletedEmployeeIds(
+          []
+        );
+
+        await fetchDeletedEmployees();
+      } catch (error) {
+        console.error(
+          "Permanent portal delete error:",
+          error
+        );
+
+        toast.error(
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to permanently remove selected employees"
+        );
+      } finally {
+        setPermanentlyDeletingEmployees(
+          false
+        );
+      }
+    };
 
   // =================================================
   // DATE
@@ -827,14 +1342,6 @@ const Employees = () => {
             "PAN Number":
               employee.panNumber ||
               "",
-
-            Bio:
-              employee.bio ||
-              "",
-
-            "Employment Status":
-              employee.employmentStatus ||
-              "",
           };
 
           dynamicFieldColumns.forEach(
@@ -873,7 +1380,7 @@ const Employees = () => {
               row[
                 columnName
               ] =
-                field?.value ??
+                field?.value ||
                 "";
             }
           );
@@ -884,7 +1391,7 @@ const Employees = () => {
             ) => {
               const label =
                 columnName.replace(
-                  "[Custom Field] ",
+                  /^\[Custom Field\]\s*/,
                   ""
                 );
 
@@ -1120,7 +1627,6 @@ const Employees = () => {
           }
         );
 
-
         if (
           Array.isArray(
             result.skipped
@@ -1148,6 +1654,10 @@ const Employees = () => {
         }
 
         await fetchEmployees();
+
+        // Important when an Excel upload
+        // restores a previously deleted employee.
+        await fetchDeletedEmployees();
       } catch (
       error
       ) {
@@ -1184,103 +1694,99 @@ const Employees = () => {
         className="hidden"
       />
 
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-8">
-        <div>
+      {/* =================================================
+    PAGE HEADER
+================================================= */}
+
+      <div className="flex items-center justify-between gap-5 mb-8">
+        <div className="shrink-0">
           <h1 className="page-title">
             Employees
           </h1>
 
           <p className="page-subtitle">
-            Manage your
-            team members
+            Manage your team members
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+        <div className="flex items-center justify-end gap-2 flex-nowrap">
+          {/* Deleted Employees */}
           <button
             type="button"
-            onClick={
-              openExcelUpload
-            }
-            disabled={
-              uploadingExcel
-            }
-            className="btn-primary flex items-center gap-2 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={() => {
+              setShowDeletedEmployees(true);
+              setSelectedDeletedEmployeeIds([]);
+              fetchDeletedEmployees();
+            }}
+            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
+          >
+            <ArchiveRestore size={15} />
+
+            Deleted Employees
+
+            {deletedEmployees.length > 0
+              ? ` (${deletedEmployees.length})`
+              : ""}
+          </button>
+
+          {/* Add Using Excel */}
+          <button
+            type="button"
+            onClick={openExcelUpload}
+            disabled={uploadingExcel}
+            className="btn-primary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {uploadingExcel ? (
               <Loader2
-                size={
-                  16
-                }
+                size={15}
                 className="animate-spin"
               />
             ) : (
-              <Upload
-                size={
-                  16
-                }
-              />
+              <Upload size={15} />
             )}
 
             {uploadingExcel
               ? "Uploading..."
-              : "Add Employees Using Excel"}
+              : "Add Using Excel"}
           </button>
 
+          {/* Add Using Form */}
           <button
             type="button"
             onClick={() =>
-              setShowCreateModal(
-                true
-              )
+              setShowCreateModal(true)
             }
-            className="btn-secondary flex items-center gap-2 justify-center"
+            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
           >
-            <Plus
-              size={
-                16
-              }
-            />
-
-            Add Employee
-            Using Form
+            <Plus size={15} />
+            Add Using Form
           </button>
 
+          {/* Download Employee Data */}
           <button
             type="button"
-            onClick={
-              exportEmployees
-            }
-            className="btn-secondary flex items-center gap-2 justify-center"
+            onClick={exportEmployees}
+            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
           >
-            <Download
-              size={
-                16
-              }
-            />
-
-            Download
-            Employee Data
+            <Download size={15} />
+            Download Data
           </button>
 
+          {/* Excel Template */}
           <button
             type="button"
-            onClick={
-              downloadEmployeeTemplate
-            }
-            className="btn-secondary flex items-center gap-2 justify-center"
+            onClick={downloadEmployeeTemplate}
+            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
           >
-            <FileSpreadsheet
-              size={
-                16
-              }
-            />
-
-            Excel
-            Template
+            <FileSpreadsheet size={15} />
+            Excel Template
           </button>
         </div>
       </div>
+
+      {/* =================================================
+          SEARCH + DEPARTMENT FILTER
+      ================================================= */}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -1353,14 +1859,91 @@ const Employees = () => {
           className="btn-secondary flex items-center gap-2 whitespace-nowrap"
         >
           <Plus
-            size={
-              16
-            }
+            size={16}
           />
 
           Add Department
         </button>
       </div>
+
+      {/* =================================================
+          MULTIPLE EMPLOYEE SELECTION
+      ================================================= */}
+
+      {!loading &&
+        filtered.length > 0 && (
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 select-none">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAllVisible}
+                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+
+              <span>
+                Select all visible
+              </span>
+            </label>
+
+            {selectedEmployeeIds.length >
+              0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-medium text-slate-600">
+                    {
+                      selectedEmployeeIds.length
+                    }{" "}
+                    employee
+                    {selectedEmployeeIds.length ===
+                      1
+                      ? ""
+                      : "s"}{" "}
+                    selected
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedEmployeeIds(
+                        []
+                      )
+                    }
+                    disabled={
+                      deletingSelected
+                    }
+                    className="text-sm font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                  >
+                    Clear selection
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      handleDeleteSelected
+                    }
+                    disabled={
+                      deletingSelected
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingSelected ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+
+                    {deletingSelected
+                      ? "Deleting..."
+                      : "Delete Selected"}
+                  </button>
+                </div>
+              )}
+          </div>
+        )}
+
+      {/* =================================================
+          EMPLOYEE CARDS
+      ================================================= */}
 
       {loading ? (
         <div className="flex justify-center p-12">
@@ -1371,35 +1954,283 @@ const Employees = () => {
           {filtered.length ===
             0 ? (
             <p className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
-              No
-              employees
-              found
+              No employees found
             </p>
           ) : (
             filtered.map(
               (
                 employee
-              ) => (
-                <EmployeeCard
-                  key={
-                    employee._id ||
-                    employee.id
-                  }
-                  employee={
+              ) => {
+                const employeeId =
+                  getEmployeeId(
                     employee
-                  }
-                  onDelete={
-                    fetchEmployees
-                  }
-                  onEdit={
-                    setEditEmployee
-                  }
-                />
-              )
+                  );
+
+                return (
+                  <EmployeeCard
+                    key={
+                      employeeId
+                    }
+                    employee={
+                      employee
+                    }
+                    onDelete={() => {
+                      setSelectedEmployeeIds(
+                        (
+                          current
+                        ) =>
+                          current.filter(
+                            (
+                              id
+                            ) =>
+                              id !==
+                              employeeId
+                          )
+                      );
+
+                      fetchEmployees();
+                      fetchDeletedEmployees();
+                    }}
+                    onEdit={
+                      setEditEmployee
+                    }
+                    selectable={
+                      true
+                    }
+                    selected={
+                      selectedEmployeeIds.includes(
+                        employeeId
+                      )
+                    }
+                    onSelect={
+                      toggleEmployeeSelection
+                    }
+                  />
+                );
+              }
             )
           )}
         </div>
       )}
+
+      {/* =================================================
+          DELETED EMPLOYEES
+      ================================================= */}
+
+      {showDeletedEmployees && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
+          onClick={() => {
+            setShowDeletedEmployees(
+              false
+            );
+
+            setSelectedDeletedEmployeeIds(
+              []
+            );
+          }}
+        >
+          <div
+            className="relative my-8 w-full max-w-6xl rounded-2xl bg-white shadow-2xl"
+            onClick={(
+              event
+            ) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-slate-100 bg-white p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Deleted Employees
+                </h2>
+
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Open Employee Details to see the complete saved data, restore an employee, or select deleted employees to remove them permanently from this portal.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeletedEmployees(
+                    false
+                  );
+
+                  setSelectedDeletedEmployeeIds(
+                    []
+                  );
+                }}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+
+              {/* =============================================
+                  DELETED EMPLOYEE MULTI-SELECTION BAR
+              ============================================= */}
+
+              {!loadingDeletedEmployees &&
+                deletedEmployees.length > 0 && (
+                  <div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <label className="flex cursor-pointer select-none items-center gap-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={
+                          allDeletedEmployeesSelected
+                        }
+                        onChange={
+                          toggleSelectAllDeletedEmployees
+                        }
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+
+                      <span>
+                        Select all deleted employees
+                      </span>
+                    </label>
+
+                    {selectedDeletedEmployeeIds.length >
+                      0 && (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm font-medium text-slate-600">
+                            {
+                              selectedDeletedEmployeeIds.length
+                            }{" "}
+                            employee
+                            {selectedDeletedEmployeeIds.length ===
+                              1
+                              ? ""
+                              : "s"}{" "}
+                            selected
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedDeletedEmployeeIds(
+                                []
+                              )
+                            }
+                            disabled={
+                              permanentlyDeletingEmployees
+                            }
+                            className="text-sm font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                          >
+                            Clear selection
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={
+                              handlePermanentlyDeleteSelected
+                            }
+                            disabled={
+                              permanentlyDeletingEmployees
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {permanentlyDeletingEmployees ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+
+                            {permanentlyDeletingEmployees
+                              ? "Deleting..."
+                              : "Delete Permanently"}
+                          </button>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+              {loadingDeletedEmployees ? (
+                <div className="flex justify-center p-12">
+                  <Loader2 className="h-7 w-7 animate-spin text-indigo-600" />
+                </div>
+              ) : deletedEmployees.length ===
+                0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-16 text-center text-slate-400">
+                  No deleted employee cards
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {deletedEmployees.map(
+                    (employee) => {
+                      const employeeId =
+                        getEmployeeId(
+                          employee
+                        );
+
+                      return (
+                        <div
+                          key={
+                            employeeId
+                          }
+                          className="space-y-2"
+                        >
+                          <EmployeeCard
+                            employee={
+                              employee
+                            }
+                            selectable={
+                              true
+                            }
+                            allowDeletedSelection={
+                              true
+                            }
+                            selected={
+                              selectedDeletedEmployeeIds.includes(
+                                employeeId
+                              )
+                            }
+                            onSelect={
+                              toggleDeletedEmployeeSelection
+                            }
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRestoreEmployee(
+                                employee
+                              )
+                            }
+                            disabled={
+                              restoringEmployeeId ===
+                              employeeId
+                            }
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {restoringEmployeeId ===
+                              employeeId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
+
+                            {restoringEmployeeId ===
+                              employeeId
+                              ? "Restoring..."
+                              : "Restore Employee"}
+                          </button>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================
+          ADD EMPLOYEE MODAL
+      ================================================= */}
 
       {showCreateModal && (
         <div
@@ -1421,16 +2252,11 @@ const Employees = () => {
             <div className="flex items-center justify-between p-6 pb-0">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
-                  Add New
-                  Employee
+                  Add New Employee
                 </h2>
 
                 <p className="text-sm text-slate-500 mt-0.5">
-                  Create a
-                  user
-                  account and
-                  employee
-                  profile
+                  Create a user account and employee profile
                 </p>
               </div>
 
@@ -1467,6 +2293,10 @@ const Employees = () => {
         </div>
       )}
 
+      {/* =================================================
+          EDIT EMPLOYEE MODAL
+      ================================================= */}
+
       {editEmployee && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/40 backdrop-blur-sm"
@@ -1487,20 +2317,11 @@ const Employees = () => {
             <div className="flex items-center justify-between p-6 pb-0">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
-                  Edit
-                  Employee
+                  Edit Employee
                 </h2>
 
                 <p className="text-sm text-slate-500 mt-0.5">
-                  Update
-                  employee
-                  details,
-                  dynamic
-                  Excel
-                  fields,
-                  custom
-                  fields and
-                  sections
+                  Update employee details, dynamic Excel fields, custom fields and sections
                 </p>
               </div>
 
@@ -1539,6 +2360,10 @@ const Employees = () => {
           </div>
         </div>
       )}
+
+      {/* =================================================
+          ADD DEPARTMENT MODAL
+      ================================================= */}
 
       <AddDepartmentModal
         open={

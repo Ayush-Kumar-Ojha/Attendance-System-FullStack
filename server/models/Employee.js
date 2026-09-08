@@ -7,16 +7,19 @@ const dynamicFieldSchema = new mongoose.Schema(
             trim: true,
             default: "Excel Fields",
         },
+
         label: {
             type: String,
             trim: true,
             default: "",
         },
+
         key: {
             type: String,
             trim: true,
             default: "",
         },
+
         value: {
             type: mongoose.Schema.Types.Mixed,
             default: "",
@@ -31,18 +34,22 @@ const customFieldSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+
         section: {
             type: String,
             default: "",
         },
+
         label: {
             type: String,
             default: "",
         },
+
         value: {
             type: mongoose.Schema.Types.Mixed,
             default: "",
         },
+
         type: {
             type: String,
             default: "",
@@ -57,10 +64,12 @@ const customSectionFieldSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+
         label: {
             type: String,
             default: "",
         },
+
         value: {
             type: mongoose.Schema.Types.Mixed,
             default: "",
@@ -75,10 +84,12 @@ const customSectionSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+
         title: {
             type: String,
             default: "",
         },
+
         fields: {
             type: [customSectionFieldSchema],
             default: [],
@@ -94,15 +105,18 @@ const employeeDocumentSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
+
         fileName: {
             type: String,
             trim: true,
             default: "",
         },
+
         fileUrl: {
             type: String,
             default: "",
         },
+
         uploadedAt: {
             type: Date,
             default: Date.now,
@@ -127,7 +141,11 @@ const employeeSchema = new mongoose.Schema(
 
         postingBlockType: {
             type: String,
-            enum: ["NONE", "TEMPORARY", "PERMANENT"],
+            enum: [
+                "NONE",
+                "TEMPORARY",
+                "PERMANENT",
+            ],
             default: "NONE",
         },
 
@@ -237,6 +255,11 @@ const employeeSchema = new mongoose.Schema(
             default: "",
         },
 
+        temporaryPassword: {
+            type: String,
+            default: "",
+        },
+
         // JOB DETAILS
         department: {
             type: String,
@@ -264,7 +287,11 @@ const employeeSchema = new mongoose.Schema(
 
         employmentStatus: {
             type: String,
-            enum: ["ACTIVE", "INACTIVE", ""],
+            enum: [
+                "ACTIVE",
+                "INACTIVE",
+                "",
+            ],
             default: "",
         },
 
@@ -649,27 +676,52 @@ const employeeSchema = new mongoose.Schema(
         },
 
         documents: {
-            type: [employeeDocumentSchema],
+            type: [
+                employeeDocumentSchema,
+            ],
             default: [],
         },
 
         // FLEXIBLE EXCEL FIELDS
         dynamicFields: {
-            type: [dynamicFieldSchema],
+            type: [
+                dynamicFieldSchema,
+            ],
             default: [],
         },
 
         customFields: {
-            type: [customFieldSchema],
+            type: [
+                customFieldSchema,
+            ],
             default: [],
         },
 
         customSections: {
-            type: [customSectionSchema],
+            type: [
+                customSectionSchema,
+            ],
             default: [],
         },
 
+        // NORMAL SOFT DELETE
         isDeleted: {
+            type: Boolean,
+            default: false,
+        },
+
+        /*
+         * DELETE PERMANENTLY FROM PORTAL ONLY
+         *
+         * true:
+         * Employee remains in MongoDB but should
+         * no longer appear inside Deleted Employees.
+         *
+         * false:
+         * A deleted employee can appear in the
+         * Deleted Employees portal.
+         */
+        isPermanentlyHidden: {
             type: Boolean,
             default: false,
         },
@@ -679,16 +731,39 @@ const employeeSchema = new mongoose.Schema(
     }
 );
 
-employeeSchema.index({ employeeCode: 1 });
-employeeSchema.index({ email: 1 });
-employeeSchema.index({ aadharNumber: 1 });
-employeeSchema.index({ uanNumber: 1 });
-employeeSchema.index({ bankAccountNumber: 1 });
-employeeSchema.index({ mobileNumber: 1 });
-employeeSchema.index({ phone: 1 });
+employeeSchema.index({
+    employeeCode: 1,
+});
+
+employeeSchema.index({
+    email: 1,
+});
+
+employeeSchema.index({
+    aadharNumber: 1,
+});
+
+employeeSchema.index({
+    uanNumber: 1,
+});
+
+employeeSchema.index({
+    bankAccountNumber: 1,
+});
+
+employeeSchema.index({
+    mobileNumber: 1,
+});
+
+employeeSchema.index({
+    phone: 1,
+});
 
 const Employee =
     mongoose.models.Employee ||
-    mongoose.model("Employee", employeeSchema);
+    mongoose.model(
+        "Employee",
+        employeeSchema
+    );
 
 export default Employee;
