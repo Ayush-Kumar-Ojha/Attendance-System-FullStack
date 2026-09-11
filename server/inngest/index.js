@@ -61,21 +61,9 @@ const calculateDayType = (
     }
 
     if (
-        workingHours >= 8
+        Number(workingHours) >= 6
     ) {
         return "Full Day";
-    }
-
-    if (
-        workingHours > 5
-    ) {
-        return "Short Day";
-    }
-
-    if (
-        workingHours >= 4
-    ) {
-        return "Half Day";
     }
 
     return "Short Day";

@@ -39,7 +39,7 @@ const getLeaveDays = (
     const end =
         new Date(
             leave?.endDate ||
-                leave?.startDate
+            leave?.startDate
         );
 
     if (
@@ -59,12 +59,12 @@ const getLeaveDays = (
                 end.getTime() -
                 start.getTime()
             ) /
-                (
-                    1000 *
-                    60 *
-                    60 *
-                    24
-                )
+            (
+                1000 *
+                60 *
+                60 *
+                24
+            )
         ) + 1
     );
 };
@@ -120,9 +120,9 @@ const getPotentialPaidDaysForMonth =
 
                     const sameMonth =
                         leaveDate.getMonth() ===
-                            requestDate.getMonth() &&
+                        requestDate.getMonth() &&
                         leaveDate.getFullYear() ===
-                            requestDate.getFullYear();
+                        requestDate.getFullYear();
 
                     if (!sameMonth) {
                         return false;
@@ -151,10 +151,10 @@ const getPotentialPaidDaysForMonth =
 
                     return (
                         leave.status ===
-                            "APPROVED" &&
+                        "APPROVED" &&
                         !leave.isLop &&
                         leave.paymentType !==
-                            "UNPAID"
+                        "UNPAID"
                     );
                 }
             )
@@ -180,6 +180,7 @@ const ApplyLeaveModal = ({
     onClose,
     onSuccess,
     leaves = [],
+    employeeGender = "",
 }) => {
     const [
         loading,
@@ -216,6 +217,15 @@ const ApplyLeaveModal = ({
         leaveType ===
         "COMPENSATORY";
 
+    const isFemaleEmployee =
+        String(
+            employeeGender ||
+            ""
+        )
+            .trim()
+            .toUpperCase() ===
+        "FEMALE";
+
     // ========================================================
     // SUBMIT LEAVE
     // ========================================================
@@ -244,14 +254,14 @@ const ApplyLeaveModal = ({
 
                 onClose();
             } catch (
-                err
+            err
             ) {
                 toast.error(
                     err.response
                         ?.data
                         ?.error ||
-                        err?.message ||
-                        "Failed to submit leave application"
+                    err?.message ||
+                    "Failed to submit leave application"
                 );
             } finally {
                 setLoading(
@@ -280,6 +290,23 @@ const ApplyLeaveModal = ({
                     formData.entries()
                 );
 
+            // WELLNESS LEAVE - FEMALE EMPLOYEES ONLY
+            if (
+                data.type ===
+                "MENSTRUAL" &&
+                !isFemaleEmployee
+            ) {
+                toast.error(
+                    "Wellness Leave is available only to female employees."
+                );
+
+                setLeaveType(
+                    "SICK"
+                );
+
+                return;
+            }
+
             // Half Day and Comp Off
             // are always single-day leave requests.
             if (
@@ -300,9 +327,9 @@ const ApplyLeaveModal = ({
                 new Date(
                     data.endDate
                 ) <
-                    new Date(
-                        data.startDate
-                    )
+                new Date(
+                    data.startDate
+                )
             ) {
                 toast.error(
                     "End date cannot be before start date"
@@ -470,6 +497,12 @@ const ApplyLeaveModal = ({
                                 )
                             }
                         >
+
+                            {!isFemaleEmployee && (
+                                <p className="mt-2 text-xs text-rose-500">
+                                    Wellness Leave is available only to female employees.
+                                </p>
+                            )}
                             <option value="SICK">
                                 Sick
                                 Leave
@@ -485,9 +518,16 @@ const ApplyLeaveModal = ({
                                 Leave
                             </option>
 
-                            <option value="MENSTRUAL">
-                                Wellness
-                                Leave
+                            <option
+                                value="MENSTRUAL"
+                                disabled={
+                                    !isFemaleEmployee
+                                }
+                            >
+                                Wellness Leave
+                                {!isFemaleEmployee
+                                    ? " (Female employees only)"
+                                    : ""}
                             </option>
 
                             <option value="HALF_DAY">
@@ -580,13 +620,13 @@ const ApplyLeaveModal = ({
                             <CalendarDays className="w-4 h-4 text-slate-400" />
 
                             {isHalfDay ||
-                            isCompensatory
+                                isCompensatory
                                 ? "Requested Leave Date"
                                 : "Duration"}
                         </label>
 
                         {isHalfDay ||
-                        isCompensatory ? (
+                            isCompensatory ? (
                             <input
                                 type="date"
                                 name="startDate"

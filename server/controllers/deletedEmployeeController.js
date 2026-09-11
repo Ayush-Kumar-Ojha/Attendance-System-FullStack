@@ -9,8 +9,20 @@ export const getDeletedEmployees = async (req, res) => {
         const employees = await Employee.find({
             isDeleted: true,
 
-            // Employees permanently removed from the
-            // Deleted Employees portal must not appear.
+            /*
+                Employees permanently hidden from the
+                Deleted Employees portal must not appear here.
+
+                IMPORTANT:
+
+                Permanently hidden does NOT mean deleted
+                from MongoDB.
+
+                The Employee record, email, userId,
+                temporaryPassword and other data remain
+                preserved in the database.
+            */
+
             isPermanentlyHidden: {
                 $ne: true,
             },
@@ -24,7 +36,9 @@ export const getDeletedEmployees = async (req, res) => {
             })
             .lean();
 
-        return res.json(employees);
+        return res.json(
+            employees
+        );
     } catch (error) {
         console.error(
             "Get Deleted Employees Error:",
@@ -60,41 +74,78 @@ export const softDeleteEmployee = async (req, res) => {
                 });
         }
 
+        /*
+            If the employee is already in Deleted Employees
+            and is visible there, there is nothing else to do.
+        */
+
         if (
             employee.isDeleted &&
             !employee.isPermanentlyHidden
         ) {
             return res.json({
                 success: true,
+
                 message:
                     "Employee already deleted",
+
+                employee,
             });
         }
 
         /*
-            IMPORTANT:
+            =================================================
+            SOFT DELETE RULE
+            =================================================
 
-            Normal delete does NOT remove the employee
-            from MongoDB.
+            Delete DOES NOT create or destroy identity.
 
-            It only moves the employee to the
-            Deleted Employees portal.
+            Preserve:
 
-            If this employee had previously been hidden
-            from Deleted Employees and later became
-            active again, deleting again should make
-            the employee visible in Deleted Employees.
+            - Employee._id
+            - Employee.userId
+            - Employee.email
+            - Employee.temporaryPassword
+            - employee information
+            - existing User
+            - existing User.password
+
+            We only archive the Employee card.
         */
 
-        employee.isDeleted = true;
-        employee.isPermanentlyHidden = false;
+        employee.isDeleted =
+            true;
 
-        await employee.save();
+        /*
+            If this employee had previously been permanently
+            hidden from the Deleted Employees portal and later
+            became active again, deleting them again should
+            show them in Deleted Employees.
+        */
+
+        employee.isPermanentlyHidden =
+            false;
+
+        /*
+            Deleted employee should not behave as an
+            active employee anywhere else in the system.
+        */
+
+        employee.employmentStatus =
+            "INACTIVE";
+
+        await employee.save({
+            validateModifiedOnly:
+                true,
+        });
 
         return res.json({
             success: true,
+
             message:
                 "Employee moved to Deleted Employees",
+
+            employee,
         });
     } catch (error) {
         console.error(
@@ -106,6 +157,7 @@ export const softDeleteEmployee = async (req, res) => {
             .status(500)
             .json({
                 error:
+                    error.message ||
                     "Failed to delete employee",
             });
     }
@@ -131,23 +183,75 @@ export const restoreEmployee = async (req, res) => {
                 });
         }
 
-        if (!employee.isDeleted) {
+        /*
+            If the employee is already active, do not create
+            anything and do not modify passwords.
+        */
+
+        if (
+            !employee.isDeleted &&
+            !employee.isPermanentlyHidden
+        ) {
             return res.json({
                 success: true,
+
                 message:
                     "Employee is already restored",
+
                 employee,
             });
         }
 
-        employee.isDeleted = false;
+        /*
+            =================================================
+            RESTORE RULE
+            =================================================
 
-        // Once restored, reset the portal-only
-        // permanent-hide state as well.
+            Restore the SAME Employee.
+
+            Keep exactly the same:
+
+            - Employee._id
+            - Employee.userId
+            - Employee.email
+            - Employee.temporaryPassword
+            - all employee information
+            - current linked User
+            - current User.password
+
+            DO NOT:
+
+            - Employee.create(...)
+            - User.create(...)
+            - regenerate temporaryPassword
+            - modify User.password
+            - copy any new form values
+            - copy any new Excel values
+
+            Only restore archive/card state.
+        */
+
+        employee.isDeleted =
+            false;
+
         employee.isPermanentlyHidden =
             false;
 
-        await employee.save();
+        employee.employmentStatus =
+            "ACTIVE";
+
+        await employee.save({
+            validateModifiedOnly:
+                true,
+        });
+
+        /*
+            Fetch again with populated User information
+            for the frontend card.
+
+            Population here is read-only.
+            No User information is modified.
+        */
 
         const restoredEmployee =
             await Employee.findById(
@@ -161,8 +265,10 @@ export const restoreEmployee = async (req, res) => {
 
         return res.json({
             success: true,
+
             message:
                 "Employee restored successfully",
+
             employee:
                 restoredEmployee,
         });
@@ -176,6 +282,7 @@ export const restoreEmployee = async (req, res) => {
             .status(500)
             .json({
                 error:
+                    error.message ||
                     "Failed to restore employee",
             });
     }
@@ -188,11 +295,34 @@ export const restoreEmployee = async (req, res) => {
 // This is the "Delete Permanently" action shown inside
 // Deleted Employees.
 //
-// IMPORTANT:
-// It DOES NOT delete MongoDB employee records.
+// VERY IMPORTANT:
 //
-// It only hides those records from the
-// Deleted Employees portal.
+// This does NOT permanently delete the Employee from MongoDB.
+//
+// The Employee record must remain because its email continues
+// to identify that same employee.
+//
+// Example:
+//
+// Employee deleted
+//      ↓
+// Employee permanently hidden from Deleted Employees portal
+//      ↓
+// MongoDB Employee STILL EXISTS
+//      ↓
+// Admin later enters the SAME Name + SAME Email
+//      ↓
+// Backend detects archived employee
+//      ↓
+// "Generate Existing Employee Card"
+//      ↓
+// SAME Employee is restored
+//
+// This guarantees that we do NOT create:
+// - duplicate Employee
+// - duplicate User
+// - new temporaryPassword
+// - new login password
 // =====================================================
 
 export const permanentlyHideDeletedEmployees =
@@ -214,6 +344,14 @@ export const permanentlyHideDeletedEmployees =
                             "Please select at least one employee",
                     });
             }
+
+            /*
+                Remove:
+                - empty IDs
+                - duplicate IDs
+
+                before sending them to MongoDB.
+            */
 
             const uniqueEmployeeIds = [
                 ...new Set(
@@ -240,11 +378,25 @@ export const permanentlyHideDeletedEmployees =
             }
 
             /*
-                Only already-deleted employees can be
-                hidden using this action.
+                =================================================
+                PORTAL-ONLY PERMANENT HIDE
+                =================================================
 
-                Active employees cannot accidentally
-                be affected.
+                Only already-deleted employees are affected.
+
+                Active employee cards cannot accidentally
+                be hidden through this endpoint.
+
+                IMPORTANT:
+
+                We intentionally do NOT call:
+
+                    Employee.deleteMany(...)
+                    Employee.findByIdAndDelete(...)
+                    User.deleteMany(...)
+                    User.findByIdAndDelete(...)
+
+                The Employee/User remain in MongoDB.
             */
 
             const result =
@@ -255,18 +407,27 @@ export const permanentlyHideDeletedEmployees =
                                 uniqueEmployeeIds,
                         },
 
-                        isDeleted: true,
+                        isDeleted:
+                            true,
                     },
                     {
                         $set: {
                             isPermanentlyHidden:
                                 true,
+
+                            /*
+                                Employee remains archived.
+                            */
+
+                            employmentStatus:
+                                "INACTIVE",
                         },
                     }
                 );
 
             return res.json({
-                success: true,
+                success:
+                    true,
 
                 message:
                     result.modifiedCount === 1
@@ -289,6 +450,7 @@ export const permanentlyHideDeletedEmployees =
                 .status(500)
                 .json({
                     error:
+                        error.message ||
                         "Failed to remove selected employees from Deleted Employees",
                 });
         }

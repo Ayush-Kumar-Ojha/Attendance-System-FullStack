@@ -11,6 +11,7 @@ import {
     getEmployeeDocuments,
     downloadEmployeeDocument,
     bulkUploadEmployees,
+    generateExistingEmployeeCard,
 } from "../controllers/employeeController.js";
 
 import {
@@ -55,6 +56,42 @@ employeesRouter.post(
 );
 
 // =====================================================
+// GENERATE EXISTING EMPLOYEE CARD
+// =====================================================
+//
+// IMPORTANT:
+//
+// This route does NOT create:
+// - a new Employee
+// - a new User
+// - a new temporary password
+// - a new login password
+//
+// It restores the SAME archived Employee record.
+//
+// It must preserve:
+//
+// - Employee._id
+// - Employee.userId
+// - Employee.temporaryPassword
+// - User._id
+// - User.password
+// - existing employee information
+//
+// Only archive/visibility state is restored.
+//
+// IMPORTANT:
+// Keep this route ABOVE "/:id" routes.
+// =====================================================
+
+employeesRouter.post(
+    "/generate-existing-card",
+    protect,
+    protectAdmin,
+    generateExistingEmployeeCard
+);
+
+// =====================================================
 // DIRECTORY
 // =====================================================
 
@@ -75,12 +112,27 @@ employeesRouter.get(
     getDeletedEmployees
 );
 
-/*
-    Removes selected deleted employees from the
-    Deleted Employees PORTAL ONLY.
-
-    MongoDB Employee records are NOT deleted.
-*/
+// =====================================================
+// PERMANENTLY HIDE FROM DELETED EMPLOYEE PORTAL
+// =====================================================
+//
+// IMPORTANT:
+//
+// "Permanent hide" means removing the employee card
+// from the Deleted Employees portal.
+//
+// It must NOT delete the Employee document from MongoDB.
+//
+// The Employee email must remain reserved so that:
+//
+// same archived email + same employee
+//
+// can later show:
+//
+// "Generate Existing Employee Card"
+//
+// instead of creating a duplicate Employee/User.
+// =====================================================
 
 employeesRouter.patch(
     "/deleted/permanent-hide",
@@ -108,7 +160,13 @@ employeesRouter.post(
 );
 
 // =====================================================
-// RESTORE
+// RESTORE FROM DELETED EMPLOYEES PORTAL
+// =====================================================
+//
+// This restores an Employee selected directly from
+// Deleted Employees.
+//
+// It must restore the SAME Employee/User identity.
 // =====================================================
 
 employeesRouter.patch(
@@ -170,6 +228,16 @@ employeesRouter.put(
 
 // =====================================================
 // SOFT DELETE
+// =====================================================
+//
+// Must archive the existing Employee.
+//
+// It must NOT remove:
+// - Employee document
+// - User document
+// - Employee email
+// - temporaryPassword
+// - User.password
 // =====================================================
 
 employeesRouter.delete(

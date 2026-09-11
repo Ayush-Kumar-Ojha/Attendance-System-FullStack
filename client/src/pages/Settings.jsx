@@ -19,16 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 
-const DEFAULT_OFFICES = [
-  {
-    id: "1",
-    name: "Headquarters (HQ)",
-    address: "Nagavarapalya, Bengaluru",
-    latitude: 12.9866,
-    longitude: 77.6663,
-    radiusKm: 2.0,
-  },
-];
+const DEFAULT_OFFICES = [];
 
 const Settings = () => {
   const { user } = useAuth();
@@ -101,13 +92,12 @@ const Settings = () => {
             "OFFICE_LOCATIONS"
           );
 
-        if (saved) {
+        if (saved !== null) {
           const parsed =
             JSON.parse(saved);
 
           if (
-            Array.isArray(parsed) &&
-            parsed.length > 0
+            Array.isArray(parsed)
           ) {
             return parsed;
           }
@@ -116,7 +106,7 @@ const Settings = () => {
         console.error(e);
       }
 
-      return DEFAULT_OFFICES;
+      return [];
     });
 
   const [
@@ -158,7 +148,7 @@ const Settings = () => {
     } catch (err) {
       toast.error(
         err?.response?.data?.error ||
-          err?.message
+        err?.message
       );
     } finally {
       setLoading(false);
@@ -221,7 +211,7 @@ const Settings = () => {
 
         setSelectedEmpDocs(
           res.data?.documents ||
-            []
+          []
         );
       } catch (err) {
         toast.error(
@@ -294,8 +284,8 @@ const Settings = () => {
         toast.error(
           err?.response?.data
             ?.error ||
-            err?.message ||
-            "Failed to upload document"
+          err?.message ||
+          "Failed to upload document"
         );
       } finally {
         setUploadingDoc(
@@ -358,8 +348,8 @@ const Settings = () => {
         toast.error(
           error.response?.data
             ?.error ||
-            error.message ||
-            "Failed to remove document"
+          error.message ||
+          "Failed to remove document"
         );
       }
     };
@@ -426,7 +416,7 @@ const Settings = () => {
 
       radiusKm: Number(
         newOffice.radiusKm ||
-          2.0
+        2.0
       ),
     };
 
@@ -461,16 +451,6 @@ const Settings = () => {
   const handleDeleteOffice = (
     id
   ) => {
-    if (
-      offices.length <= 1
-    ) {
-      toast.error(
-        "At least one office location must remain active"
-      );
-
-      return;
-    }
-
     const updated =
       offices.filter(
         (o) => o.id !== id
@@ -478,9 +458,17 @@ const Settings = () => {
 
     saveOffices(updated);
 
-    toast.success(
-      "Office location removed"
-    );
+    if (
+      updated.length === 0
+    ) {
+      toast.success(
+        "All office locations removed. Geofencing is now disabled."
+      );
+    } else {
+      toast.success(
+        "Office location removed"
+      );
+    }
   };
 
   // ============================================================
@@ -718,8 +706,8 @@ const Settings = () => {
           ==================================================== */}
 
           {!profile?.documents ||
-          profile.documents
-            .length === 0 ? (
+            profile.documents
+              .length === 0 ? (
             <p className="py-4 text-center text-xs text-slate-400">
               No extra documents
               attached yet.

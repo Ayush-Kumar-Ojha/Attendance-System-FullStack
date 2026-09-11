@@ -50,8 +50,9 @@ const EmployeeCard = ({
 
         const employeeName =
             employee?.name ||
-            `${employee?.firstName || ""} ${employee?.lastName || ""
-                }`.trim() ||
+            `${employee?.firstName || ""} ${
+                employee?.lastName || ""
+            }`.trim() ||
             "this employee";
 
         const confirmed =
@@ -81,9 +82,9 @@ const EmployeeCard = ({
 
             if (
                 error?.code ===
-                "ERR_NETWORK" ||
+                    "ERR_NETWORK" ||
                 error?.message ===
-                "Network Error"
+                    "Network Error"
             ) {
                 toast.error(
                     "Cannot connect to the backend server. Make sure the server is running."
@@ -94,8 +95,8 @@ const EmployeeCard = ({
             toast.error(
                 error.response?.data
                     ?.error ||
-                error.message ||
-                "Failed to delete employee"
+                    error.message ||
+                    "Failed to delete employee"
             );
         }
     };
@@ -169,7 +170,7 @@ const EmployeeCard = ({
                 [
                     "Phone",
                     employee?.phone ||
-                    employee?.mobileNumber,
+                        employee?.mobileNumber,
                 ],
                 [
                     "Department",
@@ -178,7 +179,7 @@ const EmployeeCard = ({
                 [
                     "Designation",
                     employee?.position ||
-                    employee?.designation,
+                        employee?.designation,
                 ],
                 [
                     "Father's Name",
@@ -487,7 +488,7 @@ const EmployeeCard = ({
         standardDetails.some(
             ([, value]) =>
                 value !==
-                undefined &&
+                    undefined &&
                 value !== null &&
                 value !== ""
         ) ||
@@ -499,7 +500,7 @@ const EmployeeCard = ({
                     section?.fields
                 ) &&
                 section.fields.length >
-                0
+                    0
         );
 
     return (
@@ -518,8 +519,12 @@ const EmployeeCard = ({
                         }
                         alt={
                             employee.name ||
-                            `${employee.firstName || ""} ${employee.lastName ||
-                            ""
+                            `${
+                                employee.firstName ||
+                                ""
+                            } ${
+                                employee.lastName ||
+                                ""
                             }`
                         }
                         className="h-full w-full object-cover"
@@ -542,8 +547,7 @@ const EmployeeCard = ({
 
             <div className="absolute top-3 left-3 flex gap-2 z-20">
                 <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs text-slate-600 rounded-lg shadow-sm">
-                    {employee.department ||
-                        "Remote"}
+                    {employee?.department?.trim() || "NA"}
 
                     {employee.isDeleted && (
                         <span className="text-red-400">
@@ -639,11 +643,11 @@ const EmployeeCard = ({
 
                 {(employee.position ||
                     employee.designation) && (
-                        <p className="text-xs text-slate-500">
-                            {employee.position ||
-                                employee.designation}
-                        </p>
-                    )}
+                    <p className="text-xs text-slate-500">
+                        {employee.position ||
+                            employee.designation}
+                    </p>
+                )}
 
                 {hasDetails && (
                     <div className="mt-4 border-t border-slate-100 pt-3">
@@ -711,85 +715,85 @@ const EmployeeCard = ({
 
                                 {dynamicFields.length >
                                     0 && (
-                                        <div className="pt-2 border-t border-slate-100">
-                                            <div className="space-y-2">
-                                                {dynamicFields.map(
-                                                    (
-                                                        field,
-                                                        index
-                                                    ) => (
-                                                        <div
-                                                            key={
-                                                                field.key ||
-                                                                `${field.section}-${field.label}-${index}`
+                                    <div className="pt-2 border-t border-slate-100">
+                                        <div className="space-y-2">
+                                            {dynamicFields.map(
+                                                (
+                                                    field,
+                                                    index
+                                                ) => (
+                                                    <div
+                                                        key={
+                                                            field.key ||
+                                                            `${field.section}-${field.label}-${index}`
+                                                        }
+                                                        className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                                                    >
+                                                        <span className="text-xs font-medium text-slate-600">
+                                                            {
+                                                                field.label
                                                             }
-                                                            className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
-                                                        >
-                                                            <span className="text-xs font-medium text-slate-600">
-                                                                {
-                                                                    field.label
-                                                                }
-                                                            </span>
+                                                        </span>
 
-                                                            <span className="max-w-[55%] break-words text-right text-xs text-slate-800">
-                                                                {field.value ===
-                                                                    undefined ||
-                                                                field.value ===
-                                                                    null ||
-                                                                field.value ===
-                                                                    ""
-                                                                    ? "—"
-                                                                    : String(
-                                                                        field.value
-                                                                    )}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
+                                                        <span className="max-w-[55%] break-words text-right text-xs text-slate-800">
+                                                            {field.value ===
+                                                                undefined ||
+                                                            field.value ===
+                                                                null ||
+                                                            field.value ===
+                                                                ""
+                                                                ? "—"
+                                                                : String(
+                                                                    field.value
+                                                                )}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
                                 {customFields.length >
                                     0 && (
-                                        <div className="pt-2 border-t border-slate-100">
-                                            <div className="space-y-2">
-                                                {customFields.map(
-                                                    (
-                                                        field,
-                                                        index
-                                                    ) => (
-                                                        <div
-                                                            key={
-                                                                field.id ||
-                                                                `${field.section}-${field.label}-${index}`
+                                    <div className="pt-2 border-t border-slate-100">
+                                        <div className="space-y-2">
+                                            {customFields.map(
+                                                (
+                                                    field,
+                                                    index
+                                                ) => (
+                                                    <div
+                                                        key={
+                                                            field.id ||
+                                                            `${field.section}-${field.label}-${index}`
+                                                        }
+                                                        className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                                                    >
+                                                        <span className="text-xs font-medium text-slate-600">
+                                                            {
+                                                                field.label
                                                             }
-                                                            className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
-                                                        >
-                                                            <span className="text-xs font-medium text-slate-600">
-                                                                {
-                                                                    field.label
-                                                                }
-                                                            </span>
+                                                        </span>
 
-                                                            <span className="max-w-[55%] break-words text-right text-xs text-slate-800">
-                                                                {field.value ===
-                                                                    undefined ||
-                                                                field.value ===
-                                                                    null ||
-                                                                field.value ===
-                                                                    ""
-                                                                    ? "—"
-                                                                    : String(
-                                                                        field.value
-                                                                    )}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
+                                                        <span className="max-w-[55%] break-words text-right text-xs text-slate-800">
+                                                            {field.value ===
+                                                                undefined ||
+                                                            field.value ===
+                                                                null ||
+                                                            field.value ===
+                                                                ""
+                                                                ? "—"
+                                                                : String(
+                                                                    field.value
+                                                                )}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
                                 {customSections.map(
                                     (

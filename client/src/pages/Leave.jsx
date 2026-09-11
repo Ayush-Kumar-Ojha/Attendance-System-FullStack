@@ -82,12 +82,12 @@ const getLeaveDays = (
         end.getTime() -
         start.getTime()
       ) /
-        (
-          1000 *
-          60 *
-          60 *
-          24
-        )
+      (
+        1000 *
+        60 *
+        60 *
+        24
+      )
     ) + 1;
 
   return diffDays;
@@ -106,16 +106,16 @@ const calculateMonthlyStats =
     const monthNum =
       selectedMonth
         ? Number(
-            selectedMonth
-          )
+          selectedMonth
+        )
         : currentDate.getMonth() +
-          1;
+        1;
 
     const yearNum =
       selectedYear
         ? Number(
-            selectedYear
-          )
+          selectedYear
+        )
         : currentDate.getFullYear();
 
     // ========================================================
@@ -140,10 +140,10 @@ const calculateMonthlyStats =
 
           return (
             d.getMonth() +
-              1 ===
-              monthNum &&
+            1 ===
+            monthNum &&
             d.getFullYear() ===
-              yearNum
+            yearNum
           );
         }
       );
@@ -205,7 +205,7 @@ const calculateMonthlyStats =
         if (
           leave.isLop ||
           leave.paymentType ===
-            "UNPAID"
+          "UNPAID"
         ) {
           lopDays +=
             days;
@@ -240,7 +240,7 @@ const calculateMonthlyStats =
         0,
 
         MONTHLY_PAID_LEAVE_LIMIT -
-          quotaPaidUsed
+        quotaPaidUsed
       );
 
     // ========================================================
@@ -265,7 +265,7 @@ const calculateMonthlyStats =
         0,
 
         quotaRelevantApprovedDays -
-          MONTHLY_PAID_LEAVE_LIMIT
+        MONTHLY_PAID_LEAVE_LIMIT
       );
 
     return {
@@ -320,8 +320,8 @@ const calculateYearlyStats =
     const yearNum =
       selectedYear
         ? Number(
-            selectedYear
-          )
+          selectedYear
+        )
         : currentDate.getFullYear();
 
     const yearLeaves =
@@ -408,7 +408,7 @@ const calculateYearlyStats =
         if (
           leave.isLop ||
           leave.paymentType ===
-            "UNPAID"
+          "UNPAID"
         ) {
           lopDays +=
             days;
@@ -484,6 +484,13 @@ const Leave = () => {
   ] =
     useState(false);
 
+
+  const [
+    employeeGender,
+    setEmployeeGender,
+  ] =
+    useState("");
+
   const [
     documents,
     setDocuments,
@@ -523,7 +530,7 @@ const Leave = () => {
     useState(
       String(
         currentDate.getMonth() +
-          1
+        1
       )
     );
 
@@ -604,8 +611,16 @@ const Leave = () => {
           setLeaves(
             res.data
               .data ||
-              []
+            []
           );
+          if (!isAdmin) {
+            setEmployeeGender(
+              res.data
+                ?.employee
+                ?.gender ||
+              ""
+            );
+          }
 
           if (
             res.data
@@ -621,14 +636,14 @@ const Leave = () => {
             );
           }
         } catch (
-          error
+        error
         ) {
           toast.error(
             error
               ?.response
               ?.data
               ?.error ||
-              error.message
+            error.message
           );
         } finally {
           setLoading(
@@ -662,7 +677,7 @@ const Leave = () => {
             res.data
           );
         } catch (
-          error
+        error
         ) {
           console.error(
             "Leave document fetch error:",
@@ -770,17 +785,15 @@ const Leave = () => {
             leave
           ) => {
             const employeeName =
-              `${
-                leave
-                  .employee
-                  ?.firstName ||
+              `${leave
+                .employee
+                ?.firstName ||
                 ""
-              } ${
-                leave
+                } ${leave
                   .employee
                   ?.lastName ||
                 ""
-              }`.toLowerCase();
+                }`.toLowerCase();
 
             return (
               employeeName.includes(
@@ -846,7 +859,7 @@ const Leave = () => {
           ) =>
             String(
               employee._id ||
-                employee.id
+              employee.id
             ) ===
             String(
               filterEmployeeId
@@ -919,17 +932,15 @@ const Leave = () => {
             leave
           ) => ({
             Employee:
-              `${
-                leave
-                  .employee
-                  ?.firstName ||
+              `${leave
+                .employee
+                ?.firstName ||
                 ""
-              } ${
-                leave
+                } ${leave
                   .employee
                   ?.lastName ||
                 ""
-              }`.trim(),
+                }`.trim(),
 
             Type:
               leave.type
@@ -942,36 +953,36 @@ const Leave = () => {
             "Worked Extra Date":
               leave.workedDate
                 ? new Date(
-                    leave.workedDate
-                  ).toLocaleDateString(
-                    "en-IN"
-                  )
+                  leave.workedDate
+                ).toLocaleDateString(
+                  "en-IN"
+                )
                 : "-",
 
             "Half Day Period":
               leave.halfDayPeriod
                 ? leave.halfDayPeriod.replaceAll(
-                    "_",
-                    " "
-                  )
+                  "_",
+                  " "
+                )
                 : "",
 
             "Start Date":
               leave.startDate
                 ? new Date(
-                    leave.startDate
-                  ).toLocaleDateString(
-                    "en-IN"
-                  )
+                  leave.startDate
+                ).toLocaleDateString(
+                  "en-IN"
+                )
                 : "",
 
             "End Date":
               leave.endDate
                 ? new Date(
-                    leave.endDate
-                  ).toLocaleDateString(
-                    "en-IN"
-                  )
+                  leave.endDate
+                ).toLocaleDateString(
+                  "en-IN"
+                )
                 : "",
 
             "Total Days":
@@ -981,13 +992,13 @@ const Leave = () => {
 
             "Payment Decision":
               leave.status !==
-              "APPROVED"
+                "APPROVED"
                 ? "-"
                 : leave.isLop ||
                   leave.paymentType ===
-                    "UNPAID"
-                ? "LOSS OF PAY"
-                : "PAID",
+                  "UNPAID"
+                  ? "LOSS OF PAY"
+                  : "PAID",
 
             Reason:
               leave.reason ||
@@ -1321,7 +1332,7 @@ const Leave = () => {
                       {new Date(
                         2000,
                         month -
-                          1
+                        1
                       ).toLocaleString(
                         "en-IN",
                         {
@@ -1835,7 +1846,7 @@ const Leave = () => {
                       {new Date(
                         2000,
                         month -
-                          1
+                        1
                       ).toLocaleString(
                         "en-IN",
                         {
@@ -2156,6 +2167,9 @@ const Leave = () => {
         }
         leaves={
           leaves
+        }
+        employeeGender={
+          employeeGender
         }
       />
     </div>

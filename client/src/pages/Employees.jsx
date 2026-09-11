@@ -77,6 +77,16 @@ const Employees = () => {
   ] = useState(false);
 
   const [
+    excelEmailConflicts,
+    setExcelEmailConflicts,
+  ] = useState([]);
+
+  const [
+    generatingExistingEmployeeId,
+    setGeneratingExistingEmployeeId,
+  ] = useState("");
+
+  const [
     selectedEmployeeIds,
     setSelectedEmployeeIds,
   ] = useState([]);
@@ -159,12 +169,34 @@ const Employees = () => {
           const response =
             await api.get(url);
 
-          setEmployees(
+          const employeeData =
             Array.isArray(
               response.data
             )
               ? response.data
-              : []
+              : [];
+
+          /*
+           * Email ID is mandatory.
+           *
+           * This is an additional frontend safeguard
+           * for legacy database records.
+           *
+           * Records without an Email ID are not turned
+           * into active Employee cards.
+           *
+           * Nothing is deleted from MongoDB here.
+           */
+          setEmployees(
+            employeeData.filter(
+              (employee) =>
+                Boolean(
+                  String(
+                    employee?.email ||
+                    ""
+                  ).trim()
+                )
+            )
           );
         } catch (error) {
           console.error(
@@ -308,8 +340,6 @@ const Employees = () => {
           "Employee restored successfully"
         );
 
-        // Remove restored employee
-        // from deleted selection.
         setSelectedDeletedEmployeeIds(
           (current) =>
             current.filter(
@@ -392,6 +422,9 @@ const Employees = () => {
                 field
               ) => [
                   field
+                    ?.section,
+
+                  field
                     ?.label,
 
                   field
@@ -402,77 +435,23 @@ const Employees = () => {
               Boolean
             );
 
-        const customSectionValues =
-          (
-            Array.isArray(
-              employee.customSections
-            )
-              ? employee.customSections
-              : []
-          )
-            .flatMap(
-              (
-                section
-              ) => [
-                  section
-                    ?.title,
-
-                  ...(section.fields ||
-                    []).flatMap(
-                      (
-                        field
-                      ) => [
-                          field
-                            ?.label,
-
-                          field
-                            ?.value,
-                        ]
-                    ),
-                ]
-            )
-            .filter(
-              Boolean
-            );
-
-        const searchText =
-          [
-            employee.employeeCode,
-
-            employee.name,
-
-            employee.firstName,
-
-            employee.lastName,
-
-            employee.position,
-
-            employee.department,
-
-            employee.email,
-
-            ...dynamicValues,
-
-            ...customFieldValues,
-
-            ...customSectionValues,
-          ]
-            .filter(
-              Boolean
-            )
-            .join(
-              " "
-            )
-            .toLowerCase();
+        const searchText = [
+          employee.name,
+          employee.firstName,
+          employee.lastName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
         return searchText.includes(
-          search.toLowerCase()
+          search.trim().toLowerCase()
         );
       }
     );
 
   // =================================================
-  // EMPLOYEE CARD SELECTION / MULTI DELETE
+  // ACTIVE EMPLOYEE SELECTION / MULTI DELETE
   // =================================================
 
   const toggleEmployeeSelection = (
@@ -801,27 +780,9 @@ const Employees = () => {
       return "";
     }
 
-    const year =
-      date.getFullYear();
-
-    const month =
-      String(
-        date.getMonth() +
-        1
-      ).padStart(
-        2,
-        "0"
-      );
-
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
-
-    return `${year}-${month}-${day}`;
+    return date
+      .toISOString()
+      .split("T")[0];
   };
 
   // =================================================
@@ -888,13 +849,11 @@ const Employees = () => {
               dynamicFieldColumns.push(
                 {
                   key,
-
+                  label:
+                    field.label,
                   section:
                     field.section ||
                     "Excel Fields",
-
-                  label:
-                    field.label,
                 }
               );
             }
@@ -917,16 +876,30 @@ const Employees = () => {
               return;
             }
 
-            const columnName =
-              `[Custom Field] ${field.label}`;
+            const key =
+              `${field.section ||
+              "Custom Fields"
+              }::${field.label
+              }`;
 
             if (
-              !customFieldColumns.includes(
-                columnName
+              !customFieldColumns.some(
+                (
+                  column
+                ) =>
+                  column.key ===
+                  key
               )
             ) {
               customFieldColumns.push(
-                columnName
+                {
+                  key,
+                  label:
+                    field.label,
+                  section:
+                    field.section ||
+                    "Custom Fields",
+                }
               );
             }
           }
@@ -950,24 +923,35 @@ const Employees = () => {
                 field
               ) => {
                 if (
-                  !section
-                    ?.title ||
-                  !field
-                    ?.label
+                  !field?.label
                 ) {
                   return;
                 }
 
-                const columnName =
-                  `[${section.title}] ${field.label}`;
+                const key =
+                  `${section.title ||
+                  "Custom Section"
+                  }::${field.label
+                  }`;
 
                 if (
-                  !customSectionColumns.includes(
-                    columnName
+                  !customSectionColumns.some(
+                    (
+                      column
+                    ) =>
+                      column.key ===
+                      key
                   )
                 ) {
                   customSectionColumns.push(
-                    columnName
+                    {
+                      key,
+                      label:
+                        field.label,
+                      section:
+                        section.title ||
+                        "Custom Section",
+                    }
                   );
                 }
               }
@@ -976,7 +960,6 @@ const Employees = () => {
         );
       }
     );
-
     const duplicateDynamicLabels =
       new Set(
         dynamicFieldColumns
@@ -1225,7 +1208,6 @@ const Employees = () => {
 
             Resume:
               employee.resume ||
-              employee.cvUrl ||
               "",
 
             "Appointment Letter":
@@ -1296,7 +1278,7 @@ const Employees = () => {
               employee.employeeCode ||
               "",
 
-            "Employee Email ID":
+            Email:
               employee.email ||
               "",
 
@@ -1306,24 +1288,20 @@ const Employees = () => {
 
             Designation:
               employee.position ||
+              employee.designation ||
               "",
 
             "Basic Salary":
               employee.basicSalary ??
               "",
 
-            Allowance:
+            Allowances:
               employee.allowances ??
               "",
 
             Deductions:
               employee.deductions ??
               "",
-
-            "System Role":
-              employee.user
-                ?.role ||
-              "EMPLOYEE",
 
             "Anniversary Date":
               formatExcelDate(
@@ -1335,12 +1313,25 @@ const Employees = () => {
                 employee.confirmationDate
               ),
 
-            "Aadhaar Number":
+            "Aadhar Number":
               employee.aadharNumber ||
               "",
 
             "PAN Number":
               employee.panNumber ||
+              "",
+
+            "Employment Status":
+              employee.employmentStatus ||
+              "",
+
+            "System Role":
+              employee.userId?.role ||
+              employee.role ||
+              "EMPLOYEE",
+
+            Bio:
+              employee.bio ||
               "",
           };
 
@@ -1348,23 +1339,23 @@ const Employees = () => {
             (
               column
             ) => {
-              const field =
+              const employeeField =
                 (
                   employee.dynamicFields ||
                   []
                 ).find(
                   (
-                    item
+                    field
                   ) => {
-                    const itemKey =
-                      item.key ||
-                      `${item.section ||
+                    const fieldKey =
+                      field.key ||
+                      `${field.section ||
                       "Excel Fields"
-                      }::${item.label
+                      }::${field.label
                       }`;
 
                     return (
-                      itemKey ===
+                      fieldKey ===
                       column.key
                     );
                   }
@@ -1377,10 +1368,8 @@ const Employees = () => {
                   ? `[${column.section}] ${column.label}`
                   : column.label;
 
-              row[
-                columnName
-              ] =
-                field?.value ||
+              row[columnName] =
+                employeeField?.value ??
                 "";
             }
           );
@@ -1395,22 +1384,20 @@ const Employees = () => {
                   ""
                 );
 
-              const field =
+              const employeeField =
                 (
                   employee.customFields ||
                   []
                 ).find(
                   (
-                    item
+                    field
                   ) =>
-                    item.label ===
+                    field.label ===
                     label
                 );
 
-              row[
-                columnName
-              ] =
-                field?.value ||
+              row[columnName] =
+                employeeField?.value ??
                 "";
             }
           );
@@ -1421,23 +1408,21 @@ const Employees = () => {
             ) => {
               const match =
                 columnName.match(
-                  /^\[(.+?)\]\s(.+)$/
+                  /^\[(.*?)\]\s+(.*)$/
                 );
 
               if (!match) {
-                row[
-                  columnName
-                ] =
+                row[columnName] =
                   "";
 
                 return;
               }
 
-              const sectionTitle =
-                match[1];
-
-              const fieldLabel =
-                match[2];
+              const [
+                ,
+                sectionTitle,
+                fieldLabel,
+              ] = match;
 
               const section =
                 (
@@ -1452,7 +1437,10 @@ const Employees = () => {
                 );
 
               const field =
-                section?.fields?.find(
+                (
+                  section?.fields ||
+                  []
+                ).find(
                   (
                     item
                   ) =>
@@ -1460,10 +1448,8 @@ const Employees = () => {
                     fieldLabel
                 );
 
-              row[
-                columnName
-              ] =
-                field?.value ||
+              row[columnName] =
+                field?.value ??
                 "";
             }
           );
@@ -1516,6 +1502,102 @@ const Employees = () => {
       "Employee data downloaded"
     );
   };
+
+  // =================================================
+  // GENERATE EXISTING EMPLOYEE CARD
+  // =================================================
+
+  const handleGenerateExistingEmployeeCard =
+    async (conflict) => {
+      const employeeId =
+        String(
+          conflict?.employeeId ||
+          ""
+        );
+
+      const email =
+        String(
+          conflict?.email ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        !employeeId &&
+        !email
+      ) {
+        toast.error(
+          "Existing employee details not found"
+        );
+
+        return;
+      }
+
+      setGeneratingExistingEmployeeId(
+        employeeId ||
+        email
+      );
+
+      try {
+        const response =
+          await api.post(
+            "/employees/generate-existing-card",
+            {
+              employeeId:
+                employeeId ||
+                undefined,
+
+              email:
+                email ||
+                undefined,
+            }
+          );
+
+        toast.success(
+          response.data?.message ||
+          "Existing employee card generated again"
+        );
+
+        setExcelEmailConflicts(
+          (current) =>
+            current.filter(
+              (item) =>
+                String(
+                  item?.employeeId ||
+                  ""
+                ) !==
+                employeeId ||
+                String(
+                  item?.email ||
+                  ""
+                )
+                  .trim()
+                  .toLowerCase() !==
+                email
+            )
+        );
+
+        await fetchEmployees();
+        await fetchDeletedEmployees();
+      } catch (error) {
+        console.error(
+          "Generate existing employee card error:",
+          error
+        );
+
+        toast.error(
+          error.response?.data
+            ?.error ||
+          error.message ||
+          "Failed to generate existing employee card"
+        );
+      } finally {
+        setGeneratingExistingEmployeeId(
+          ""
+        );
+      }
+    };
 
   // =================================================
   // EXCEL UPLOAD
@@ -1588,21 +1670,32 @@ const Employees = () => {
       );
 
       try {
+        /*
+         * IMPORTANT:
+         * Do not manually set multipart Content-Type here.
+         * The browser/Axios must add the correct multipart
+         * boundary automatically, otherwise Multer may not
+         * receive req.file correctly.
+         */
         const response =
           await api.post(
             "/employees/bulk-upload",
-            formData,
-            {
-              headers:
-              {
-                "Content-Type":
-                  "multipart/form-data",
-              },
-            }
+            formData
           );
 
         const result =
           response.data;
+
+        const conflicts =
+          Array.isArray(
+            result.conflicts
+          )
+            ? result.conflicts
+            : [];
+
+        setExcelEmailConflicts(
+          conflicts
+        );
 
         const created =
           result.created || 0;
@@ -1613,19 +1706,50 @@ const Employees = () => {
         const restored =
           result.restored || 0;
 
+        const deleted =
+          result.deleted || 0;
+
         const skipped =
           result.skippedCount ??
           result.skipped?.length ??
           0;
 
+        const conflictCount =
+          result.conflictCount ??
+          conflicts.length;
+
         toast.success(
-          restored > 0
-            ? `${created} created, ${updated} updated, ${restored} restored, ${skipped} skipped`
-            : `${created} created, ${updated} updated, ${skipped} skipped`,
+          `${created} created, ${updated} updated, ${restored} restored, ${deleted} deleted, ${skipped} skipped, ${conflictCount} conflict(s)`,
           {
             duration: 5000,
           }
         );
+
+        if (
+          skipped > 0 &&
+          Array.isArray(
+            result.skipped
+          ) &&
+          result.skipped.length >
+          0
+        ) {
+          const firstReason =
+            result.skipped.find(
+              (item) =>
+                item?.reason
+            )?.reason;
+
+          if (firstReason) {
+            toast.error(
+              skipped === 1
+                ? firstReason
+                : `${skipped} rows skipped. ${firstReason}`,
+              {
+                duration: 6000,
+              }
+            );
+          }
+        }
 
         if (
           Array.isArray(
@@ -1637,6 +1761,17 @@ const Employees = () => {
         ) {
           console.table(
             result.skipped
+          );
+        }
+
+        if (
+          conflicts.length > 0
+        ) {
+          toast.error(
+            `${conflicts.length} employee email conflict(s) need review.`,
+            {
+              duration: 6000,
+            }
           );
         }
 
@@ -1654,9 +1789,6 @@ const Employees = () => {
         }
 
         await fetchEmployees();
-
-        // Important when an Excel upload
-        // restores a previously deleted employee.
         await fetchDeletedEmployees();
       } catch (
       error
@@ -1695,8 +1827,8 @@ const Employees = () => {
       />
 
       {/* =================================================
-    PAGE HEADER
-================================================= */}
+          PAGE HEADER
+      ================================================= */}
 
       <div className="flex items-center justify-between gap-5 mb-8">
         <div className="shrink-0">
@@ -1714,35 +1846,60 @@ const Employees = () => {
           <button
             type="button"
             onClick={() => {
-              setShowDeletedEmployees(true);
-              setSelectedDeletedEmployeeIds([]);
+              setShowDeletedEmployees(
+                true
+              );
+
               fetchDeletedEmployees();
             }}
-            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
+            className="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
           >
-            <ArchiveRestore size={15} />
+            <Trash2 className="h-4 w-4" />
 
-            Deleted Employees
+            Deleted Employees ({deletedEmployees.length})
+          </button>
 
-            {deletedEmployees.length > 0
-              ? ` (${deletedEmployees.length})`
-              : ""}
+          {/* Download Employee Data */}
+          <button
+            type="button"
+            onClick={
+              exportEmployees
+            }
+            className="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            <Download className="h-4 w-4" />
+
+            Download Employee Data
+          </button>
+
+          {/* Excel Template */}
+          <button
+            type="button"
+            onClick={
+              downloadEmployeeTemplate
+            }
+            className="btn-secondary inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+
+            Excel Template
           </button>
 
           {/* Add Using Excel */}
           <button
             type="button"
-            onClick={openExcelUpload}
-            disabled={uploadingExcel}
-            className="btn-primary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={
+              openExcelUpload
+            }
+            disabled={
+              uploadingExcel
+            }
+            className="btn-secondary inline-flex items-center gap-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
           >
             {uploadingExcel ? (
-              <Loader2
-                size={15}
-                className="animate-spin"
-              />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Upload size={15} />
+              <Upload className="h-4 w-4" />
             )}
 
             {uploadingExcel
@@ -1754,32 +1911,15 @@ const Employees = () => {
           <button
             type="button"
             onClick={() =>
-              setShowCreateModal(true)
+              setShowCreateModal(
+                true
+              )
             }
-            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
+            className="btn-primary inline-flex items-center gap-2 whitespace-nowrap"
           >
-            <Plus size={15} />
+            <Plus className="h-4 w-4" />
+
             Add Using Form
-          </button>
-
-          {/* Download Employee Data */}
-          <button
-            type="button"
-            onClick={exportEmployees}
-            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
-          >
-            <Download size={15} />
-            Download Data
-          </button>
-
-          {/* Excel Template */}
-          <button
-            type="button"
-            onClick={downloadEmployeeTemplate}
-            className="btn-secondary flex items-center gap-1.5 justify-center whitespace-nowrap px-3 py-2 text-sm"
-          >
-            <FileSpreadsheet size={15} />
-            Excel Template
           </button>
         </div>
       </div>
@@ -1788,84 +1928,57 @@ const Employees = () => {
           SEARCH + DEPARTMENT FILTER
       ================================================= */}
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center">
+        {/* SEARCH */}
+        <div className="relative flex-[2]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
           <input
+            type="text"
+            value={search}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
             placeholder="Search employees..."
             className="w-full pl-10"
-            value={
-              search
-            }
-            onChange={(
-              event
-            ) =>
-              setSearch(
-                event
-                  .target
-                  .value
-              )
-            }
           />
         </div>
 
-        <select
-          value={
-            selectedDept
-          }
-          onChange={(
-            event
-          ) =>
-            setSelectedDept(
-              event
-                .target
-                .value
-            )
-          }
-          className="max-w-48"
-        >
-          <option value="">
-            All Departments
-          </option>
+        {/* DEPARTMENT */}
+        <div className="flex-1">
+          <select
+            value={selectedDept}
+            onChange={(event) =>
+              setSelectedDept(event.target.value)
+            }
+            className="w-full"
+          >
+            <option value="">
+              All Departments
+            </option>
 
-          {departments.map(
-            (
-              department
-            ) => (
+            {departments.map((department) => (
               <option
-                key={
-                  department
-                }
-                value={
-                  department
-                }
+                key={department}
+                value={department}
               >
-                {
-                  department
-                }
+                {department}
               </option>
-            )
-          )}
-        </select>
+            ))}
+          </select>
+        </div>
 
+        {/* ADD DEPARTMENT */}
         <button
           type="button"
           onClick={() =>
-            setShowAddDeptModal(
-              true
-            )
+            setShowAddDeptModal(true)
           }
-          className="btn-secondary flex items-center gap-2 whitespace-nowrap"
+          className="btn-secondary whitespace-nowrap"
         >
-          <Plus
-            size={16}
-          />
-
-          Add Department
+          + Add Department
         </button>
       </div>
-
       {/* =================================================
           MULTIPLE EMPLOYEE SELECTION
       ================================================= */}
@@ -1876,8 +1989,12 @@ const Employees = () => {
             <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 select-none">
               <input
                 type="checkbox"
-                checked={allVisibleSelected}
-                onChange={toggleSelectAllVisible}
+                checked={
+                  allVisibleSelected
+                }
+                onChange={
+                  toggleSelectAllVisible
+                }
                 className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
 
@@ -2164,7 +2281,6 @@ const Employees = () => {
                         getEmployeeId(
                           employee
                         );
-
                       return (
                         <div
                           key={
@@ -2229,6 +2345,142 @@ const Employees = () => {
       )}
 
       {/* =================================================
+          EXCEL EMAIL CONFLICTS
+      ================================================= */}
+
+      {excelEmailConflicts.length >
+        0 && (
+          <div
+            className="fixed inset-0 z-[60] flex items-start justify-center p-4 overflow-y-auto bg-black/40 backdrop-blur-sm"
+            onClick={() =>
+              setExcelEmailConflicts(
+                []
+              )
+            }
+          >
+            <div
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8 animate-fade-in"
+              onClick={(
+                event
+              ) =>
+                event.stopPropagation()
+              }
+            >
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Employee Email Conflicts
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Existing email IDs were found. Review them before generating any archived employee card again.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExcelEmailConflicts(
+                      []
+                    )
+                  }
+                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 p-6">
+                {excelEmailConflicts.map(
+                  (
+                    conflict,
+                    index
+                  ) => {
+                    const conflictKey =
+                      conflict?.employeeId ||
+                      conflict?.email ||
+                      index;
+
+                    const busyKey =
+                      String(
+                        conflict?.employeeId ||
+                        conflict?.email ||
+                        ""
+                      );
+
+                    return (
+                      <div
+                        key={
+                          conflictKey
+                        }
+                        className="rounded-xl border border-amber-200 bg-amber-50 p-4"
+                      >
+                        <p className="font-medium text-amber-900">
+                          {conflict?.reason ||
+                            "This email ID already exists."}
+                        </p>
+
+                        {conflict?.submittedName && (
+                          <p className="mt-2 text-sm text-amber-800">
+                            Excel employee:{" "}
+                            {
+                              conflict.submittedName
+                            }
+                          </p>
+                        )}
+
+                        {conflict?.existingEmployeeName && (
+                          <p className="mt-1 text-sm text-amber-800">
+                            Existing employee:{" "}
+                            {
+                              conflict.existingEmployeeName
+                            }
+                          </p>
+                        )}
+
+                        {conflict?.email && (
+                          <p className="mt-1 text-sm text-amber-800">
+                            Email:{" "}
+                            {
+                              conflict.email
+                            }
+                          </p>
+                        )}
+
+                        {conflict?.canGenerateExistingCard && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleGenerateExistingEmployeeCard(
+                                conflict
+                              )
+                            }
+                            disabled={
+                              generatingExistingEmployeeId ===
+                              busyKey
+                            }
+                            className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {generatingExistingEmployeeId ===
+                              busyKey ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              "Generate Existing Employee Card"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      {/* =================================================
           ADD EMPLOYEE MODAL
       ================================================= */}
 
@@ -2243,9 +2495,7 @@ const Employees = () => {
         >
           <div
             className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
-            onClick={(
-              event
-            ) =>
+            onClick={(event) =>
               event.stopPropagation()
             }
           >
@@ -2275,12 +2525,68 @@ const Employees = () => {
 
             <div className="p-6">
               <EmployeeForm
-                onSuccess={() => {
+                onSuccess={(restoredEmployee) => {
                   setShowCreateModal(
                     false
                   );
 
+                  // If this callback came from
+                  // "Generate Existing Employee Card", the
+                  // backend already returns the restored Employee.
+                  // Put that exact record back on the page
+                  // immediately instead of depending only on a
+                  // second GET request.
+                  if (
+                    restoredEmployee &&
+                    getEmployeeId(
+                      restoredEmployee
+                    )
+                  ) {
+                    const restoredId =
+                      getEmployeeId(
+                        restoredEmployee
+                      );
+
+                    // Clear local filters so the restored card
+                    // cannot remain hidden by an old search or
+                    // department selection.
+                    setSearch("");
+                    setSelectedDept("");
+
+                    setEmployees(
+                      (current) => {
+                        const exists =
+                          current.some(
+                            (employee) =>
+                              getEmployeeId(
+                                employee
+                              ) ===
+                              restoredId
+                          );
+
+                        if (exists) {
+                          return current.map(
+                            (employee) =>
+                              getEmployeeId(
+                                employee
+                              ) ===
+                                restoredId
+                                ? restoredEmployee
+                                : employee
+                          );
+                        }
+
+                        return [
+                          restoredEmployee,
+                          ...current,
+                        ];
+                      }
+                    );
+                  }
+
+                  // Re-sync with the backend as well.
                   fetchEmployees();
+                  fetchDeletedEmployees();
                 }}
                 onCancel={() =>
                   setShowCreateModal(
@@ -2308,9 +2614,7 @@ const Employees = () => {
         >
           <div
             className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in"
-            onClick={(
-              event
-            ) =>
+            onClick={(event) =>
               event.stopPropagation()
             }
           >
@@ -2380,6 +2684,6 @@ const Employees = () => {
       />
     </div>
   );
-};
 
+};
 export default Employees;

@@ -19,36 +19,41 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos((lat1 * Math.PI) / 180) *
-            Math.cos((lat2 * Math.PI) / 180) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 };
 
 // Default fallback office if none configured by Admin
-const DEFAULT_OFFICES = [
-    {
-        id: "1",
-        name: "Headquarters (HQ)",
-        address: "Nagavarapalya, Bengaluru",
-        latitude: 12.9866,
-        longitude: 77.6663,
-        radiusKm: 2.0,
-    },
-];
+const DEFAULT_OFFICES = [];
 
 const getOfficeLocations = () => {
     try {
-        const saved = localStorage.getItem("OFFICE_LOCATIONS");
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const saved =
+            localStorage.getItem(
+                "OFFICE_LOCATIONS"
+            );
+
+        if (saved !== null) {
+            const parsed =
+                JSON.parse(saved);
+
+            if (
+                Array.isArray(parsed)
+            ) {
+                return parsed;
+            }
         }
     } catch (error) {
-        console.error("Error reading office locations:", error);
+        console.error(
+            "Error reading office locations:",
+            error
+        );
     }
-    return DEFAULT_OFFICES;
+
+    return [];
 };
 
 const CheckInButton = ({ todayRecord, onAction }) => {
@@ -56,57 +61,160 @@ const CheckInButton = ({ todayRecord, onAction }) => {
     const [locating, setLocating] = useState(true);
     const [locationError, setLocationError] = useState(null);
     const [nearestOffice, setNearestOffice] = useState(null);
+
+    const [
+        geofenceDisabled,
+        setGeofenceDisabled,
+    ] = useState(false);
+
     const [showWeekendModal, setShowWeekendModal] = useState(false);
 
     const isCheckedIn = !!todayRecord?.checkIn;
 
     // Check Employee's GPS location against all office locations
     const checkLocation = useCallback(() => {
-        if (!navigator.geolocation) {
-            setLocationError("Geolocation is not supported by your browser");
-            setLocating(false);
+        const offices =
+            getOfficeLocations();
+
+        // =========================================================
+        // NO OFFICE CONFIGURED
+        // Geofencing is disabled.
+        // Employee can mark attendance from anywhere.
+        // =========================================================
+
+        if (
+            offices.length === 0
+        ) {
+            setGeofenceDisabled(
+                true
+            );
+
+            setNearestOffice(
+                null
+            );
+
+            setLocationError(
+                null
+            );
+
+            setLocating(
+                false
+            );
+
             return;
         }
 
-        setLocating(true);
-        setLocationError(null);
+        // =========================================================
+        // OFFICE EXISTS
+        // Normal geofencing continues.
+        // =========================================================
+
+        setGeofenceDisabled(
+            false
+        );
+
+        if (
+            !navigator.geolocation
+        ) {
+            setLocationError(
+                "Geolocation is not supported by your browser"
+            );
+
+            setLocating(
+                false
+            );
+
+            return;
+        }
+
+        setLocating(
+            true
+        );
+
+        setLocationError(
+            null
+        );
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const userLat = position.coords.latitude;
-                const userLng = position.coords.longitude;
+                const userLat =
+                    position.coords.latitude;
 
-                const offices = getOfficeLocations();
-                let closest = null;
-                let minDistance = Infinity;
+                const userLng =
+                    position.coords.longitude;
 
-                offices.forEach((office) => {
-                    const dist = calculateDistance(
-                        userLat,
-                        userLng,
-                        Number(office.latitude),
-                        Number(office.longitude)
-                    );
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        closest = office;
+                let closest =
+                    null;
+
+                let minDistance =
+                    Infinity;
+
+                offices.forEach(
+                    (office) => {
+                        const dist =
+                            calculateDistance(
+                                userLat,
+                                userLng,
+                                Number(
+                                    office.latitude
+                                ),
+                                Number(
+                                    office.longitude
+                                )
+                            );
+
+                        if (
+                            dist <
+                            minDistance
+                        ) {
+                            minDistance =
+                                dist;
+
+                            closest =
+                                office;
+                        }
                     }
-                });
+                );
 
                 if (closest) {
-                    const allowedRadius = Number(closest.radiusKm || 2.0);
+                    const allowedRadius =
+                        Number(
+                            closest.radiusKm ||
+                            2.0
+                        );
+
                     setNearestOffice({
-                        office: closest,
-                        distanceKm: minDistance,
-                        isWithinRadius: minDistance <= allowedRadius,
+                        office:
+                            closest,
+
+                        distanceKm:
+                            minDistance,
+
+                        isWithinRadius:
+                            minDistance <=
+                            allowedRadius,
                     });
                 }
-                setLocating(false);
+
+                setLocating(
+                    false
+                );
             },
+
             (error) => {
-                console.error("Geolocation Error:", error);
-                setLocating(false);
-                if (error.code === error.PERMISSION_DENIED) {
+                console.error(
+                    "Geolocation Error:",
+                    error
+                );
+
+                setLocating(
+                    false
+                );
+
+                if (
+                    error.code ===
+                    error.PERMISSION_DENIED
+                ) {
                     setLocationError(
                         "Location permission denied. Please allow location access in your browser."
                     );
@@ -116,7 +224,17 @@ const CheckInButton = ({ todayRecord, onAction }) => {
                     );
                 }
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+
+            {
+                enableHighAccuracy:
+                    true,
+
+                timeout:
+                    10000,
+
+                maximumAge:
+                    0,
+            }
         );
     }, []);
 
@@ -124,7 +242,13 @@ const CheckInButton = ({ todayRecord, onAction }) => {
         checkLocation();
     }, [checkLocation]);
 
-    const canClock = !locating && !locationError && nearestOffice?.isWithinRadius;
+    const canClock =
+        geofenceDisabled ||
+        (
+            !locating &&
+            !locationError &&
+            nearestOffice?.isWithinRadius
+        );
 
     const executeAttendance = async () => {
         setLoading(true);
@@ -145,33 +269,62 @@ const CheckInButton = ({ todayRecord, onAction }) => {
     };
 
     const handleAttendanceClick = () => {
-        if (locating) {
-            toast.error("Checking your location, please wait...");
-            return;
+        // =========================================================
+        // ONLY CHECK LOCATION WHEN ADMIN HAS CONFIGURED OFFICES
+        // =========================================================
+
+        if (!geofenceDisabled) {
+            if (locating) {
+                toast.error(
+                    "Checking your location, please wait..."
+                );
+
+                return;
+            }
+
+            if (locationError) {
+                toast.error(
+                    locationError
+                );
+
+                return;
+            }
+
+            if (
+                !nearestOffice
+                    ?.isWithinRadius
+            ) {
+                toast.error(
+                    `You are ${nearestOffice?.distanceKm?.toFixed(
+                        1
+                    )} km away. You must be within ${nearestOffice?.office?.radiusKm ||
+                    2.0
+                    } km of an office to ${isCheckedIn
+                        ? "clock out"
+                        : "clock in"
+                    }.`
+                );
+
+                return;
+            }
         }
 
-        if (locationError) {
-            toast.error(locationError);
-            return;
-        }
+        // Existing weekend functionality remains unchanged.
+        const todayDay =
+            new Date().getDay();
 
-        if (!nearestOffice?.isWithinRadius) {
-            toast.error(
-                `You are ${nearestOffice?.distanceKm?.toFixed(
-                    1
-                )} km away. You must be within ${
-                    nearestOffice?.office?.radiusKm || 2.0
-                } km of an office to ${isCheckedIn ? "clock out" : "clock in"}.`
+        const isWeekend =
+            todayDay === 0 ||
+            todayDay === 6;
+
+        if (
+            !isCheckedIn &&
+            isWeekend
+        ) {
+            setShowWeekendModal(
+                true
             );
-            return;
-        }
 
-        // Check if today is weekend (Saturday = 6, Sunday = 0)
-        const todayDay = new Date().getDay();
-        const isWeekend = todayDay === 0 || todayDay === 6;
-
-        if (!isCheckedIn && isWeekend) {
-            setShowWeekendModal(true);
             return;
         }
 
@@ -196,7 +349,12 @@ const CheckInButton = ({ todayRecord, onAction }) => {
             <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
                 {/* Geofence Status Badge */}
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium shadow-md backdrop-blur">
-                    {locating ? (
+                    {geofenceDisabled ? (
+                        <div className="flex items-center gap-2 text-emerald-700">
+                            <MapPinIcon className="h-3.5 w-3.5" />
+                            <span>No office location restriction</span>
+                        </div>
+                    ) : locating ? (
                         <div className="flex items-center gap-2 text-slate-500">
                             <Loader2Icon className="h-3.5 w-3.5 animate-spin text-indigo-600" />
                             <span>Verifying office distance...</span>
@@ -216,11 +374,10 @@ const CheckInButton = ({ todayRecord, onAction }) => {
                     ) : nearestOffice ? (
                         <div className="flex items-center gap-2">
                             <MapPinIcon
-                                className={`h-3.5 w-3.5 ${
-                                    nearestOffice.isWithinRadius
-                                        ? "text-emerald-600"
-                                        : "text-amber-600"
-                                }`}
+                                className={`h-3.5 w-3.5 ${nearestOffice.isWithinRadius
+                                    ? "text-emerald-600"
+                                    : "text-amber-600"
+                                    }`}
                             />
                             {nearestOffice.isWithinRadius ? (
                                 <span className="text-emerald-700">
@@ -251,13 +408,12 @@ const CheckInButton = ({ todayRecord, onAction }) => {
                     type="button"
                     onClick={handleAttendanceClick}
                     disabled={loading || !canClock}
-                    className={`flex items-center justify-center gap-3 rounded-xl px-5 py-3 text-white shadow-md transition-all ${
-                        !canClock
-                            ? "cursor-not-allowed bg-slate-400 opacity-65 shadow-none"
-                            : isCheckedIn
+                    className={`flex items-center justify-center gap-3 rounded-xl px-5 py-3 text-white shadow-md transition-all ${!canClock
+                        ? "cursor-not-allowed bg-slate-400 opacity-65 shadow-none"
+                        : isCheckedIn
                             ? "bg-slate-900 hover:bg-black"
                             : "bg-indigo-600 hover:bg-indigo-700"
-                    }`}
+                        }`}
                 >
                     {loading ? (
                         <Loader2Icon className="h-5 w-5 animate-spin shrink-0" />
@@ -272,15 +428,19 @@ const CheckInButton = ({ todayRecord, onAction }) => {
                             {loading
                                 ? "Processing..."
                                 : isCheckedIn
-                                ? "Clock Out"
-                                : "Clock In"}
+                                    ? "Clock Out"
+                                    : "Clock In"}
                         </h2>
                         <p className="text-[11px] opacity-80 leading-tight mt-0.5">
-                            {canClock
+                            {geofenceDisabled
                                 ? isCheckedIn
                                     ? "Click to end shift"
-                                    : "Start your work day"
-                                : "Must be within 2km of office"}
+                                    : "Attendance available from anywhere"
+                                : canClock
+                                    ? isCheckedIn
+                                        ? "Click to end shift"
+                                        : "Start your work day"
+                                    : "Must be within office radius"}
                         </p>
                     </div>
                 </button>
@@ -288,11 +448,11 @@ const CheckInButton = ({ todayRecord, onAction }) => {
 
             {/* Weekend / Holiday Confirmation Pop-up Modal */}
             {showWeekendModal && createPortal(
-                <div 
+                <div
                     className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
                     onClick={() => setShowWeekendModal(false)}
                 >
-                    <div 
+                    <div
                         className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in"
                         onClick={(e) => e.stopPropagation()}
                     >

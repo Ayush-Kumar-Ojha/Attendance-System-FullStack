@@ -35,20 +35,16 @@ const getDayType = (
     workingHours,
     isWeekendOrHoliday = false
 ) => {
-    if (isWeekendOrHoliday) {
+    if (
+        isWeekendOrHoliday
+    ) {
         return "Weekend Work";
     }
 
-    if (workingHours >= 8) {
+    if (
+        Number(workingHours) >= 6
+    ) {
         return "Full Day";
-    }
-
-    if (workingHours > 5) {
-        return "Short Day";
-    }
-
-    if (workingHours >= 4) {
-        return "Half Day";
     }
 
     return "Short Day";
@@ -82,7 +78,7 @@ const getISTDayRange = (
     const end =
         new Date(
             start.getTime() +
-                MILLISECONDS_IN_DAY
+            MILLISECONDS_IN_DAY
         );
 
     return {
@@ -210,7 +206,7 @@ const getEmployeeCorrectionUsage =
             remaining:
                 Math.max(
                     MONTHLY_CORRECTION_LIMIT -
-                        used,
+                    used,
                     0
                 ),
         };
@@ -363,7 +359,7 @@ export const clockInOut =
                         },
                     })
                     .catch(
-                        () => {}
+                        () => { }
                     );
 
                 return res.json(
@@ -414,7 +410,7 @@ export const clockInOut =
                 if (
                     !existing.source ||
                     existing.source ===
-                        "AUTO_CHECKOUT"
+                    "AUTO_CHECKOUT"
                 ) {
                     existing.source =
                         "NORMAL";
@@ -509,7 +505,7 @@ export const getAttendance =
                 parseInt(
                     req.query
                         .limit ||
-                        30,
+                    30,
                     10
                 );
 
@@ -755,7 +751,7 @@ export const correctMissedAttendance =
                     .json({
                         error:
                             existing.source ===
-                            "EMPLOYEE_CORRECTION"
+                                "EMPLOYEE_CORRECTION"
                                 ? "You have already corrected attendance for this date."
                                 : "This date already has completed attendance. Please contact HR/Admin if it needs to be changed.",
                     });
@@ -792,9 +788,9 @@ export const correctMissedAttendance =
 
             const isWeekend =
                 istDayName ===
-                    "Sat" ||
+                "Sat" ||
                 istDayName ===
-                    "Sun";
+                "Sun";
 
             const dayType =
                 getDayType(
@@ -1143,9 +1139,9 @@ export const adminOverrideAttendance =
 
             const isWeekend =
                 istDayName ===
-                    "Sat" ||
+                "Sat" ||
                 istDayName ===
-                    "Sun";
+                "Sun";
 
             let checkIn =
                 null;
@@ -1336,7 +1332,7 @@ export const adminOverrideAttendance =
 
                 message:
                     status ===
-                    "ABSENT"
+                        "ABSENT"
                         ? "Employee marked absent successfully."
                         : "Attendance overridden successfully.",
 

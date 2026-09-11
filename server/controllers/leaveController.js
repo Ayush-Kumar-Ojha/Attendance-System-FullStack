@@ -30,12 +30,12 @@ const getLeaveDayCount = (leave) => {
     return (
         Math.round(
             diffTime /
-                (
-                    1000 *
-                    60 *
-                    60 *
-                    24
-                )
+            (
+                1000 *
+                60 *
+                60 *
+                24
+            )
         ) + 1
     );
 };
@@ -172,6 +172,24 @@ export const createLeave = async (
         }
 
         // ====================================================
+        // WELLNESS LEAVE - FEMALE EMPLOYEES ONLY
+        // ====================================================
+
+        if (
+            type === "MENSTRUAL" &&
+            String(employee.gender || "")
+                .trim()
+                .toUpperCase() !== "FEMALE"
+        ) {
+            return res
+                .status(403)
+                .json({
+                    error:
+                        "Wellness Leave is available only to female employees.",
+                });
+        }
+
+        // ====================================================
         // DATE VALIDATION
         // ====================================================
 
@@ -269,17 +287,17 @@ export const createLeave = async (
 
                     halfDayPeriod:
                         type ===
-                        "HALF_DAY"
+                            "HALF_DAY"
                             ? halfDayPeriod
                             : null,
 
                     workedDate:
                         type ===
                             "COMPENSATORY" &&
-                        workedDate
+                            workedDate
                             ? new Date(
-                                  workedDate
-                              )
+                                workedDate
+                            )
                             : null,
 
                     startDate:
@@ -746,9 +764,9 @@ export const updateLeaveStatus =
 
             if (
                 status ===
-                    "APPROVED" ||
+                "APPROVED" ||
                 status ===
-                    "REJECTED"
+                "REJECTED"
             ) {
                 const employee =
                     await Employee.findById(
@@ -766,7 +784,7 @@ export const updateLeaveStatus =
                             updatedLeave.isLop ||
                             updatedLeave
                                 .paymentType ===
-                                "UNPAID"
+                            "UNPAID"
                         );
 
                     const leaveTypeLabel =
@@ -783,22 +801,22 @@ export const updateLeaveStatus =
                         approvedAsLop
                             ? "Approved as Loss of Pay"
                             : isApproved
-                            ? "Approved"
-                            : "Rejected";
+                                ? "Approved"
+                                : "Rejected";
 
                     const approvalText =
                         approvedAsLop
                             ? "The leave request has been approved as Loss of Pay (unpaid leave)."
                             : isApproved
-                            ? "The leave request has been approved as paid leave."
-                            : "The leave request has been rejected.";
+                                ? "The leave request has been approved as paid leave."
+                                : "The leave request has been rejected.";
 
                     const decisionColor =
                         approvedAsLop
                             ? "#b45309"
                             : isApproved
-                            ? "#047857"
-                            : "#dc2626";
+                                ? "#047857"
+                                : "#dc2626";
 
                     sendEmail({
                         to:
@@ -823,10 +841,9 @@ export const updateLeaveStatus =
                                         margin-bottom:8px;
                                     "
                                 >
-                                    Hi ${
-                                        employee.firstName ||
-                                        "Employee"
-                                    },
+                                    Hi ${employee.firstName ||
+                            "Employee"
+                            },
                                 </h2>
 
                                 <p style="font-size:15px;">
@@ -868,11 +885,10 @@ export const updateLeaveStatus =
                                         </strong>
 
                                         ${duration}
-                                        day${
-                                            duration !== 1
-                                                ? "s"
-                                                : ""
-                                        }
+                                        day${duration !== 1
+                                ? "s"
+                                : ""
+                            }
                                     </p>
 
                                     <p style="margin:4px 0;">
@@ -881,64 +897,59 @@ export const updateLeaveStatus =
                                         </strong>
 
                                         ${new Date(
-                                            updatedLeave.startDate
-                                        ).toLocaleDateString(
-                                            "en-IN"
-                                        )}
+                                updatedLeave.startDate
+                            ).toLocaleDateString(
+                                "en-IN"
+                            )}
 
                                         -
 
                                         ${new Date(
-                                            updatedLeave.endDate
-                                        ).toLocaleDateString(
-                                            "en-IN"
-                                        )}
+                                updatedLeave.endDate
+                            ).toLocaleDateString(
+                                "en-IN"
+                            )}
                                     </p>
 
-                                    ${
-                                        updatedLeave.type ===
-                                            "HALF_DAY" &&
-                                        updatedLeave
-                                            .halfDayPeriod
-                                            ? `
+                                    ${updatedLeave.type ===
+                                "HALF_DAY" &&
+                                updatedLeave
+                                    .halfDayPeriod
+                                ? `
                                                 <p style="margin:4px 0;">
                                                     <strong>
                                                         Half Day Period:
                                                     </strong>
 
-                                                    ${
-                                                        updatedLeave
-                                                            .halfDayPeriod ===
-                                                        "FIRST_HALF"
-                                                            ? "First Half"
-                                                            : "Second Half"
-                                                    }
+                                                    ${updatedLeave
+                                    .halfDayPeriod ===
+                                    "FIRST_HALF"
+                                    ? "First Half"
+                                    : "Second Half"
+                                }
                                                 </p>
                                             `
-                                            : ""
-                                    }
+                                : ""
+                            }
 
-                                    ${
-                                        updatedLeave.adminRemark
-                                            ? `
+                                    ${updatedLeave.adminRemark
+                                ? `
                                                 <p style="margin:4px 0;">
                                                     <strong>
                                                         Admin Remark:
                                                     </strong>
 
-                                                    ${
-                                                        updatedLeave
-                                                            .adminRemark
-                                                    }
+                                                    ${updatedLeave
+                                    .adminRemark
+                                }
                                                 </p>
                                             `
-                                            : ""
-                                    }
+                                : ""
+                            }
                                 </div>
 
-                                ${
-                                    approvedAsLop
-                                        ? `
+                                ${approvedAsLop
+                                ? `
                                             <p
                                                 style="
                                                     margin-top:18px;
@@ -949,8 +960,8 @@ export const updateLeaveStatus =
                                                 This approved leave has been recorded as Loss of Pay and will not consume your paid leave balance.
                                             </p>
                                         `
-                                        : isApproved
-                                        ? `
+                                : isApproved
+                                    ? `
                                             <p
                                                 style="
                                                     margin-top:18px;
@@ -961,7 +972,7 @@ export const updateLeaveStatus =
                                                 This approved leave will be reflected in your paid leave usage.
                                             </p>
                                         `
-                                        : `
+                                    : `
                                             <p
                                                 style="
                                                     margin-top:18px;
@@ -972,7 +983,7 @@ export const updateLeaveStatus =
                                                 Please contact your administrator if you require further clarification.
                                             </p>
                                         `
-                                }
+                            }
                             </div>
                         `,
                     }).catch(

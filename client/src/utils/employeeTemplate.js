@@ -77,15 +77,24 @@ export const EMPLOYEE_COLUMNS = [
     "PF Number",
     "ESI Number",
 
-    // Existing system fields required by your EMS
+    // Existing EMS fields
     "Employee Code",
-    "Employee Email ID",
+
+    /*
+        IMPORTANT:
+        Email ID is mandatory.
+
+        Excel upload matches employees using Email ID.
+        Existing email -> update same employee.
+        New email -> create new employee.
+    */
+    "Email ID*",
+
     "Department",
     "Designation",
     "Basic Salary",
     "Allowance",
     "Deductions",
-    "Temporary Password",
     "System Role",
 
     "Anniversary Date",
@@ -172,14 +181,22 @@ const EXAMPLE_ROW = [
     "",
     "",
 
+    /*
+        Employee Code is optional for matching.
+        It remains normal employee data.
+    */
     "EMP001",
+
+    /*
+        REQUIRED EMAIL ID
+    */
     "rahul.sharma@company.com",
+
     "Engineering",
     "Software Engineer",
     50000,
     5000,
     0,
-    "TempPass123",
     "EMPLOYEE",
 
     "",
@@ -196,18 +213,71 @@ export const downloadEmployeeTemplate = () => {
             EXAMPLE_ROW,
         ]);
 
+    // =====================================================
+    // COLUMN WIDTHS
+    // =====================================================
+
     worksheet["!cols"] =
-        EMPLOYEE_COLUMNS.map((header) => ({
-            wch: Math.max(
-                header.length + 3,
-                18
-            ),
-        }));
+        EMPLOYEE_COLUMNS.map(
+            (header) => ({
+                wch: Math.max(
+                    header.length + 3,
+                    18
+                ),
+            })
+        );
+
+    // =====================================================
+    // FREEZE HEADER ROW
+    // =====================================================
 
     worksheet["!freeze"] = {
         xSplit: 0,
         ySplit: 1,
     };
+
+    // =====================================================
+    // EMAIL COLUMN VALIDATION / NOTE
+    // =====================================================
+
+    const emailColumnIndex =
+        EMPLOYEE_COLUMNS.findIndex(
+            (column) =>
+                column === "Email ID*"
+        );
+
+    if (emailColumnIndex !== -1) {
+        const emailColumnLetter =
+            XLSX.utils.encode_col(
+                emailColumnIndex
+            );
+
+        /*
+            Add a note to the Email ID header.
+
+            This does not replace backend validation.
+            Backend still strictly checks Email ID.
+        */
+
+        const emailHeaderCell =
+            worksheet[
+                `${emailColumnLetter}1`
+            ];
+
+        if (emailHeaderCell) {
+            emailHeaderCell.c = [
+                {
+                    a: "System",
+                    t:
+                        "Required field. Email ID is used to match employees during Excel upload. Existing email updates the same employee; a new email creates a new employee.",
+                },
+            ];
+        }
+    }
+
+    // =====================================================
+    // WORKBOOK
+    // =====================================================
 
     const workbook =
         XLSX.utils.book_new();

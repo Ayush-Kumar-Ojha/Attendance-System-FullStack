@@ -11,11 +11,22 @@ const removeLegacyEmployeeUniqueIndexes = async () => {
         const indexes =
             await Employee.collection.indexes();
 
+        /*
+            IMPORTANT:
+
+            Email is NOT included here anymore.
+
+            Email will remain protected as a unique
+            employee identifier.
+
+            Only old optional unique indexes for
+            userId / employeeCode can be cleaned.
+        */
+
         const optionalFields =
             new Set([
                 "userId",
                 "employeeCode",
-                "email",
             ]);
 
         for (const index of indexes) {
@@ -86,54 +97,185 @@ const textValue = (
     return result || fallback;
 };
 
-// Temporary password:
+// =====================================================
+// EMAIL HELPERS
+// =====================================================
+
+const DUPLICATE_EMPLOYEE_EMAIL_MESSAGE =
+    "This employee already exists with this email ID.";
+
+const EMAIL_REQUIRED_MESSAGE =
+    "Email ID is required.";
+
+const EXCEL_EMAIL_REQUIRED_MESSAGE =
+    "Email ID is required in the Excel file.";
+
+const normalizeEmail = (
+    value
+) =>
+    textValue(value)
+        .trim()
+        .toLowerCase();
+
+const findEmployeeByEmail =
+    async (
+        email,
+        excludeEmployeeId = null
+    ) => {
+        const normalizedEmail =
+            normalizeEmail(
+                email
+            );
+
+        if (
+            !normalizedEmail
+        ) {
+            return null;
+        }
+
+        const query = {
+            email:
+                normalizedEmail,
+        };
+
+        if (
+            excludeEmployeeId
+        ) {
+            query._id = {
+                $ne:
+                    excludeEmployeeId,
+            };
+        }
+
+        /*
+            DO NOT filter by isDeleted.
+
+            Deleted and permanently-hidden employees
+            still reserve their email ID.
+        */
+
+        return Employee.findOne(
+            query
+        );
+    };
+
+const getEmployeeDisplayName = (
+    employee
+) =>
+    textValue(
+        employee?.name ||
+        `${employee?.firstName || ""} ${employee?.lastName || ""}`.trim(),
+        "Existing employee"
+    );
+
+const buildEmailConflictPayload = (
+    employee,
+    message = null
+) => {
+    const employeeName =
+        getEmployeeDisplayName(
+            employee
+        );
+
+    const canGenerateExistingCard =
+        Boolean(
+            employee?.isDeleted ||
+            employee?.isPermanentlyHidden
+        );
+
+    return {
+        error:
+            message ||
+            `This email ID already exists for employee ${employeeName}.`,
+
+        conflictType:
+            "EMPLOYEE_EMAIL_EXISTS",
+
+        existingEmployee: {
+            employeeId:
+                employee?._id?.toString?.() ||
+                String(
+                    employee?._id ||
+                    ""
+                ),
+
+            name:
+                employeeName,
+
+            email:
+                normalizeEmail(
+                    employee?.email
+                ),
+
+            isDeleted:
+                Boolean(
+                    employee?.isDeleted
+                ),
+
+            isPermanentlyHidden:
+                Boolean(
+                    employee?.isPermanentlyHidden
+                ),
+        },
+
+        canGenerateExistingCard,
+    };
+};
+
+// =====================================================
+// TEMPORARY PASSWORD
+// =====================================================
 //
-// First 3 alphabetic characters from name
-// +
-// First 3 digits from Phone Number
-// (Mobile Number is used if Phone Number is empty)
-// +
-// @#
+// Temporary password format:
 //
-// Example:
-// Ayush + 9876543210
-// => Ayu987@#
+// first up to 3 alphabetic characters from employee name
+// + @#123
+//
+// Examples:
+//
+// Ayush => Ayu@#123
+// Om    => Om@#123
+//
+// IMPORTANT:
+//
+// Temporary password is generated only when the employee's
+// login account is originally created.
+//
+// Updating from Excel does NOT regenerate it.
+//
+// Editing employee details does NOT regenerate it.
+//
+// Restoring / regenerating an existing Employee card does
+// NOT regenerate it.
+//
+// Employee.temporaryPassword keeps the original plain
+// temporary password visible to Admin.
+//
+// Authentication continues to use User.password only.
+// =====================================================
 
 const generateTemporaryPassword = (
-    name,
-    phone
+    name
 ) => {
     const namePart =
         String(name || "")
+            .trim()
             .replace(
                 /[^A-Za-z]/g,
                 ""
             )
             .slice(0, 3);
 
-    const phonePart =
-        String(phone || "")
-            .replace(/\D/g, "")
-            .slice(0, 3);
-
-    if (
-        namePart.length < 3 ||
-        phonePart.length < 3
-    ) {
+    if (!namePart) {
         return "";
     }
 
-    return `${namePart}${phonePart}@#`;
+    return `${namePart}@#123`;
 };
 
-const getEmployeePhoneForPassword =
-    (source = {}) =>
-        textValue(
-            source.phone
-        ) ||
-        textValue(
-            source.mobileNumber
-        );
+// =====================================================
+// VALUE HELPERS
+// =====================================================
 
 const numberValue = (
     value,
@@ -241,9 +383,12 @@ const splitEmployeeName = (
                 .trim();
 
         return {
-            name: complete,
+            name:
+                complete,
+
             firstName:
                 explicitFirst,
+
             lastName:
                 explicitLast,
         };
@@ -263,9 +408,12 @@ const splitEmployeeName = (
             .filter(Boolean);
 
     return {
-        name: fullName,
+        name:
+            fullName,
+
         firstName:
             parts[0] || "",
+
         lastName:
             parts
                 .slice(1)
@@ -281,7 +429,10 @@ const normalizeGender = (
             .toUpperCase();
 
     if (
-        ["M", "MALE"].includes(
+        [
+            "M",
+            "MALE",
+        ].includes(
             gender
         )
     ) {
@@ -289,7 +440,10 @@ const normalizeGender = (
     }
 
     if (
-        ["F", "FEMALE"].includes(
+        [
+            "F",
+            "FEMALE",
+        ].includes(
             gender
         )
     ) {
@@ -297,7 +451,10 @@ const normalizeGender = (
     }
 
     if (
-        ["O", "OTHER"].includes(
+        [
+            "O",
+            "OTHER",
+        ].includes(
             gender
         )
     ) {
@@ -317,7 +474,9 @@ const normalizeMaritalStatus =
             [
                 "UNMARRIED",
                 "SINGLE",
-            ].includes(status)
+            ].includes(
+                status
+            )
         ) {
             return "SINGLE";
         }
@@ -327,7 +486,9 @@ const normalizeMaritalStatus =
                 "MARRIED",
                 "DIVORCED",
                 "WIDOWED",
-            ].includes(status)
+            ].includes(
+                status
+            )
         ) {
             return status;
         }
@@ -353,6 +514,7 @@ const DATE_FIELDS =
 const NUMBER_FIELDS =
     new Set([
         "numberOfChildren",
+        "yearOfPassing",
         "basicSalary",
         "allowances",
         "deductions",
@@ -362,6 +524,7 @@ const EMPLOYEE_FIELDS = [
     "name",
     "firstName",
     "lastName",
+
     "fatherName",
     "gender",
     "bloodGroup",
@@ -481,7 +644,9 @@ const buildEmployeeData = (
         source.lastName !==
         undefined;
 
-    if (hasNameInput) {
+    if (
+        hasNameInput
+    ) {
         result.name =
             names.name;
 
@@ -490,12 +655,13 @@ const buildEmployeeData = (
 
         result.lastName =
             names.lastName;
-    } else if (existing) {
+    } else if (
+        existing
+    ) {
         result.name =
             existing.name ||
-            `${existing.firstName || ""} ${existing.lastName ||
-                ""
-                }`.trim();
+            `${existing.firstName || ""} ${existing.lastName || ""}`
+                .trim();
 
         result.firstName =
             existing.firstName ||
@@ -515,7 +681,9 @@ const buildEmployeeData = (
                 "name",
                 "firstName",
                 "lastName",
-            ].includes(field)
+            ].includes(
+                field
+            )
         ) {
             continue;
         }
@@ -580,9 +748,9 @@ const buildEmployeeData = (
                 "email"
             ) {
                 result[field] =
-                    textValue(
+                    normalizeEmail(
                         source[field]
-                    ).toLowerCase();
+                    );
 
                 continue;
             }
@@ -596,7 +764,8 @@ const buildEmployeeData = (
                 result[field] =
                     textValue(
                         source[field]
-                    ).toUpperCase();
+                    )
+                        .toUpperCase();
 
                 continue;
             }
@@ -608,7 +777,8 @@ const buildEmployeeData = (
                 const status =
                     textValue(
                         source[field]
-                    ).toUpperCase();
+                    )
+                        .toUpperCase();
 
                 result[field] =
                     [
@@ -619,51 +789,15 @@ const buildEmployeeData = (
                         status
                     )
                         ? status
-                        : "";
+                        : "ACTIVE";
 
                 continue;
             }
 
             result[field] =
-                textValue(
-                    source[field]
-                );
-        } else if (
-            existing &&
-            existing[field] !==
-            undefined
-        ) {
-            result[field] =
-                existing[field];
+                source[field];
         }
     }
-
-    result.dynamicFields =
-        Array.isArray(
-            source.dynamicFields
-        )
-            ? source.dynamicFields
-            : existing
-                ?.dynamicFields ||
-            [];
-
-    result.customFields =
-        Array.isArray(
-            source.customFields
-        )
-            ? source.customFields
-            : existing
-                ?.customFields ||
-            [];
-
-    result.customSections =
-        Array.isArray(
-            source.customSections
-        )
-            ? source.customSections
-            : existing
-                ?.customSections ||
-            [];
 
     return result;
 };
@@ -672,234 +806,17 @@ const buildEmployeeData = (
 // EXCEL HELPERS
 // =====================================================
 
-const normalizeExcelHeader = (value) =>
+const normalizeExcelHeader = (
+    value
+) =>
     String(value || "")
         .trim()
         .toLowerCase()
-        .replace(/['’]/g, "")
-        .replace(/&/g, " and ")
-        .replace(/[_\-./()]/g, " ")
-        .replace(/[*:#?]/g, " ")
-        .replace(/\s+/g, " ")
+        .replace(/\*/g, "")
+        .replace(/&/g, "and")
+        .replace(/[^a-z0-9]+/g, "")
         .trim();
 
-const HEADER_ALIASES = {
-    name: "name",
-    "employee name": "name",
-    "full name": "name",
-    "employee full name": "name",
-
-    "first name": "firstName",
-    firstname: "firstName",
-
-    "last name": "lastName",
-    lastname: "lastName",
-    surname: "lastName",
-
-    "fathers name": "fatherName",
-    "father name": "fatherName",
-
-    gender: "gender",
-    sex: "gender",
-
-    "blood group": "bloodGroup",
-    bloodgroup: "bloodGroup",
-
-    "date of birth": "dateOfBirth",
-    dob: "dateOfBirth",
-
-    "date of joining": "joinDate",
-    "joining date": "joinDate",
-    doj: "joinDate",
-
-    "birth place": "birthPlace",
-    birthplace: "birthPlace",
-
-    nationality: "nationality",
-
-    "mother tongue": "motherTongue",
-
-    languages: "languages",
-    language: "languages",
-
-    "phone number": "phone",
-    phone: "phone",
-
-    "passport number": "passportNumber",
-
-    "identification mark": "identificationMark",
-
-    "manpower type": "manpowerType",
-
-    "vendor code": "vendorCode",
-
-    "marital status": "maritalStatus",
-
-    "number of children": "numberOfChildren",
-
-    "safety issued": "safetyIssued",
-    "safety issued or not": "safetyIssued",
-
-    "shoe size": "shoeSize",
-    "shoe issue date": "shoeIssueDate",
-
-    "safety helmet": "safetyHelmet",
-    "helmet color": "helmetColor",
-    "helmet issue date": "helmetIssueDate",
-
-    jacket: "jacket",
-    "jacket size": "jacketSize",
-    "jacket issue date": "jacketIssueDate",
-
-    "eye protection equipment":
-        "eyeProtectionEquipment",
-
-    "permanent address line 1":
-        "permanentAddressLine1",
-    "permanent address line 2":
-        "permanentAddressLine2",
-    "permanent city": "permanentCity",
-    "permanent country": "permanentCountry",
-    "permanent state": "permanentState",
-    "permanent pin code": "permanentPinCode",
-
-    "present address line 1":
-        "presentAddressLine1",
-    "present address line 2":
-        "presentAddressLine2",
-    "present city": "presentCity",
-    village: "village",
-    "present country": "presentCountry",
-    "present state": "presentState",
-    "present pin code": "presentPinCode",
-
-    "mobile number": "mobileNumber",
-    mobile: "mobileNumber",
-
-    "emergency contact person name":
-        "emergencyContactPersonName",
-    "emergency contact person relation":
-        "emergencyContactPersonRelation",
-    "emergency contact person address":
-        "emergencyContactPersonAddress",
-    "emergency mobile number":
-        "emergencyMobileNumber",
-
-    qualification: "qualification",
-    specialization: "specialization",
-
-    "college school name":
-        "collegeSchoolName",
-
-    "board university name":
-        "boardUniversityName",
-
-    "year of passing": "yearOfPassing",
-
-    resume: "resume",
-    "appointment letter":
-        "appointmentLetter",
-    "degree certificate":
-        "degreeCertificate",
-    "kyc document": "kycDocument",
-    "medical certificate":
-        "medicalCertificate",
-
-    "previous employment appointment letter":
-        "previousEmploymentAppointmentLetter",
-
-    "previous employment relevant experience letter":
-        "previousEmploymentRelevantExperienceLetter",
-
-    "police verification":
-        "policeVerification",
-
-    "bank account number":
-        "bankAccountNumber",
-    "bank account name":
-        "bankAccountName",
-    "bank account type":
-        "bankAccountType",
-
-    "ifsc code": "ifscCode",
-    ifsc: "ifscCode",
-
-    "bank name": "bankName",
-    "branch name": "branchName",
-
-    "uan number": "uanNumber",
-    uan: "uanNumber",
-
-    "pf number": "pfNumber",
-    "esi number": "esiNumber",
-
-    "employee code": "employeeCode",
-    "emp code": "employeeCode",
-    "employee id": "employeeCode",
-    "emp id": "employeeCode",
-
-    "employee email id": "email",
-    "email id": "email",
-    "work email": "email",
-    email: "email",
-
-    department: "department",
-
-    designation: "position",
-    position: "position",
-
-    "basic salary": "basicSalary",
-
-    allowances: "allowances",
-    allowance: "allowances",
-
-    deductions: "deductions",
-    deduction: "deductions",
-
-    "temporary password": "password",
-    password: "password",
-
-    role: "role",
-    "system role": "role",
-
-    "anniversary date":
-        "anniversaryDate",
-    "confirmation date":
-        "confirmationDate",
-
-    "aadhaar number": "aadharNumber",
-    "aadhaar no": "aadharNumber",
-    "aadhar number": "aadharNumber",
-    "aadhar no": "aadharNumber",
-    aadhaar: "aadharNumber",
-    aadhar: "aadharNumber",
-
-    "pan number": "panNumber",
-    "pan no": "panNumber",
-    pan: "panNumber",
-
-    bio: "bio",
-
-    "employment status":
-        "employmentStatus",
-
-    // Optional Excel-only operation column.
-    action: "excelAction",
-};
-
-const resolveExcelField = (column) => {
-    const normalized =
-        normalizeExcelHeader(column);
-
-    if (!normalized) {
-        return null;
-    }
-
-    return (
-        HEADER_ALIASES[normalized] ||
-        null
-    );
-};
 const cleanExcelValue = (
     value
 ) => {
@@ -910,148 +827,464 @@ const cleanExcelValue = (
         return "";
     }
 
-    if (value instanceof Date) {
+    if (
+        value instanceof Date
+    ) {
         return value;
     }
 
     return String(value)
-        .replace(/\u00a0/g, " ")
         .trim();
 };
 
 const isEmptyExcelValue = (
     value
-) => {
-    if (
-        value === undefined ||
-        value === null
-    ) {
-        return true;
-    }
-
-    if (value instanceof Date) {
-        return false;
-    }
-
-    return (
-        String(value)
-            .replace(/\u00a0/g, " ")
-            .trim() === ""
+) =>
+    value ===
+    undefined ||
+    value ===
+    null ||
+    (
+        typeof value ===
+        "string" &&
+        value.trim() ===
+        ""
     );
+
+const normalizeNameForMatch = (value) => {
+    return String(value || "")
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 };
 
-const normalizeIdentifier = (
+const normalizeDynamicFieldKey = (
     value
 ) =>
-    textValue(value)
-        .toLowerCase()
-        .replace(/\s+/g, "");
-
-const normalizeNameForMatch = (
-    value
-) =>
-    textValue(value)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
-
-const employeeDocumentName = (
-    employee
-) =>
-    normalizeNameForMatch(
-        employee?.name ||
-        `${employee?.firstName || ""} ${employee?.lastName || ""}`.trim()
+    normalizeExcelHeader(
+        value
     );
 
-const normalizeDynamicKey = (
-    value
-) =>
-    normalizeExcelHeader(value)
-        .replace(/\s+/g, "_");
+// =====================================================
+// EXCEL FIELD ALIASES
+// =====================================================
 
-const dynamicKey = (
-    section,
-    label
-) => {
-    const sectionKey =
-        normalizeDynamicKey(
-            section
-        );
+const EXCEL_FIELD_ALIASES = {
+    action:
+        "excelAction",
 
-    const labelKey =
-        normalizeDynamicKey(
-            label
-        );
+    excelaction:
+        "excelAction",
 
-    if (!labelKey) {
-        return "";
-    }
+    name:
+        "name",
 
-    return sectionKey
-        ? `${sectionKey}__${labelKey}`
-        : labelKey;
+    employeename:
+        "name",
+
+    fullname:
+        "name",
+
+    firstname:
+        "firstName",
+
+    lastname:
+        "lastName",
+
+    fathername:
+        "fatherName",
+
+    gender:
+        "gender",
+
+    bloodgroup:
+        "bloodGroup",
+
+    dateofbirth:
+        "dateOfBirth",
+
+    dob:
+        "dateOfBirth",
+
+    birthdate:
+        "dateOfBirth",
+
+    joiningdate:
+        "joinDate",
+
+    joindate:
+        "joinDate",
+
+    dateofjoining:
+        "joinDate",
+
+    birthplace:
+        "birthPlace",
+
+    nationality:
+        "nationality",
+
+    mothertongue:
+        "motherTongue",
+
+    languages:
+        "languages",
+
+    language:
+        "languages",
+
+    email:
+        "email",
+
+    emailid:
+        "email",
+
+    employeeemail:
+        "email",
+
+    employeeemailid:
+        "email",
+
+    phone:
+        "phone",
+
+    phonenumber:
+        "phone",
+
+    mobile:
+        "mobileNumber",
+
+    mobilenumber:
+        "mobileNumber",
+
+    passportnumber:
+        "passportNumber",
+
+    identificationmark:
+        "identificationMark",
+
+    manpowertype:
+        "manpowerType",
+
+    vendorcode:
+        "vendorCode",
+
+    maritalstatus:
+        "maritalStatus",
+
+    numberofchildren:
+        "numberOfChildren",
+
+    noofchildren:
+        "numberOfChildren",
+
+    safetyissued:
+        "safetyIssued",
+
+    shoesize:
+        "shoeSize",
+
+    shoeissuedate:
+        "shoeIssueDate",
+
+    safetyhelmet:
+        "safetyHelmet",
+
+    helmetcolor:
+        "helmetColor",
+
+    helmetissuedate:
+        "helmetIssueDate",
+
+    jacket:
+        "jacket",
+
+    jacketsize:
+        "jacketSize",
+
+    jacketissuedate:
+        "jacketIssueDate",
+
+    eyeprotectionequipment:
+        "eyeProtectionEquipment",
+
+    permanentaddressline1:
+        "permanentAddressLine1",
+
+    permanentaddress1:
+        "permanentAddressLine1",
+
+    permanentaddressline2:
+        "permanentAddressLine2",
+
+    permanentaddress2:
+        "permanentAddressLine2",
+
+    permanentcity:
+        "permanentCity",
+
+    permanentcountry:
+        "permanentCountry",
+
+    permanentstate:
+        "permanentState",
+
+    permanentpincode:
+        "permanentPinCode",
+
+    presentaddressline1:
+        "presentAddressLine1",
+
+    presentaddress1:
+        "presentAddressLine1",
+
+    presentaddressline2:
+        "presentAddressLine2",
+
+    presentaddress2:
+        "presentAddressLine2",
+
+    presentcity:
+        "presentCity",
+
+    village:
+        "village",
+
+    presentcountry:
+        "presentCountry",
+
+    presentstate:
+        "presentState",
+
+    presentpincode:
+        "presentPinCode",
+
+    emergencycontactpersonname:
+        "emergencyContactPersonName",
+
+    emergencycontactname:
+        "emergencyContactPersonName",
+
+    emergencycontactpersonrelation:
+        "emergencyContactPersonRelation",
+
+    emergencycontactrelation:
+        "emergencyContactPersonRelation",
+
+    emergencycontactpersonaddress:
+        "emergencyContactPersonAddress",
+
+    emergencymobilenumber:
+        "emergencyMobileNumber",
+
+    emergencyphone:
+        "emergencyMobileNumber",
+
+    qualification:
+        "qualification",
+
+    specialization:
+        "specialization",
+
+    collegeschoolname:
+        "collegeSchoolName",
+
+    college:
+        "collegeSchoolName",
+
+    school:
+        "collegeSchoolName",
+
+    boarduniversityname:
+        "boardUniversityName",
+
+    university:
+        "boardUniversityName",
+
+    yearofpassing:
+        "yearOfPassing",
+
+    resume:
+        "resume",
+
+    appointmentletter:
+        "appointmentLetter",
+
+    degreecertificate:
+        "degreeCertificate",
+
+    kycdocument:
+        "kycDocument",
+
+    medicalcertificate:
+        "medicalCertificate",
+
+    previousemploymentappointmentletter:
+        "previousEmploymentAppointmentLetter",
+
+    previousemploymentrelevantexperienceletter:
+        "previousEmploymentRelevantExperienceLetter",
+
+    policeverification:
+        "policeVerification",
+
+    bankaccountnumber:
+        "bankAccountNumber",
+
+    bankaccountname:
+        "bankAccountName",
+
+    bankaccounttype:
+        "bankAccountType",
+
+    ifsccode:
+        "ifscCode",
+
+    bankname:
+        "bankName",
+
+    branchname:
+        "branchName",
+
+    uannumber:
+        "uanNumber",
+
+    uan:
+        "uanNumber",
+
+    pfnumber:
+        "pfNumber",
+
+    esinumber:
+        "esiNumber",
+
+    employeecode:
+        "employeeCode",
+
+    department:
+        "department",
+
+    designation:
+        "position",
+
+    position:
+        "position",
+
+    basicsalary:
+        "basicSalary",
+
+    allowance:
+        "allowances",
+
+    allowances:
+        "allowances",
+
+    deduction:
+        "deductions",
+
+    deductions:
+        "deductions",
+
+    systemrole:
+        "role",
+
+    role:
+        "role",
+
+    anniversarydate:
+        "anniversaryDate",
+
+    confirmationdate:
+        "confirmationDate",
+
+    aadharnumber:
+        "aadharNumber",
+
+    aadhaarnumber:
+        "aadharNumber",
+
+    aadhar:
+        "aadharNumber",
+
+    aadhaar:
+        "aadharNumber",
+
+    pannumber:
+        "panNumber",
+
+    pan:
+        "panNumber",
+
+    bio:
+        "bio",
+
+    employmentstatus:
+        "employmentStatus",
+
+    status:
+        "employmentStatus",
 };
-const valuesAreEqual = (
-    first,
-    second
+
+// =====================================================
+// EXCEL DYNAMIC FIELDS
+// =====================================================
+
+const buildExcelDynamicFields = (
+    row,
+    columns
 ) => {
-    if (
-        first instanceof Date ||
-        second instanceof Date
+    const fields = [];
+
+    for (
+        const column
+        of columns
     ) {
-        const firstDate =
-            parseEmployeeDate(
-                first
-            );
-
-        const secondDate =
-            parseEmployeeDate(
-                second
-            );
-
         if (
-            !firstDate &&
-            !secondDate
+            !column?.isDynamic
         ) {
-            return true;
+            continue;
         }
 
-        if (
-            !firstDate ||
-            !secondDate
-        ) {
-            return false;
-        }
+        const value =
+            cleanExcelValue(
+                row[
+                column.index
+                ]
+            );
 
-        return (
-            firstDate.getTime() ===
-            secondDate.getTime()
-        );
+        fields.push({
+            section:
+                "Excel Additional Fields",
+
+            label:
+                column.originalHeader,
+
+            key:
+                column.dynamicKey,
+
+            value,
+        });
     }
 
-    return (
-        textValue(first) ===
-        textValue(second)
-    );
+    return fields;
 };
 
 const mergeDynamicFields = (
     existingFields = [],
-    incomingFields = [],
-    allColumns = []
+    incomingFields = []
 ) => {
     const map =
         new Map();
 
     for (
         const field
-        of Array.isArray(
-            existingFields
-        )
-            ? existingFields
-            : []
+        of existingFields || []
     ) {
         const key =
-            normalizeDynamicKey(
+            normalizeDynamicFieldKey(
                 field?.key ||
                 field?.label
             );
@@ -1083,82 +1316,60 @@ const mergeDynamicFields = (
         );
     }
 
-    /*
-        IMPORTANT CHANGE:
-
-        Every dynamic column that exists
-        in the currently uploaded Excel
-        becomes the source of truth.
-
-        If the column exists but the
-        employee's cell is blank, the
-        stored value becomes blank.
-
-        We do NOT invent any value.
-    */
-
-    for (
-        const column
-        of Array.isArray(
-            allColumns
-        )
-            ? allColumns
-            : []
-    ) {
-        if (
-            !column?.isDynamic
-        ) {
-            continue;
-        }
-
-        const key =
-            normalizeDynamicKey(
-                column.key ||
-                column.header
-            );
-
-        if (!key) {
-            continue;
-        }
-
-        if (!map.has(key)) {
-            map.set(
-                key,
-                {
-                    section:
-                        textValue(
-                            column.section,
-                            "Excel Additional Fields"
-                        ),
-
-                    label:
-                        textValue(
-                            column.header
-                        ),
-
-                    key,
-
-                    value: "",
-                }
-            );
-        }
-    }
-
     for (
         const field
-        of Array.isArray(
-            incomingFields
-        )
-            ? incomingFields
-            : []
+        of incomingFields || []
     ) {
         const key =
-            normalizeDynamicKey(
+            normalizeDynamicFieldKey(
                 field?.key ||
                 field?.label
             );
 
         if (!key) {
+            continue;
+        }
+
+        const incomingValue =
+            field?.value;
+
+        if (
+            isEmptyExcelValue(
+                incomingValue
+            )
+        ) {
+            /*
+                Blank incoming cells do NOT erase
+                an existing custom/dynamic value.
+            */
+
+            if (
+                !map.has(
+                    key
+                )
+            ) {
+                map.set(
+                    key,
+                    {
+                        section:
+                            textValue(
+                                field?.section,
+                                "Excel Additional Fields"
+                            ),
+
+                        label:
+                            textValue(
+                                field?.label
+                            ),
+
+                        key,
+
+                        value:
+                            "",
+                    }
+                );
+            }
+
             continue;
         }
 
@@ -1179,12 +1390,7 @@ const mergeDynamicFields = (
                 key,
 
                 value:
-                    field?.value ===
-                        undefined ||
-                        field?.value ===
-                        null
-                        ? ""
-                        : field.value,
+                    incomingValue,
             }
         );
     }
@@ -1198,40 +1404,14 @@ const mergeDynamicFields = (
 // EXCEL SOURCE-OF-TRUTH HELPERS
 // =====================================================
 
-/*
-    These fields are managed by Excel
-    whenever the corresponding column
-    exists in the uploaded sheet.
-
-    RULE:
-
-    Column exists + value exists
-    -> save value.
-
-    Column exists + blank cell
-    -> save blank.
-
-    Column does not exist
-    -> clear old Excel-managed value.
-
-    This prevents old generated values
-    such as:
-
-    EMP0029
-    emp0029@employee.local
-    WEHA001
-
-    from remaining on an employee when
-    they are not actually present in
-    the uploaded Excel.
-*/
-
 const EXCEL_MANAGED_FIELDS =
     EMPLOYEE_FIELDS.filter(
         (field) =>
             ![
                 "bio",
-            ].includes(field)
+            ].includes(
+                field
+            )
     );
 
 const getExcelKnownColumns = (
@@ -1270,33 +1450,13 @@ const getExcelKnownColumns = (
     return fields;
 };
 
-const getEmptyValueForEmployeeField =
-    (field) => {
-        if (
-            DATE_FIELDS.has(
-                field
-            )
-        ) {
-            return null;
-        }
-
-        if (
-            NUMBER_FIELDS.has(
-                field
-            )
-        ) {
-            return null;
-        }
-
-        return "";
-    };
-
 const buildExcelSourceOfTruthData = ({
     employeeData = {},
     knownData = {},
     columns = [],
 }) => {
-    const result = {};
+    const result =
+        {};
 
     const excelKnownColumns =
         getExcelKnownColumns(
@@ -1304,29 +1464,11 @@ const buildExcelSourceOfTruthData = ({
         );
 
     /*
-        First clear all Excel-managed
-        fields.
+        Only values actually supplied in the new Excel
+        are allowed to update the existing employee.
 
-        This is intentional.
-
-        If the Excel did not provide a
-        field, we do NOT retain an old
-        fake/generated value.
-    */
-
-    for (
-        const field
-        of EXCEL_MANAGED_FIELDS
-    ) {
-        result[field] =
-            getEmptyValueForEmployeeField(
-                field
-            );
-    }
-
-    /*
-        Then apply only the real values
-        supplied by Excel.
+        Missing columns and blank cells preserve the
+        old database value.
     */
 
     for (
@@ -1343,7 +1485,9 @@ const buildExcelSourceOfTruthData = ({
                 "dynamicFields",
                 "customFields",
                 "customSections",
-            ].includes(field)
+            ].includes(
+                field
+            )
         ) {
             continue;
         }
@@ -1356,33 +1500,55 @@ const buildExcelSourceOfTruthData = ({
             continue;
         }
 
+        if (
+            !excelKnownColumns.has(
+                field
+            )
+        ) {
+            continue;
+        }
+
+        if (
+            isEmptyExcelValue(
+                value
+            )
+        ) {
+            continue;
+        }
+
         result[field] =
             value;
     }
 
-    /*
-        Name needs special handling.
-
-        If Excel contains any name
-        column, use the parsed values.
-
-        If it contains no name columns,
-        the values remain blank rather
-        than being manufactured.
-    */
-
-    const hasNameColumn =
-        excelKnownColumns.has(
-            "name"
+    const hasNonBlankName =
+        (
+            excelKnownColumns.has(
+                "name"
+            ) &&
+            !isEmptyExcelValue(
+                knownData.name
+            )
         ) ||
-        excelKnownColumns.has(
-            "firstName"
+        (
+            excelKnownColumns.has(
+                "firstName"
+            ) &&
+            !isEmptyExcelValue(
+                knownData.firstName
+            )
         ) ||
-        excelKnownColumns.has(
-            "lastName"
+        (
+            excelKnownColumns.has(
+                "lastName"
+            ) &&
+            !isEmptyExcelValue(
+                knownData.lastName
+            )
         );
 
-    if (hasNameColumn) {
+    if (
+        hasNonBlankName
+    ) {
         const names =
             splitEmployeeName(
                 knownData.name,
@@ -1390,14 +1556,26 @@ const buildExcelSourceOfTruthData = ({
                 knownData.lastName
             );
 
-        result.name =
-            names.name;
+        if (
+            names.name
+        ) {
+            result.name =
+                names.name;
+        }
 
-        result.firstName =
-            names.firstName;
+        if (
+            names.firstName
+        ) {
+            result.firstName =
+                names.firstName;
+        }
 
-        result.lastName =
-            names.lastName;
+        if (
+            names.lastName
+        ) {
+            result.lastName =
+                names.lastName;
+        }
     }
 
     return result;
@@ -1422,9 +1600,7 @@ export const createEmployee =
                     source.lastName
                 );
 
-            if (
-                !names.name
-            ) {
+            if (!names.name) {
                 return res
                     .status(400)
                     .json({
@@ -1433,128 +1609,212 @@ export const createEmployee =
                     });
             }
 
-            const employeeCode =
-                source.employeeCode !==
-                    undefined
-                    ? String(
-                        source.employeeCode ||
-                        ""
-                    ).trim()
-                    : "";
+            // =================================================
+            // EMAIL IS REQUIRED
+            // =================================================
 
             const email =
-                source.email !==
-                    undefined
-                    ? String(
-                        source.email ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase()
-                    : "";
+                normalizeEmail(
+                    source.email
+                );
+
+            if (!email) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Please enter employee email.",
+                    });
+            }
 
             /*
-                IMPORTANT:
+                Check ALL Employee records.
 
-                employeeCode is NEVER
-                generated here.
-
-                email is NEVER generated
-                here.
-
-                If admin leaves them
-                blank, they stay blank.
+                Deleted and permanently hidden employees are
+                intentionally included because their email must
+                continue identifying the archived employee.
             */
 
-            let user = null;
-            let temporaryPassword =
-                "";
+            const existingEmployee =
+                await findEmployeeByEmail(
+                    email
+                );
 
-            if (email) {
-                const existingUser =
-                    await User.findOne({
-                        email,
-                    });
+            if (existingEmployee) {
+                const existingName =
+                    getEmployeeDisplayName(
+                        existingEmployee
+                    );
 
-                if (
-                    existingUser
-                ) {
+                const submittedName =
+                    normalizeNameForMatch(
+                        names.name
+                    );
+
+                const storedName =
+                    normalizeNameForMatch(
+                        existingName
+                    );
+
+                const sameName =
+                    submittedName &&
+                    storedName &&
+                    submittedName ===
+                    storedName;
+
+                /*
+                    SAME EMAIL + DIFFERENT NAME
+
+                    Hard conflict.
+
+                    Never:
+                    - create
+                    - update
+                    - restore
+                    - offer Generate Existing Employee Card
+                */
+
+                if (!sameName) {
                     return res
                         .status(409)
                         .json({
-                            error:
-                                "A user with this email already exists",
+                            ...buildEmailConflictPayload(
+                                existingEmployee,
+                                `This email ID already belongs to ${existingName}.`
+                            ),
+
+                            canGenerateExistingCard:
+                                false,
+
+                            submittedEmployeeName:
+                                names.name,
                         });
                 }
 
-                temporaryPassword =
-                    generateTemporaryPassword(
-                        names.name,
-                        getEmployeePhoneForPassword(
-                            source
+                /*
+                    SAME EMAIL + SAME NAME
+
+                    Active employee:
+                    duplicate conflict only.
+
+                    Deleted/archived employee:
+                    frontend may offer Generate Existing
+                    Employee Card.
+                */
+
+                return res
+                    .status(409)
+                    .json(
+                        buildEmailConflictPayload(
+                            existingEmployee,
+                            `This email ID already exists for employee ${existingName}.`
                         )
                     );
+            }
 
-                if (
-                    !temporaryPassword
-                ) {
-                    return res
-                        .status(400)
-                        .json({
-                            error:
-                                "At least 3 letters in employee name and 3 digits in phone/mobile number are required to generate the temporary password",
-                        });
-                }
+            /*
+                User.email is unique as well.
 
-                const hashedPassword =
-                    await bcrypt.hash(
-                        temporaryPassword,
-                        10
-                    );
+                If a User exists but there is no Employee
+                associated with the email, do not guess that
+                they are the same person.
+            */
 
+            const existingUser =
+                await User.findOne({
+                    email,
+                });
+
+            if (existingUser) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
+
+                        conflictType:
+                            "USER_EMAIL_EXISTS",
+
+                        canGenerateExistingCard:
+                            false,
+                    });
+            }
+
+            // =================================================
+            // AUTOMATIC TEMPORARY PASSWORD
+            // =================================================
+
+            const temporaryPassword =
+                generateTemporaryPassword(
+                    names.name
+                );
+
+            if (
+                !temporaryPassword
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Employee name is required to generate the temporary password.",
+                    });
+            }
+
+            const employeeCode =
+                textValue(
+                    source.employeeCode
+                );
+
+            let user = null;
+
+            try {
                 user =
                     await User.create({
                         email,
+
                         password:
-                            hashedPassword,
+                            await bcrypt.hash(
+                                temporaryPassword,
+                                10
+                            ),
+
                         role:
                             textValue(
                                 source.role,
                                 "EMPLOYEE"
-                            ).toUpperCase() ===
+                            )
+                                .toUpperCase() ===
                                 "ADMIN"
                                 ? "ADMIN"
                                 : "EMPLOYEE",
                     });
-            }
 
-            try {
                 const employeeData =
-                    buildEmployeeData(
-                        {
-                            ...source,
-                            name:
-                                names.name,
-                            firstName:
-                                names.firstName,
-                            lastName:
-                                names.lastName,
-                            employeeCode,
-                            email,
-                        }
-                    );
+                    buildEmployeeData({
+                        ...source,
+
+                        name:
+                            names.name,
+
+                        firstName:
+                            names.firstName,
+
+                        lastName:
+                            names.lastName,
+
+                        employeeCode,
+
+                        email,
+                    });
 
                 const employee =
                     await Employee.create({
                         ...employeeData,
 
                         userId:
-                            user?._id ||
-                            null,
-                        temporaryPassword:
-                            user
-                                ? temporaryPassword
-                                : "",
+                            user._id,
+
+                        temporaryPassword,
 
                         employeeCode,
 
@@ -1583,6 +1843,9 @@ export const createEmployee =
 
                         isDeleted:
                             false,
+
+                        isPermanentlyHidden:
+                            false,
                     });
 
                 return res
@@ -1592,27 +1855,13 @@ export const createEmployee =
                             true,
 
                         message:
-                            user
-                                ? "Employee and login account created successfully"
-                                : "Employee created successfully",
+                            "Employee and login account created successfully",
 
                         employee,
 
-                        temporaryPassword:
-                            user
-                                ? temporaryPassword
-                                : null,
+                        temporaryPassword,
                     });
-            } catch (
-            employeeError
-            ) {
-                /*
-                    If User was created
-                    but Employee creation
-                    failed, remove the
-                    orphan login account.
-                */
-
+            } catch (employeeError) {
                 if (user?._id) {
                     try {
                         await User.findByIdAndDelete(
@@ -1622,7 +1871,7 @@ export const createEmployee =
                     cleanupError
                     ) {
                         console.error(
-                            "Create employee user cleanup error:",
+                            "Failed to clean up orphan User:",
                             cleanupError
                         );
                     }
@@ -1644,7 +1893,7 @@ export const createEmployee =
                     .status(409)
                     .json({
                         error:
-                            "Duplicate employee data",
+                            DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
                     });
             }
 
@@ -1654,6 +1903,178 @@ export const createEmployee =
                     error:
                         error.message ||
                         "Failed to create employee",
+                });
+        }
+    };
+
+// =====================================================
+// GENERATE / RESTORE EXISTING EMPLOYEE CARD
+// =====================================================
+
+export const generateExistingEmployeeCard =
+    async (req, res) => {
+        try {
+            const email =
+                normalizeEmail(
+                    req.body?.email
+                );
+
+            const employeeId =
+                textValue(
+                    req.body?.employeeId
+                );
+
+            if (
+                !email &&
+                !employeeId
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            "Employee email or employee ID is required.",
+                    });
+            }
+
+            const query =
+                employeeId
+                    ? {
+                        _id:
+                            employeeId,
+                    }
+                    : {
+                        email,
+                    };
+
+            const employee =
+                await Employee.findOne(
+                    query
+                );
+
+            if (!employee) {
+                return res
+                    .status(404)
+                    .json({
+                        error:
+                            "Existing employee record not found.",
+                    });
+            }
+
+            /*
+                When both employeeId and email are supplied,
+                make sure they refer to the SAME old Employee.
+            */
+
+            if (
+                email &&
+                normalizeEmail(
+                    employee.email
+                ) !== email
+            ) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            "The employee record does not belong to this email ID.",
+                    });
+            }
+
+            /*
+                GENERATE EXISTING EMPLOYEE CARD is ONLY
+                permitted for an archived/deleted employee.
+
+                An already-active employee must never be
+                recreated or modified through this endpoint.
+            */
+
+            if (
+                !employee.isDeleted &&
+                !employee.isPermanentlyHidden
+            ) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            `${getEmployeeDisplayName(
+                                employee
+                            )}'s employee card is already active.`,
+                    });
+            }
+
+            /*
+                =================================================
+                CRITICAL RESTORATION RULE
+                =================================================
+
+                This operation is NOT employee creation.
+
+                We intentionally preserve:
+
+                - employee._id
+                - employee.userId
+                - employee.temporaryPassword
+                - all employee information
+                - current User.password
+                - current User._id
+
+                We DO NOT:
+
+                - call User.create()
+                - call Employee.create()
+                - regenerate temporaryPassword
+                - hash/reset a password
+                - update the existing User password
+                - apply the newly submitted Form values
+                - apply newly submitted Excel values
+                - replace old employee information
+
+                Only the archived/card state is restored.
+            */
+
+            employee.isDeleted =
+                false;
+
+            employee.isPermanentlyHidden =
+                false;
+
+            /*
+                Soft deletion makes employmentStatus INACTIVE.
+
+                When Generate Existing Employee Card is clicked,
+                the SAME Employee is made active again.
+            */
+
+            employee.employmentStatus =
+                "ACTIVE";
+
+            await employee.save({
+                validateModifiedOnly:
+                    true,
+            });
+
+            return res.json({
+                success:
+                    true,
+
+                message:
+                    `Existing employee card generated again for ${getEmployeeDisplayName(
+                        employee
+                    )}.`,
+
+                employee,
+            });
+        } catch (error) {
+            console.error(
+                "Generate Existing Employee Card Error:",
+                error
+            );
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        error.message ||
+                        "Failed to generate existing employee card.",
                 });
         }
     };
@@ -1669,6 +2090,18 @@ export const getEmployees =
                 await Employee.find({
                     isDeleted: {
                         $ne: true,
+                    },
+
+                    isPermanentlyHidden: {
+                        $ne: true,
+                    },
+
+                    email: {
+                        $exists: true,
+                        $nin: [
+                            "",
+                            null,
+                        ],
                     },
                 })
                     .populate(
@@ -1711,6 +2144,10 @@ export const getEmployeeById =
                         req.params.id,
 
                     isDeleted: {
+                        $ne: true,
+                    },
+
+                    isPermanentlyHidden: {
                         $ne: true,
                     },
                 })
@@ -1778,18 +2215,39 @@ export const updateEmployee =
             const source =
                 req.body || {};
 
-            /*
-                IMPORTANT:
+            const requestedEmail =
+                source.email !==
+                    undefined
+                    ? normalizeEmail(
+                        source.email
+                    )
+                    : normalizeEmail(
+                        employee.email
+                    );
 
-                undefined
-                -> preserve old value
+            if (!requestedEmail) {
+                return res
+                    .status(400)
+                    .json({
+                        error:
+                            EMAIL_REQUIRED_MESSAGE,
+                    });
+            }
 
-                explicit ""
-                -> save blank
+            const duplicateEmployee =
+                await findEmployeeByEmail(
+                    requestedEmail,
+                    employee._id
+                );
 
-                No generated employee
-                code/email/default data.
-            */
+            if (duplicateEmployee) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
+                    });
+            }
 
             const requestedCode =
                 source.employeeCode !==
@@ -1800,17 +2258,6 @@ export const updateEmployee =
                     ).trim()
                     : employee.employeeCode;
 
-            const requestedEmail =
-                source.email !==
-                    undefined
-                    ? String(
-                        source.email ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase()
-                    : employee.email;
-
             const employeeData =
                 buildEmployeeData(
                     source,
@@ -1818,127 +2265,41 @@ export const updateEmployee =
                 );
 
             let loginUser =
-                null;
-
-            let temporaryPassword =
-                "";
-
-            if (
                 employee.userId
-            ) {
-                loginUser =
-                    await User.findById(
+                    ? await User.findById(
                         employee.userId
-                    );
-            }
+                    )
+                    : null;
 
-            /*
-                Existing employee has
-                email but no linked User.
-
-                Create/link the login
-                automatically if enough
-                information exists for
-                the temporary password.
-            */
-
-            if (
-                !loginUser &&
-                requestedEmail
-            ) {
-                const existingUser =
-                    await User.findOne({
-                        email:
-                            requestedEmail,
-                    });
-
+            if (loginUser) {
                 if (
-                    existingUser
+                    normalizeEmail(
+                        loginUser.email
+                    ) !==
+                    requestedEmail
                 ) {
-                    const linkedEmployee =
-                        await Employee.findOne({
-                            userId:
-                                existingUser._id,
+                    const userWithRequestedEmail =
+                        await User.findOne({
+                            email:
+                                requestedEmail,
 
                             _id: {
                                 $ne:
-                                    employee._id,
+                                    loginUser._id,
                             },
                         });
 
                     if (
-                        linkedEmployee
+                        userWithRequestedEmail
                     ) {
                         return res
                             .status(409)
                             .json({
                                 error:
-                                    "Email already belongs to another employee login account",
+                                    DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
                             });
                     }
 
-                    loginUser =
-                        existingUser;
-                } else {
-                    const updatedName =
-                        employeeData.name ||
-                        employee.name ||
-                        `${employeeData.firstName || employee.firstName || ""} ${employeeData.lastName || employee.lastName || ""}`.trim();
-
-                    temporaryPassword =
-                        generateTemporaryPassword(
-                            updatedName,
-
-                            getEmployeePhoneForPassword(
-                                {
-                                    ...employee.toObject(),
-                                    ...employeeData,
-                                    ...source,
-                                }
-                            )
-                        );
-
-                    if (
-                        temporaryPassword
-                    ) {
-                        loginUser =
-                            await User.create({
-                                email:
-                                    requestedEmail,
-
-                                password:
-                                    await bcrypt.hash(
-                                        temporaryPassword,
-                                        10
-                                    ),
-
-                                role:
-                                    textValue(
-                                        source.role,
-                                        "EMPLOYEE"
-                                    ).toUpperCase() ===
-                                        "ADMIN"
-                                        ? "ADMIN"
-                                        : "EMPLOYEE",
-                            });
-                    }
-                }
-            }
-
-            /*
-                Update linked User.
-
-                Frontend no longer sends
-                a manually entered
-                password, but explicit
-                API password support is
-                kept for compatibility.
-            */
-
-            if (loginUser) {
-                if (
-                    requestedEmail
-                ) {
                     loginUser.email =
                         requestedEmail;
                 }
@@ -1951,29 +2312,102 @@ export const updateEmployee =
                         textValue(
                             source.role,
                             "EMPLOYEE"
-                        ).toUpperCase() ===
+                        )
+                            .toUpperCase() ===
                             "ADMIN"
                             ? "ADMIN"
                             : "EMPLOYEE";
                 }
 
-                if (
-                    source.password !==
-                    undefined &&
-                    textValue(
-                        source.password
-                    )
-                ) {
-                    loginUser.password =
-                        await bcrypt.hash(
-                            textValue(
-                                source.password
-                            ),
-                            10
-                        );
-                }
-
                 await loginUser.save();
+            } else {
+                const userWithEmail =
+                    await User.findOne({
+                        email:
+                            requestedEmail,
+                    });
+
+                if (userWithEmail) {
+                    const linkedEmployee =
+                        await Employee.findOne({
+                            userId:
+                                userWithEmail._id,
+
+                            _id: {
+                                $ne:
+                                    employee._id,
+                            },
+                        });
+
+                    if (linkedEmployee) {
+                        return res
+                            .status(409)
+                            .json({
+                                error:
+                                    DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
+                            });
+                    }
+
+                    loginUser =
+                        userWithEmail;
+                } else {
+                    const updatedName =
+                        employeeData.name ||
+                        employee.name ||
+                        `${employeeData.firstName || employee.firstName || ""} ${employeeData.lastName || employee.lastName || ""}`
+                            .replace(
+                                /\s+/g,
+                                " "
+                            )
+                            .trim();
+
+                    const firstTemporaryPassword =
+                        generateTemporaryPassword(
+                            updatedName
+                        );
+
+                    if (
+                        !firstTemporaryPassword
+                    ) {
+                        return res
+                            .status(400)
+                            .json({
+                                error:
+                                    "Unable to generate temporary password from employee name.",
+                            });
+                    }
+
+                    loginUser =
+                        await User.create({
+                            email:
+                                requestedEmail,
+
+                            password:
+                                await bcrypt.hash(
+                                    firstTemporaryPassword,
+                                    10
+                                ),
+
+                            role:
+                                textValue(
+                                    source.role,
+                                    "EMPLOYEE"
+                                )
+                                    .toUpperCase() ===
+                                    "ADMIN"
+                                    ? "ADMIN"
+                                    : "EMPLOYEE",
+                        });
+
+                    if (
+                        !textValue(
+                            employee.temporaryPassword
+                        )
+                    ) {
+                        employee.temporaryPassword =
+                            firstTemporaryPassword;
+                    }
+                }
             }
 
             Object.assign(
@@ -1992,15 +2426,11 @@ export const updateEmployee =
                 employee.userId ||
                 null;
 
-            if (temporaryPassword) {
-                employee.temporaryPassword =
-                    temporaryPassword;
-            }
-
             await employee.save();
 
             return res.json({
-                success: true,
+                success:
+                    true,
 
                 message:
                     "Employee updated successfully",
@@ -2008,7 +2438,7 @@ export const updateEmployee =
                 employee,
 
                 temporaryPassword:
-                    temporaryPassword ||
+                    employee.temporaryPassword ||
                     null,
             });
         } catch (error) {
@@ -2025,7 +2455,7 @@ export const updateEmployee =
                     .status(409)
                     .json({
                         error:
-                            "Duplicate employee data",
+                            DUPLICATE_EMPLOYEE_EMAIL_MESSAGE,
                     });
             }
 
@@ -2038,65 +2468,72 @@ export const updateEmployee =
                 });
         }
     };
+
 // =====================================================
 // DELETE EMPLOYEE
 // =====================================================
 
-export const deleteEmployee = async (
-    req,
-    res
-) => {
-    try {
-        const employee =
-            await Employee.findById(
-                req.params.id
+export const deleteEmployee =
+    async (
+        req,
+        res
+    ) => {
+        try {
+            const employee =
+                await Employee.findById(
+                    req.params.id
+                );
+
+            if (!employee) {
+                return res
+                    .status(404)
+                    .json({
+                        error:
+                            "Employee not found",
+                    });
+            }
+
+            if (
+                employee.isDeleted
+            ) {
+                return res.json({
+                    success:
+                        true,
+
+                    message:
+                        "Employee already deleted",
+                });
+            }
+
+            employee.isDeleted =
+                true;
+
+            employee.employmentStatus =
+                "INACTIVE";
+
+            await employee.save();
+
+            return res.json({
+                success:
+                    true,
+
+                message:
+                    "Employee deleted successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Delete Employee Error:",
+                error
             );
 
-        if (!employee) {
             return res
-                .status(404)
+                .status(500)
                 .json({
                     error:
-                        "Employee not found",
+                        "Failed to delete employee",
                 });
         }
-
-        if (employee.isDeleted) {
-            return res.json({
-                success: true,
-                message:
-                    "Employee already deleted",
-            });
-        }
-
-        employee.isDeleted =
-            true;
-
-        employee.employmentStatus =
-            "INACTIVE";
-
-        await employee.save();
-
-        return res.json({
-            success: true,
-
-            message:
-                "Employee deleted successfully",
-        });
-    } catch (error) {
-        console.error(
-            "Delete Employee Error:",
-            error
-        );
-
-        return res
-            .status(500)
-            .json({
-                error:
-                    "Failed to delete employee",
-            });
-    }
-};
+    };
 
 // =====================================================
 // EMPLOYEE PUBLIC PROFILE
@@ -2248,8 +2685,7 @@ export const getEmployeeDirectory =
 
                             name:
                                 employee.name ||
-                                `${employee.firstName || ""} ${employee.lastName || ""
-                                    }`
+                                `${employee.firstName || ""} ${employee.lastName || ""}`
                                     .replace(
                                         /\s+/g,
                                         " "
@@ -2321,58 +2757,73 @@ export const getEmployeeDirectory =
 // EXPORT EMPLOYEES
 // =====================================================
 
-export const exportEmployees = async (
-    req,
-    res
-) => {
-    try {
-        const employees =
-            await Employee.find({
-                isDeleted: {
-                    $ne: true,
-                },
-            })
-                .populate(
-                    "userId",
-                    "email role"
-                )
-                .sort({
-                    createdAt: -1,
+export const exportEmployees =
+    async (
+        req,
+        res
+    ) => {
+        try {
+            const employees =
+                await Employee.find({
+                    isDeleted: {
+                        $ne: true,
+                    },
                 })
-                .lean();
+                    .populate(
+                        "userId",
+                        "email role"
+                    )
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .lean();
 
-        return res.json({
-            success: true,
-            employees,
-        });
-    } catch (error) {
-        console.error(
-            "Export Employees Error:",
-            error
-        );
+            return res.json({
+                success:
+                    true,
 
-        return res.status(500).json({
-            error:
-                "Failed to export employees",
-        });
-    }
-};
+                employees,
+            });
+        } catch (error) {
+            console.error(
+                "Export Employees Error:",
+                error
+            );
+
+            return res
+                .status(500)
+                .json({
+                    error:
+                        "Failed to export employees",
+                });
+        }
+    };
 
 // =====================================================
 // BULK EXCEL UPLOAD
+// =====================================================
 //
-// FLEXIBLE RULES:
-// - No specific employee column is required.
-// - Missing columns are allowed.
-// - Blank cells are ignored.
-// - Known columns are stored in their normal fields.
-// - Unknown columns become dynamicFields.
-// - Manual Add Employee validation is NOT used here.
-// - Existing employees can be updated from partial Excel rows.
-// - Existing employees are also matched by employee name.
-// - Same person = update same employee card.
-// - Blank/missing Excel values clear old Excel-managed employee values.
-// - Action DELETE / REMOVE can soft-delete an employee.
+// FINAL RULES:
+//
+// - Excel MUST contain an Email ID column.
+// - Every employee row must contain Name + Email.
+// - Name + Email match -> update SAME employee.
+// - Same Name + different Email -> create NEW employee.
+// - Same Email + different Name -> conflict.
+// - Missing optional columns DO NOT cause errors.
+// - Blank cells DO NOT erase existing employee data.
+// - Unknown Excel columns become dynamic fields.
+// - New employees automatically receive temporary password.
+// - Existing employees keep their original temporary password.
+// - Deleted / permanently hidden matching employee is NOT
+//   automatically restored.
+// - Instead a conflict is returned so Admin can choose
+//   "Generate Existing Employee Card".
+// - Regenerating existing card never creates another User,
+//   never resets current login password and never replaces
+//   old employee data.
+// - Employee Code remains a normal field only.
+// - DELETE / REMOVE action is preserved.
 // =====================================================
 
 export const bulkUploadEmployees =
@@ -2384,7 +2835,9 @@ export const bulkUploadEmployees =
                 return res
                     .status(400)
                     .json({
-                        success: false,
+                        success:
+                            false,
+
                         error:
                             "Excel file is required",
                     });
@@ -2397,9 +2850,14 @@ export const bulkUploadEmployees =
                 XLSX.read(
                     req.file.buffer,
                     {
-                        type: "buffer",
-                        cellDates: true,
-                        raw: false,
+                        type:
+                            "buffer",
+
+                        cellDates:
+                            true,
+
+                        raw:
+                            false,
                     }
                 );
 
@@ -2411,7 +2869,9 @@ export const bulkUploadEmployees =
                 return res
                     .status(400)
                     .json({
-                        success: false,
+                        success:
+                            false,
+
                         error:
                             "Excel workbook is empty",
                     });
@@ -2428,9 +2888,15 @@ export const bulkUploadEmployees =
                     worksheet,
                     {
                         header: 1,
-                        defval: "",
-                        blankrows: false,
-                        raw: false,
+
+                        defval:
+                            "",
+
+                        blankrows:
+                            false,
+
+                        raw:
+                            false,
                     }
                 );
 
@@ -2438,20 +2904,19 @@ export const bulkUploadEmployees =
                 !Array.isArray(
                     rawRows
                 ) ||
-                rawRows.length === 0
+                rawRows.length ===
+                0
             ) {
                 return res
                     .status(400)
                     .json({
-                        success: false,
+                        success:
+                            false,
+
                         error:
                             "Excel sheet is empty",
                     });
             }
-
-            // =============================================
-            // FIND HEADER ROW
-            // =============================================
 
             let headerRowIndex =
                 -1;
@@ -2466,16 +2931,20 @@ export const bulkUploadEmployees =
                 );
 
             for (
-                let r = 0;
-                r < maxCheckRows;
-                r++
+                let rowIndex = 0;
+                rowIndex <
+                maxCheckRows;
+                rowIndex++
             ) {
                 const row =
-                    rawRows[r] ||
-                    [];
+                    rawRows[
+                    rowIndex
+                    ] || [];
 
                 let score = 0;
-                let nonEmpty = 0;
+
+                let nonEmpty =
+                    0;
 
                 for (
                     const cell
@@ -2486,19 +2955,15 @@ export const bulkUploadEmployees =
                             cell
                         );
 
-                    if (!value) {
+                    if (
+                        isEmptyExcelValue(
+                            value
+                        )
+                    ) {
                         continue;
                     }
 
                     nonEmpty++;
-
-                    if (
-                        resolveExcelField(
-                            value
-                        )
-                    ) {
-                        score += 10;
-                    }
 
                     const normalized =
                         normalizeExcelHeader(
@@ -2506,26 +2971,19 @@ export const bulkUploadEmployees =
                         );
 
                     if (
-                        normalized ===
-                        "name" ||
-                        normalized ===
-                        "employee name" ||
-                        normalized ===
-                        "full name"
+                        EXCEL_FIELD_ALIASES[
+                        normalized
+                        ]
                     ) {
-                        score += 25;
+                        score += 3;
+                    } else {
+                        score += 1;
                     }
                 }
 
                 if (
                     nonEmpty >=
-                    3
-                ) {
-                    score +=
-                        nonEmpty;
-                }
-
-                if (
+                    2 &&
                     score >
                     highestScore
                 ) {
@@ -2533,1385 +2991,922 @@ export const bulkUploadEmployees =
                         score;
 
                     headerRowIndex =
-                        r;
+                        rowIndex;
                 }
             }
 
             if (
-                headerRowIndex <
-                0
+                headerRowIndex ===
+                -1
             ) {
-                headerRowIndex =
-                    0;
+                return res
+                    .status(400)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            "Unable to detect Excel header row",
+                    });
             }
-
-            console.log(
-                "Detected Excel header row:",
-                headerRowIndex +
-                1
-            );
-
-            // =============================================
-            // BUILD COLUMN MAP
-            // =============================================
 
             const headerRow =
                 rawRows[
                 headerRowIndex
-                ] || [];
+                ];
 
-            const columns = [];
+            const columns =
+                headerRow.map(
+                    (
+                        header,
+                        index
+                    ) => {
+                        const originalHeader =
+                            textValue(
+                                header,
+                                `Column ${index + 1}`
+                            );
 
-            for (
-                let c = 0;
-                c <
-                headerRow.length;
-                c++
-            ) {
-                const rawHeader =
-                    cleanExcelValue(
-                        headerRow[c]
-                    );
+                        const normalizedHeader =
+                            normalizeExcelHeader(
+                                originalHeader
+                            );
 
-                if (!rawHeader) {
-                    continue;
-                }
+                        const knownField =
+                            EXCEL_FIELD_ALIASES[
+                            normalizedHeader
+                            ] ||
+                            "";
 
-                const knownField =
-                    resolveExcelField(
-                        rawHeader
-                    );
+                        return {
+                            index,
 
-                const isDynamic =
-                    !knownField;
+                            originalHeader,
 
-                const key =
-                    isDynamic
-                        ? dynamicKey(
-                            "Excel Fields",
-                            rawHeader
-                        )
-                        : null;
+                            normalizedHeader,
 
-                columns.push({
-                    columnIndex:
-                        c,
+                            knownField,
 
-                    header:
-                        rawHeader,
+                            isDynamic:
+                                !knownField,
+                        };
+                    }
+                );
 
-                    knownField,
-
-                    isDynamic,
-
-                    key,
-
-                    section:
-                        "Excel Fields",
-                });
-            }
+            const hasEmailColumn =
+                columns.some(
+                    (
+                        column
+                    ) =>
+                        column
+                            .knownField ===
+                        "email"
+                );
 
             if (
-                columns.length ===
+                !hasEmailColumn
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            EXCEL_EMAIL_REQUIRED_MESSAGE,
+                    });
+            }
+
+            const hasNameColumn =
+                columns.some(
+                    (
+                        column
+                    ) =>
+                        [
+                            "name",
+                            "firstName",
+                            "lastName",
+                        ].includes(
+                            column
+                                .knownField
+                        )
+                );
+
+            if (
+                !hasNameColumn
+            ) {
+                return res
+                    .status(400)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            "Employee Name is required in the Excel file.",
+                    });
+            }
+
+            const dataRows =
+                rawRows.slice(
+                    headerRowIndex +
+                    1
+                );
+
+            if (
+                dataRows.length ===
                 0
             ) {
                 return res
                     .status(400)
                     .json({
-                        success: false,
+                        success:
+                            false,
 
                         error:
-                            "No Excel columns were detected",
+                            "Excel file does not contain employee rows",
                     });
             }
-
-            const dynamicColumns =
-                columns
-                    .filter(
-                        (
-                            column
-                        ) =>
-                            column.isDynamic
-                    )
-                    .map(
-                        (
-                            column
-                        ) => ({
-                            section:
-                                column.section,
-
-                            label:
-                                column.header,
-
-                            key:
-                                column.key,
-                        })
-                    );
-
-            // =============================================
-            // ADD NEW DYNAMIC COLUMNS TO EXISTING CARDS
-            // =============================================
-
-            if (
-                dynamicColumns.length >
-                0
-            ) {
-                const allEmployees =
-                    await Employee.find(
-                        {}
-                    )
-                        .select(
-                            "_id dynamicFields"
-                        )
-                        .lean();
-
-                for (
-                    const employee
-                    of allEmployees
-                ) {
-                    const merged =
-                        mergeDynamicFields(
-                            employee.dynamicFields ||
-                            [],
-
-                            [],
-
-                            dynamicColumns
-                        );
-
-                    await Employee.updateOne(
-                        {
-                            _id:
-                                employee._id,
-                        },
-                        {
-                            $set: {
-                                dynamicFields:
-                                    merged,
-                            },
-                        }
-                    );
-                }
-            }
-
-            // =============================================
-            // CACHE EXISTING EMPLOYEES
-            // =============================================
 
             const existingEmployees =
                 await Employee.find(
                     {}
-                ).lean();
+                );
 
-            const employeesByCode =
+            const employeeByEmail =
                 new Map();
-
-            const employeesByEmail =
-                new Map();
-
-            const employeesByAadhar =
-                new Map();
-
-            const employeesByUan =
-                new Map();
-
-            const employeesByBank =
-                new Map();
-
-            const employeesByMobile =
-                new Map();
-
-            const employeesByPhone =
-                new Map();
-
-            const employeesByName =
-                new Map();
-
-            const addToMap = (
-                map,
-                value,
-                employee
-            ) => {
-                const key =
-                    normalizeIdentifier(
-                        value
-                    );
-
-                if (!key) {
-                    return;
-                }
-
-                if (
-                    !map.has(
-                        key
-                    )
-                ) {
-                    map.set(
-                        key,
-                        []
-                    );
-                }
-
-                map
-                    .get(key)
-                    .push(
-                        employee
-                    );
-            };
-
-            const addNameToMap =
-                (
-                    employee
-                ) => {
-                    const key =
-                        employeeDocumentName(
-                            employee
-                        );
-
-                    if (!key) {
-                        return;
-                    }
-
-                    if (
-                        !employeesByName.has(
-                            key
-                        )
-                    ) {
-                        employeesByName.set(
-                            key,
-                            []
-                        );
-                    }
-
-                    employeesByName
-                        .get(key)
-                        .push(
-                            employee
-                        );
-                };
 
             for (
                 const employee
                 of existingEmployees
             ) {
-                addToMap(
-                    employeesByCode,
-                    employee.employeeCode,
-                    employee
-                );
+                const email =
+                    normalizeEmail(
+                        employee.email
+                    );
 
-                addToMap(
-                    employeesByEmail,
-                    employee.email,
-                    employee
-                );
-
-                addToMap(
-                    employeesByAadhar,
-                    employee.aadharNumber,
-                    employee
-                );
-
-                addToMap(
-                    employeesByUan,
-                    employee.uanNumber,
-                    employee
-                );
-
-                addToMap(
-                    employeesByBank,
-                    employee.bankAccountNumber,
-                    employee
-                );
-
-                addToMap(
-                    employeesByMobile,
-                    employee.mobileNumber,
-                    employee
-                );
-
-                addToMap(
-                    employeesByPhone,
-                    employee.phone,
-                    employee
-                );
-
-                addNameToMap(
-                    employee
-                );
+                if (email) {
+                    employeeByEmail.set(
+                        email,
+                        employee
+                    );
+                }
             }
 
-            const chooseCandidate =
-                (
-                    candidates,
-                    excelName
-                ) => {
-                    if (
-                        !Array.isArray(
-                            candidates
-                        ) ||
-                        candidates.length ===
-                        0
-                    ) {
-                        return null;
-                    }
+            const existingUsers =
+                await User.find(
+                    {}
+                );
 
-                    if (
-                        candidates.length ===
-                        1
-                    ) {
-                        return candidates[0];
-                    }
-
-                    const normalizedName =
-                        normalizeNameForMatch(
-                            excelName
-                        );
-
-                    if (
-                        !normalizedName
-                    ) {
-                        return null;
-                    }
-
-                    const exactNames =
-                        candidates.filter(
-                            (
-                                candidate
-                            ) =>
-                                employeeDocumentName(
-                                    candidate
-                                ) ===
-                                normalizedName
-                        );
-
-                    const activeExact =
-                        exactNames.find(
-                            (
-                                candidate
-                            ) =>
-                                candidate.isDeleted !==
-                                true
-                        );
-
-                    if (
-                        activeExact
-                    ) {
-                        return activeExact;
-                    }
-
-                    const deletedExact =
-                        exactNames.find(
-                            (
-                                candidate
-                            ) =>
-                                candidate.isDeleted ===
-                                true
-                        );
-
-                    if (
-                        deletedExact
-                    ) {
-                        return deletedExact;
-                    }
-
-                    if (
-                        exactNames.length ===
-                        1
-                    ) {
-                        return exactNames[0];
-                    }
-
-                    return null;
-                };
-
-            // =============================================
-            // RESULTS
-            // =============================================
-
-            let created = 0;
-            let updated = 0;
-            let restored = 0;
-            let deleted = 0;
-
-            const skipped = [];
-
-            const processedEmployeeIds =
-                new Set();
-
-            // =============================================
-            // PROCESS EVERY EXCEL ROW
-            // =============================================
+            const userByEmail =
+                new Map();
 
             for (
-                let r =
-                    headerRowIndex +
-                    1;
-
-                r <
-                rawRows.length;
-
-                r++
+                const user
+                of existingUsers
             ) {
-                const row =
-                    rawRows[r] ||
-                    [];
+                const email =
+                    normalizeEmail(
+                        user.email
+                    );
 
-                const excelRow =
-                    r + 1;
+                if (email) {
+                    userByEmail.set(
+                        email,
+                        user
+                    );
+                }
+            }
 
+            let created = 0;
+
+            let updated = 0;
+
+            let restored = 0;
+
+            let deleted = 0;
+
+            const skipped =
+                [];
+
+            const conflicts =
+                [];
+
+            const dynamicColumnMap =
+                new Map();
+
+            for (
+                const column
+                of columns
+            ) {
                 if (
-                    !row.some(
-                        (
-                            cell
-                        ) =>
-                            !isEmptyExcelValue(
-                                cell
-                            )
-                    )
+                    !column.isDynamic
                 ) {
                     continue;
                 }
 
-                let createdLoginUserIdForRow =
-                    null;
+                if (
+                    !column
+                        .normalizedHeader
+                ) {
+                    continue;
+                }
 
-                try {
-                    const knownData =
-                        {};
+                dynamicColumnMap.set(
+                    column
+                        .normalizedHeader,
+                    column
+                        .originalHeader
+                );
+            }
 
-                    const incomingDynamic =
-                        [];
+            const dynamicColumns =
+                Array.from(
+                    dynamicColumnMap.entries()
+                ).map(
+                    ([
+                        key,
+                        label,
+                    ]) => ({
+                        key,
+                        label,
+                    })
+                );
 
-                    // =====================================
-                    // READ ALL CELLS
-                    // =====================================
+            for (
+                let rowIndex = 0;
+                rowIndex <
+                dataRows.length;
+                rowIndex++
+            ) {
+                const row =
+                    dataRows[
+                    rowIndex
+                    ] || [];
 
-                    for (
-                        const column
-                        of columns
+                const excelRowNumber =
+                    headerRowIndex +
+                    rowIndex +
+                    2;
+
+                const rowHasData =
+                    row.some(
+                        (
+                            cell
+                        ) =>
+                            !isEmptyExcelValue(
+                                cleanExcelValue(
+                                    cell
+                                )
+                            )
+                    );
+
+                if (
+                    !rowHasData
+                ) {
+                    continue;
+                }
+
+                const knownData =
+                    {};
+
+                const incomingDynamicFields =
+                    [];
+
+                for (
+                    const column
+                    of columns
+                ) {
+                    const rawValue =
+                        row[
+                        column.index
+                        ];
+
+                    const value =
+                        cleanExcelValue(
+                            rawValue
+                        );
+
+                    if (
+                        column.isDynamic
                     ) {
-                        const value =
-                            cleanExcelValue(
-                                row[
-                                column
-                                    .columnIndex
-                                ]
-                            );
-
                         if (
-                            column.isDynamic
+                            column
+                                .normalizedHeader
                         ) {
-                            incomingDynamic.push(
+                            incomingDynamicFields.push(
                                 {
                                     section:
-                                        column.section,
+                                        "Excel Additional Fields",
 
                                     label:
-                                        column.header,
+                                        column.originalHeader,
 
                                     key:
-                                        column.key,
+                                        column.normalizedHeader,
 
                                     value,
                                 }
                             );
-
-                            continue;
                         }
-
-                        /*
-                            IMPORTANT:
-
-                            For known Excel columns we keep
-                            the column even when the cell
-                            is blank.
-
-                            That allows the upload to clear
-                            old values instead of silently
-                            preserving them.
-                        */
-
-                        knownData[
-                            column.knownField
-                        ] = value;
-                    }
-
-                    // =====================================
-                    // EXCEL ACTION
-                    // =====================================
-
-                    const excelAction =
-                        cleanExcelValue(
-                            knownData.excelAction
-                        )
-                            .toUpperCase()
-                            .trim();
-
-                    delete knownData.excelAction;
-
-                    // =====================================
-                    // OPTIONAL EMPLOYEE NAME
-                    // =====================================
-
-                    const names =
-                        splitEmployeeName(
-                            knownData.name,
-                            knownData.firstName,
-                            knownData.lastName
-                        );
-
-                    if (
-                        knownData.name !==
-                        undefined ||
-                        knownData.firstName !==
-                        undefined ||
-                        knownData.lastName !==
-                        undefined
-                    ) {
-                        knownData.name =
-                            names.name;
-
-                        knownData.firstName =
-                            names.firstName;
-
-                        knownData.lastName =
-                            names.lastName;
-                    }
-
-                    const employeeData =
-                        buildEmployeeData(
-                            knownData
-                        );
-
-                    // =====================================
-                    // FIND EXISTING EMPLOYEE
-                    // =====================================
-
-                    let existingEmployee =
-                        null;
-
-                    const employeeCode =
-                        normalizeIdentifier(
-                            knownData.employeeCode
-                        );
-
-                    const email =
-                        normalizeIdentifier(
-                            knownData.email
-                        );
-
-                    const aadhar =
-                        normalizeIdentifier(
-                            knownData.aadharNumber
-                        );
-
-                    const uan =
-                        normalizeIdentifier(
-                            knownData.uanNumber
-                        );
-
-                    const bank =
-                        normalizeIdentifier(
-                            knownData.bankAccountNumber
-                        );
-
-                    const mobile =
-                        normalizeIdentifier(
-                            knownData.mobileNumber
-                        );
-
-                    const phone =
-                        normalizeIdentifier(
-                            knownData.phone
-                        );
-
-                    const normalizedName =
-                        normalizeNameForMatch(
-                            names.name
-                        );
-
-                    // -------------------------------------
-                    // 1. EMPLOYEE CODE
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        employeeCode
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByCode.get(
-                                    employeeCode
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 2. EMAIL
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        email
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByEmail.get(
-                                    email
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 3. AADHAAR
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        aadhar
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByAadhar.get(
-                                    aadhar
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 4. UAN
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        uan
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByUan.get(
-                                    uan
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 5. BANK ACCOUNT
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        bank
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByBank.get(
-                                    bank
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 6. MOBILE NUMBER
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        mobile
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByMobile.get(
-                                    mobile
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 7. PHONE NUMBER
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        phone
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByPhone.get(
-                                    phone
-                                ),
-                                names.name
-                            );
-                    }
-
-                    // -------------------------------------
-                    // 8. EMPLOYEE NAME
-                    // -------------------------------------
-
-                    if (
-                        !existingEmployee &&
-                        normalizedName
-                    ) {
-                        existingEmployee =
-                            chooseCandidate(
-                                employeesByName.get(
-                                    normalizedName
-                                ),
-                                names.name
-                            );
-                    }
-                    // =====================================
-                    // DELETE / REMOVE ACTION
-                    // =====================================
-
-                    if (
-                        ["DELETE", "REMOVE"].includes(
-                            excelAction
-                        )
-                    ) {
-                        if (
-                            !existingEmployee
-                        ) {
-                            skipped.push({
-                                row:
-                                    excelRow,
-
-                                reason:
-                                    "Employee not found for delete/remove action",
-                            });
-
-                            continue;
-                        }
-
-                        if (
-                            processedEmployeeIds.has(
-                                existingEmployee
-                                    ._id
-                                    .toString()
-                            )
-                        ) {
-                            skipped.push({
-                                row:
-                                    excelRow,
-
-                                reason:
-                                    "Another row in this Excel file already matched this employee",
-                            });
-
-                            continue;
-                        }
-
-                        processedEmployeeIds.add(
-                            existingEmployee
-                                ._id
-                                .toString()
-                        );
-
-                        await Employee.updateOne(
-                            {
-                                _id:
-                                    existingEmployee._id,
-                            },
-                            {
-                                $set: {
-                                    isDeleted:
-                                        true,
-
-                                    employmentStatus:
-                                        "INACTIVE",
-                                },
-                            }
-                        );
-
-                        existingEmployee.isDeleted =
-                            true;
-
-                        existingEmployee.employmentStatus =
-                            "INACTIVE";
-
-                        deleted++;
 
                         continue;
                     }
 
-                    // =====================================
-                    // EXISTING EMPLOYEE
-                    // =====================================
+                    if (
+                        !column
+                            .knownField
+                    ) {
+                        continue;
+                    }
+
+                    knownData[
+                        column
+                            .knownField
+                    ] = value;
+                }
+
+                const excelAction =
+                    textValue(
+                        knownData
+                            .excelAction
+                    )
+                        .trim()
+                        .toUpperCase();
+
+                const email =
+                    normalizeEmail(
+                        knownData.email
+                    );
+
+                if (
+                    [
+                        "DELETE",
+                        "REMOVE",
+                    ].includes(
+                        excelAction
+                    )
+                ) {
+                    if (!email) {
+                        skipped.push({
+                            row:
+                                excelRowNumber,
+
+                            reason:
+                                "Email ID is required to delete an employee.",
+                        });
+
+                        continue;
+                    }
+
+                    const employee =
+                        employeeByEmail.get(
+                            email
+                        );
+
+                    if (
+                        !employee
+                    ) {
+                        skipped.push({
+                            row:
+                                excelRowNumber,
+
+                            email,
+
+                            reason:
+                                "Employee not found for DELETE / REMOVE action.",
+                        });
+
+                        continue;
+                    }
+
+                    if (
+                        !employee
+                            .isDeleted
+                    ) {
+                        employee.isDeleted =
+                            true;
+
+                        employee.employmentStatus =
+                            "INACTIVE";
+
+                        await employee.save({
+                            validateModifiedOnly:
+                                true,
+                        });
+
+                        deleted++;
+                    }
+
+                    continue;
+                }
+
+                if (!email) {
+                    skipped.push({
+                        row:
+                            excelRowNumber,
+
+                        reason:
+                            "Email ID is required for every employee row.",
+                    });
+
+                    continue;
+                }
+
+                const names =
+                    splitEmployeeName(
+                        knownData.name,
+                        knownData
+                            .firstName,
+                        knownData
+                            .lastName
+                    );
+
+                if (!names.name) {
+                    skipped.push({
+                        row:
+                            excelRowNumber,
+
+                        email,
+
+                        reason:
+                            "Employee Name is required for every employee row.",
+                    });
+
+                    continue;
+                }
+
+                const submittedName =
+                    normalizeNameForMatch(
+                        names.name
+                    );
+
+                const existingEmployee =
+                    employeeByEmail.get(
+                        email
+                    );
+
+                if (
+                    existingEmployee
+                ) {
+                    const existingEmployeeName =
+                        getEmployeeDisplayName(
+                            existingEmployee
+                        );
+
+                    const storedName =
+                        normalizeNameForMatch(
+                            existingEmployeeName
+                        );
+
+                    // =============================================
+                    // SAME EMAIL + DIFFERENT NAME
+                    // =============================================
+
+                    if (
+                        !submittedName ||
+                        !storedName ||
+                        submittedName !==
+                        storedName
+                    ) {
+                        conflicts.push({
+                            row:
+                                excelRowNumber,
+
+                            email,
+
+                            submittedName:
+                                names.name,
+
+                            existingEmployeeName,
+
+                            employeeId:
+                                existingEmployee
+                                    ._id
+                                    .toString(),
+
+                            canGenerateExistingCard:
+                                false,
+
+                            reason:
+                                `This email ID already belongs to ${existingEmployeeName}. The submitted employee name is ${names.name}.`,
+                        });
+
+                        continue;
+                    }
+
+                    // =============================================
+                    // SAME EMAIL + SAME NAME + ARCHIVED
+                    // =============================================
 
                     if (
                         existingEmployee
+                            .isDeleted ||
+                        existingEmployee
+                            .isPermanentlyHidden
                     ) {
-                        const employeeId =
-                            existingEmployee
-                                ._id
-                                .toString();
+                        conflicts.push({
+                            row:
+                                excelRowNumber,
 
-                        if (
-                            processedEmployeeIds.has(
-                                employeeId
-                            )
-                        ) {
-                            skipped.push({
-                                row:
-                                    excelRow,
+                            email,
 
-                                employee:
-                                    names.name,
+                            submittedName:
+                                names.name,
 
-                                reason:
-                                    "Another row in this Excel file already matched this employee",
-                            });
+                            existingEmployeeName,
 
-                            continue;
-                        }
-
-                        processedEmployeeIds.add(
-                            employeeId
-                        );
-
-                        const wasDeleted =
-                            existingEmployee.isDeleted ===
-                            true;
-
-                        /*
-                            SOURCE OF TRUTH:
-
-                            Existing data is NOT silently
-                            preserved for Excel-managed
-                            employee fields.
-
-                            Missing/blank Excel data clears
-                            the old value.
-
-                            This is what prevents stale
-                            generated values such as:
-
-                            EMP0029
-                            emp0029@employee.local
-                            WEHA001
-
-                            from remaining visible.
-                        */
-
-                        const updateData =
-                            buildExcelSourceOfTruthData({
-                                employeeData,
-                                knownData,
-                                columns,
-                            });
-
-                        /*
-                            Preserve values which are NOT
-                            supposed to be controlled by
-                            the Excel employee-data sheet.
-                        */
-
-                        updateData.userId =
-                            existingEmployee.userId ||
-                            null;
-
-                        updateData.image =
-                            existingEmployee.image ||
-                            null;
-
-                        updateData.cvUrl =
-                            existingEmployee.cvUrl ||
-                            null;
-
-                        updateData.cvFileName =
-                            existingEmployee.cvFileName ||
-                            null;
-
-                        updateData.documents =
-                            Array.isArray(
-                                existingEmployee.documents
-                            )
-                                ? existingEmployee.documents
-                                : [];
-
-                        updateData.skills =
-                            Array.isArray(
-                                existingEmployee.skills
-                            )
-                                ? existingEmployee.skills
-                                : [];
-
-                        updateData.customFields =
-                            Array.isArray(
-                                existingEmployee.customFields
-                            )
-                                ? existingEmployee.customFields
-                                : [];
-
-                        updateData.customSections =
-                            Array.isArray(
-                                existingEmployee.customSections
-                            )
-                                ? existingEmployee.customSections
-                                : [];
-
-                        updateData.bio =
-                            existingEmployee.bio ||
-                            "";
-
-                        updateData.dynamicFields =
-                            mergeDynamicFields(
-                                existingEmployee.dynamicFields ||
-                                [],
-
-                                incomingDynamic,
-
-                                dynamicColumns
-                            );
-
-                        /*
-                            If employee was deleted earlier
-                            but appears normally in Excel,
-                            restore the card.
-                        */
-
-                        if (
-                            wasDeleted
-                        ) {
-                            updateData.isDeleted =
-                                false;
-
-                            restored++;
-                        }
-
-                        await Employee.updateOne(
-                            {
-                                _id:
-                                    existingEmployee._id,
-                            },
-                            {
-                                $set:
-                                    updateData,
-                            },
-                            {
-                                runValidators:
-                                    false,
-                            }
-                        );
-
-                        updated++;
-
-                        // ---------------------------------
-                        // KEEP LOCAL CACHE UPDATED
-                        // ---------------------------------
-
-                        const oldNameKey =
-                            employeeDocumentName(
+                            employeeId:
                                 existingEmployee
-                            );
+                                    ._id
+                                    .toString(),
 
-                        Object.assign(
-                            existingEmployee,
-                            updateData
-                        );
+                            canGenerateExistingCard:
+                                true,
 
-                        const newNameKey =
-                            employeeDocumentName(
-                                existingEmployee
-                            );
-
-                        if (
-                            oldNameKey !==
-                            newNameKey
-                        ) {
-                            if (
-                                oldNameKey &&
-                                employeesByName.has(
-                                    oldNameKey
-                                )
-                            ) {
-                                employeesByName.set(
-                                    oldNameKey,
-
-                                    employeesByName
-                                        .get(
-                                            oldNameKey
-                                        )
-                                        .filter(
-                                            (
-                                                employee
-                                            ) =>
-                                                employee
-                                                    ._id
-                                                    .toString() !==
-                                                existingEmployee
-                                                    ._id
-                                                    .toString()
-                                        )
-                                );
-                            }
-
-                            addNameToMap(
-                                existingEmployee
-                            );
-                        }
-
-                        /*
-                            Re-add current identifiers to
-                            caches so later rows in the SAME
-                            upload use the latest values.
-                        */
-
-                        addToMap(
-                            employeesByCode,
-                            existingEmployee.employeeCode,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByEmail,
-                            existingEmployee.email,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByAadhar,
-                            existingEmployee.aadharNumber,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByUan,
-                            existingEmployee.uanNumber,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByBank,
-                            existingEmployee.bankAccountNumber,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByMobile,
-                            existingEmployee.mobileNumber,
-                            existingEmployee
-                        );
-
-                        addToMap(
-                            employeesByPhone,
-                            existingEmployee.phone,
-                            existingEmployee
-                        );
+                            reason:
+                                `This email ID already exists for employee ${existingEmployeeName}.`,
+                        });
 
                         continue;
                     }
 
-                    // =====================================
-                    // CREATE NEW EMPLOYEE
-                    // =====================================
+                    // =============================================
+                    // SAME EMAIL + SAME NAME + ACTIVE
+                    //
+                    // Update ONLY the non-blank values supplied
+                    // in the current Excel file.
+                    // =============================================
 
-                    /*
-                        For a new employee:
+                    const employeeData =
+                        buildEmployeeData(
+                            {
+                                ...knownData,
 
-                        Start from completely blank/default
-                        employee fields.
+                                name:
+                                    names.name,
 
-                        Then apply ONLY data from the Excel.
+                                firstName:
+                                    names.firstName,
 
-                        No employee code is invented.
-                        No email is invented.
-                        No vendor code is invented.
-                        No department is invented.
-                        No designation is invented.
-                        No salary is invented.
-                        No dates are invented.
-                    */
+                                lastName:
+                                    names.lastName,
 
-                    const excelSourceData =
+                                email,
+                            },
+
+                            existingEmployee
+                        );
+
+                    const updateData =
                         buildExcelSourceOfTruthData({
                             employeeData,
-                            knownData,
+
+                            knownData: {
+                                ...knownData,
+
+                                name:
+                                    names.name,
+
+                                firstName:
+                                    names.firstName,
+
+                                lastName:
+                                    names.lastName,
+
+                                email,
+                            },
+
                             columns,
                         });
 
-                    const newEmployeeData = {
-                        ...excelSourceData,
-
-                        dynamicFields:
-                            mergeDynamicFields(
-                                [],
-                                incomingDynamic,
-                                dynamicColumns
-                            ),
-
-                        customFields:
-                            [],
-
-                        customSections:
-                            [],
-
-                        isDeleted:
-                            false,
-                    };
-
-                    // =====================================
-                    // CREATE / LINK LOGIN USER
-                    // =====================================
-
-                    let excelLoginUser =
-                        null;
-
-                    let excelTemporaryPassword =
-                        "";
-
-                    const newEmployeeEmail =
-                        textValue(
-                            newEmployeeData.email
+                    for (
+                        const [
+                            field,
+                            value,
+                        ]
+                        of Object.entries(
+                            updateData
                         )
-                            .trim()
-                            .toLowerCase();
+                    ) {
+                        existingEmployee[
+                            field
+                        ] = value;
+                    }
 
-                    /*
-                        Login account is created ONLY when
-                        the Excel genuinely contains an
-                        email.
+                    existingEmployee.email =
+                        email;
 
-                        We never manufacture an email such
-                        as:
+                    existingEmployee.dynamicFields =
+                        mergeDynamicFields(
+                            existingEmployee
+                                .dynamicFields ||
+                            [],
 
-                        emp0029@employee.local
-                    */
+                            incomingDynamicFields,
+
+                            columns
+                        );
+
+                    await existingEmployee.save({
+                        validateModifiedOnly:
+                            true,
+                    });
 
                     if (
-                        newEmployeeEmail
+                        existingEmployee
+                            .userId
                     ) {
-                        const existingUserForExcel =
-                            await User.findOne({
-                                email:
-                                    newEmployeeEmail,
-                            });
+                        const linkedUser =
+                            await User.findById(
+                                existingEmployee
+                                    .userId
+                            );
 
                         if (
-                            existingUserForExcel
+                            linkedUser &&
+                            normalizeEmail(
+                                linkedUser
+                                    .email
+                            ) !==
+                            email
                         ) {
-                            const linkedEmployee =
-                                await Employee.findOne({
-                                    userId:
-                                        existingUserForExcel._id,
+                            const anotherUser =
+                                await User.findOne({
+                                    email,
+
+                                    _id: {
+                                        $ne:
+                                            linkedUser
+                                                ._id,
+                                    },
                                 });
 
                             if (
-                                linkedEmployee
+                                anotherUser
                             ) {
-                                throw new Error(
-                                    "Email already belongs to another employee login account"
-                                );
+                                conflicts.push({
+                                    row:
+                                        excelRowNumber,
+
+                                    email,
+
+                                    submittedName:
+                                        names.name,
+
+                                    existingEmployeeName,
+
+                                    employeeId:
+                                        existingEmployee
+                                            ._id
+                                            .toString(),
+
+                                    canGenerateExistingCard:
+                                        false,
+
+                                    reason:
+                                        "This email ID already belongs to another login account.",
+                                });
+
+                                continue;
                             }
 
-                            excelLoginUser =
-                                existingUserForExcel;
-                        } else {
-                            excelTemporaryPassword =
-                                generateTemporaryPassword(
-                                    newEmployeeData.name ||
-                                    `${newEmployeeData.firstName || ""} ${newEmployeeData.lastName || ""}`
-                                        .replace(
-                                            /\s+/g,
-                                            " "
-                                        )
-                                        .trim(),
+                            linkedUser.email =
+                                email;
 
-                                    getEmployeePhoneForPassword(
-                                        newEmployeeData
-                                    )
-                                );
-
-                            /*
-                                Do not fail the whole employee
-                                import if password cannot be
-                                generated.
-
-                                Employee record can still exist
-                                without a linked User.
-                            */
-
-                            if (
-                                excelTemporaryPassword
-                            ) {
-                                excelLoginUser =
-                                    await User.create({
-                                        email:
-                                            newEmployeeEmail,
-
-                                        password:
-                                            await bcrypt.hash(
-                                                excelTemporaryPassword,
-                                                10
-                                            ),
-
-                                        role:
-                                            textValue(
-                                                knownData.role,
-                                                "EMPLOYEE"
-                                            )
-                                                .toUpperCase() ===
-                                                "ADMIN"
-                                                ? "ADMIN"
-                                                : "EMPLOYEE",
-                                    });
-
-                                createdLoginUserIdForRow =
-                                    excelLoginUser._id;
-                            }
+                            await linkedUser.save();
                         }
                     }
 
-                    const newEmployee =
-                        await Employee.create({
-                            ...newEmployeeData,
+                    updated++;
 
-                            userId:
-                                excelLoginUser?._id ||
-                                null,
+                    continue;
+                }
 
-                            temporaryPassword:
-                                excelLoginUser
-                                    ? excelTemporaryPassword
-                                    : "",
+                // =================================================
+                // NEW EMAIL -> CREATE NEW EMPLOYEE + USER
+                // =================================================
+
+                const existingUser =
+                    userByEmail.get(
+                        email
+                    );
+
+                if (
+                    existingUser
+                ) {
+                    conflicts.push({
+                        row:
+                            excelRowNumber,
+
+                        email,
+
+                        submittedName:
+                            names.name,
+
+                        existingEmployeeName:
+                            "",
+
+                        employeeId:
+                            "",
+
+                        canGenerateExistingCard:
+                            false,
+
+                        reason:
+                            "This email ID already belongs to an existing user account.",
+                    });
+
+                    continue;
+                }
+
+                const temporaryPassword =
+                    generateTemporaryPassword(
+                        names.name
+                    );
+
+                if (
+                    !temporaryPassword
+                ) {
+                    skipped.push({
+                        row:
+                            excelRowNumber,
+
+                        email,
+
+                        reason:
+                            "Unable to generate temporary password from employee name.",
+                    });
+
+                    continue;
+                }
+
+                const hashedPassword =
+                    await bcrypt.hash(
+                        temporaryPassword,
+                        10
+                    );
+
+                let createdUser =
+                    null;
+
+                try {
+                    createdUser =
+                        await User.create({
+                            email,
+
+                            password:
+                                hashedPassword,
+
+                            role:
+                                textValue(
+                                    knownData
+                                        .role,
+                                    "EMPLOYEE"
+                                )
+                                    .toUpperCase() ===
+                                    "ADMIN"
+                                    ? "ADMIN"
+                                    : "EMPLOYEE",
                         });
 
-                    createdLoginUserIdForRow =
-                        null;
+                    const employeeData =
+                        buildEmployeeData({
+                            ...knownData,
+
+                            name:
+                                names.name,
+
+                            firstName:
+                                names.firstName,
+
+                            lastName:
+                                names.lastName,
+
+                            email,
+                        });
+
+                    const newEmployee =
+                        await Employee.create({
+                            ...employeeData,
+
+                            userId:
+                                createdUser._id,
+
+                            email,
+
+                            temporaryPassword,
+
+                            dynamicFields:
+                                mergeDynamicFields(
+                                    [],
+
+                                    incomingDynamicFields,
+
+                                    columns
+                                ),
+
+                            customFields:
+                                [],
+
+                            customSections:
+                                [],
+
+                            isDeleted:
+                                false,
+
+                            isPermanentlyHidden:
+                                false,
+                        });
+
+                    employeeByEmail.set(
+                        email,
+                        newEmployee
+                    );
+
+                    userByEmail.set(
+                        email,
+                        createdUser
+                    );
 
                     created++;
-
-                    processedEmployeeIds.add(
-                        newEmployee
-                            ._id
-                            .toString()
-                    );
-
-                    // =====================================
-                    // UPDATE LOCAL CACHE
-                    // =====================================
-
-                    const cacheEmployee =
-                        newEmployee.toObject();
-
-                    existingEmployees.push(
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByCode,
-                        cacheEmployee.employeeCode,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByEmail,
-                        cacheEmployee.email,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByAadhar,
-                        cacheEmployee.aadharNumber,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByUan,
-                        cacheEmployee.uanNumber,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByBank,
-                        cacheEmployee.bankAccountNumber,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByMobile,
-                        cacheEmployee.mobileNumber,
-                        cacheEmployee
-                    );
-
-                    addToMap(
-                        employeesByPhone,
-                        cacheEmployee.phone,
-                        cacheEmployee
-                    );
-
-                    addNameToMap(
-                        cacheEmployee
-                    );
                 } catch (
-                rowError
+                createError
                 ) {
-                    /*
-                        If a login User was created for this
-                        Excel row but Employee creation later
-                        failed, remove the orphan User.
-                    */
-
                     if (
-                        createdLoginUserIdForRow
+                        createdUser?._id
                     ) {
                         try {
                             await User.findByIdAndDelete(
-                                createdLoginUserIdForRow
+                                createdUser._id
                             );
                         } catch (
                         cleanupError
                         ) {
                             console.error(
-                                "Excel login cleanup error:",
+                                "Excel orphan User cleanup error:",
                                 cleanupError
                             );
                         }
                     }
 
-                    console.error(
-                        `Excel Row ${excelRow} Error:`,
-                        rowError
-                    );
+                    if (
+                        createError?.code ===
+                        11000
+                    ) {
+                        conflicts.push({
+                            row:
+                                excelRowNumber,
+
+                            email,
+
+                            submittedName:
+                                names.name,
+
+                            existingEmployeeName:
+                                "",
+
+                            employeeId:
+                                "",
+
+                            canGenerateExistingCard:
+                                false,
+
+                            reason:
+                                "This email ID already exists.",
+                        });
+
+                        continue;
+                    }
 
                     skipped.push({
                         row:
-                            excelRow,
+                            excelRowNumber,
+
+                        email,
 
                         reason:
-                            rowError?.code ===
-                                11000
-                                ? `Duplicate value blocked by MongoDB index${rowError?.keyPattern
-                                    ? ` (${Object.keys(
-                                        rowError.keyPattern
-                                    ).join(", ")})`
-                                    : ""
-                                }`
-                                : rowError?.message ||
-                                "Failed to import employee",
+                            createError.message ||
+                            "Failed to create employee.",
                     });
                 }
             }
-
-            // =============================================
-            // FINAL RESULT
-            // =============================================
 
             console.log(
                 "Employee Excel Upload Result:",
                 {
                     created,
+
                     updated,
+
                     restored,
+
                     deleted,
+
                     skipped:
                         skipped.length,
+
+                    conflicts:
+                        conflicts.length,
                 }
             );
 
@@ -3921,6 +3916,15 @@ export const bulkUploadEmployees =
             ) {
                 console.table(
                     skipped
+                );
+            }
+
+            if (
+                conflicts.length >
+                0
+            ) {
+                console.table(
+                    conflicts
                 );
             }
 
@@ -3941,6 +3945,11 @@ export const bulkUploadEmployees =
 
                 skipped,
 
+                conflictCount:
+                    conflicts.length,
+
+                conflicts,
+
                 dynamicColumns,
 
                 headerRow:
@@ -3951,14 +3960,16 @@ export const bulkUploadEmployees =
                     created +
                     updated +
                     deleted +
-                    skipped.length,
+                    skipped.length +
+                    conflicts.length,
 
                 message:
                     `${created} created, ` +
                     `${updated} updated, ` +
                     `${restored} restored, ` +
                     `${deleted} deleted, ` +
-                    `${skipped.length} skipped`,
+                    `${skipped.length} skipped, ` +
+                    `${conflicts.length} conflict(s)`,
             });
         } catch (error) {
             console.error(
@@ -3983,55 +3994,57 @@ export const bulkUploadEmployees =
 // GET EMPLOYEE DOCUMENTS
 // =====================================================
 
-export const getEmployeeDocuments = async (
-    req,
-    res
-) => {
-    try {
-        const employee =
-            await Employee.findOne({
-                _id:
-                    req.params.id,
+export const getEmployeeDocuments =
+    async (req, res) => {
+        try {
+            const employee =
+                await Employee.findOne({
+                    _id:
+                        req.params.id,
 
-                isDeleted: {
-                    $ne: true,
-                },
-            }).lean();
+                    isDeleted: {
+                        $ne: true,
+                    },
+                }).lean();
 
-        if (!employee) {
+            if (
+                !employee
+            ) {
+                return res
+                    .status(404)
+                    .json({
+                        error:
+                            "Employee not found",
+                    });
+            }
+
+            const documents =
+                Array.isArray(
+                    employee.documents
+                )
+                    ? employee.documents
+                    : [];
+
+            return res.json({
+                success:
+                    true,
+
+                documents,
+            });
+        } catch (error) {
+            console.error(
+                "Get Employee Documents Error:",
+                error
+            );
+
             return res
-                .status(404)
+                .status(500)
                 .json({
                     error:
-                        "Employee not found",
+                        "Failed to fetch employee documents",
                 });
         }
-
-        const documents =
-            Array.isArray(
-                employee.documents
-            )
-                ? employee.documents
-                : [];
-
-        return res.json({
-            success: true,
-            documents,
-        });
-    } catch (error) {
-        console.error(
-            "Get Employee Documents Error:",
-            error
-        );
-
-        return res
-            .status(500)
-            .json({
-                error:
-                    "Failed to fetch employee documents",
-            });
-    }
-};
+    };
 
 // =====================================================
 // DOWNLOAD EMPLOYEE DOCUMENT
@@ -4043,7 +4056,8 @@ export const downloadEmployeeDocument =
             const {
                 id,
                 documentId,
-            } = req.params;
+            } =
+                req.params;
 
             const employee =
                 await Employee.findOne({
@@ -4055,7 +4069,9 @@ export const downloadEmployeeDocument =
                     },
                 }).lean();
 
-            if (!employee) {
+            if (
+                !employee
+            ) {
                 return res
                     .status(404)
                     .json({
@@ -4073,7 +4089,9 @@ export const downloadEmployeeDocument =
 
             const document =
                 documents.find(
-                    (doc) =>
+                    (
+                        doc
+                    ) =>
                         String(
                             doc._id ||
                             doc.id
@@ -4083,7 +4101,9 @@ export const downloadEmployeeDocument =
                         )
                 );
 
-            if (!document) {
+            if (
+                !document
+            ) {
                 return res
                     .status(404)
                     .json({
@@ -4099,7 +4119,9 @@ export const downloadEmployeeDocument =
                 document.path ||
                 "";
 
-            if (!documentUrl) {
+            if (
+                !documentUrl
+            ) {
                 return res
                     .status(404)
                     .json({
