@@ -882,6 +882,18 @@ const EXCEL_FIELD_ALIASES = {
     name:
         "name",
 
+    nameasperaadharcard:
+        "name",
+
+    nameasperaadhaarcard:
+        "name",
+
+    nameasperaadhar:
+        "name",
+
+    nameasperaadhaar:
+        "name",
+
     employeename:
         "name",
 
@@ -895,6 +907,15 @@ const EXCEL_FIELD_ALIASES = {
         "lastName",
 
     fathername:
+        "fatherName",
+
+    fatherguardianname:
+        "fatherName",
+
+    fatherguardiannameasperaadharcard:
+        "fatherName",
+
+    fatherguardiannameasperaadhaarcard:
         "fatherName",
 
     gender:
@@ -912,6 +933,18 @@ const EXCEL_FIELD_ALIASES = {
     birthdate:
         "dateOfBirth",
 
+    dateofbirthmmddyyyy:
+        "dateOfBirth",
+
+    dateofbirthddmmyyyy:
+        "dateOfBirth",
+
+    dateofbirthmmddyyyyasperaadharcard:
+        "dateOfBirth",
+
+    dateofbirthmmddyyyyasperaadhaarcard:
+        "dateOfBirth",
+
     joiningdate:
         "joinDate",
 
@@ -919,6 +952,12 @@ const EXCEL_FIELD_ALIASES = {
         "joinDate",
 
     dateofjoining:
+        "joinDate",
+
+    dateofjoiningmmddyyyy:
+        "joinDate",
+
+    dateofjoiningddmmyyyy:
         "joinDate",
 
     birthplace:
@@ -942,6 +981,9 @@ const EXCEL_FIELD_ALIASES = {
     emailid:
         "email",
 
+    emailidmandatory:
+        "email",
+
     employeeemail:
         "email",
 
@@ -960,6 +1002,15 @@ const EXCEL_FIELD_ALIASES = {
     mobilenumber:
         "mobileNumber",
 
+    mobilenumberpersonal:
+        "mobileNumber",
+
+    personalmobilenumber:
+        "mobileNumber",
+
+    personalphone:
+        "mobileNumber",
+
     passportnumber:
         "passportNumber",
 
@@ -973,6 +1024,10 @@ const EXCEL_FIELD_ALIASES = {
         "vendorCode",
 
     maritalstatus:
+        "maritalStatus",
+
+    // Common typo in employee Excel forms
+    martialstatus:
         "maritalStatus",
 
     numberofchildren:
@@ -1011,6 +1066,9 @@ const EXCEL_FIELD_ALIASES = {
     eyeprotectionequipment:
         "eyeProtectionEquipment",
 
+    permanentaddress:
+        "permanentAddressLine1",
+
     permanentaddressline1:
         "permanentAddressLine1",
 
@@ -1034,6 +1092,9 @@ const EXCEL_FIELD_ALIASES = {
 
     permanentpincode:
         "permanentPinCode",
+
+    presentaddress:
+        "presentAddressLine1",
 
     presentaddressline1:
         "presentAddressLine1",
@@ -1076,6 +1137,9 @@ const EXCEL_FIELD_ALIASES = {
 
     emergencycontactpersonaddress:
         "emergencyContactPersonAddress",
+
+    emergencycontactnumber:
+        "emergencyMobileNumber",
 
     emergencymobilenumber:
         "emergencyMobileNumber",
@@ -1122,6 +1186,9 @@ const EXCEL_FIELD_ALIASES = {
     medicalcertificate:
         "medicalCertificate",
 
+    previouseploymentappointmentletter:
+        "previousEmploymentAppointmentLetter",
+
     previousemploymentappointmentletter:
         "previousEmploymentAppointmentLetter",
 
@@ -1155,10 +1222,22 @@ const EXCEL_FIELD_ALIASES = {
     uan:
         "uanNumber",
 
+    epfuannumber:
+        "uanNumber",
+
+    epfuannumbermandatory:
+        "uanNumber",
+
+    uanmandatory:
+        "uanNumber",
+
     pfnumber:
         "pfNumber",
 
     esinumber:
+        "esiNumber",
+
+    esinumberifhave:
         "esiNumber",
 
     employeecode:
@@ -1212,10 +1291,19 @@ const EXCEL_FIELD_ALIASES = {
     aadhaar:
         "aadharNumber",
 
+    aadharcardnumber:
+        "aadharNumber",
+
+    aadhaarcardnumber:
+        "aadharNumber",
+
     pannumber:
         "panNumber",
 
     pan:
+        "panNumber",
+
+    pannumbermandatory:
         "panNumber",
 
     bio:
@@ -2835,11 +2923,8 @@ export const bulkUploadEmployees =
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
-                        error:
-                            "Excel file is required",
+                        success: false,
+                        error: "Excel file is required",
                     });
             }
 
@@ -2850,73 +2935,334 @@ export const bulkUploadEmployees =
                 XLSX.read(
                     req.file.buffer,
                     {
-                        type:
-                            "buffer",
-
-                        cellDates:
-                            true,
-
-                        raw:
-                            false,
+                        type: "buffer",
+                        cellDates: true,
+                        raw: false,
                     }
                 );
 
             if (
                 !workbook.SheetNames ||
-                workbook.SheetNames.length ===
-                0
+                workbook.SheetNames.length === 0
             ) {
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
-                        error:
-                            "Excel workbook is empty",
+                        success: false,
+                        error: "Excel workbook is empty",
                     });
             }
 
-            const worksheet =
-                workbook.Sheets[
-                workbook
-                    .SheetNames[0]
-                ];
+            // =====================================================
+            // FIND FIRST NON-EMPTY WORKSHEET
+            // =====================================================
 
-            const rawRows =
-                XLSX.utils.sheet_to_json(
-                    worksheet,
-                    {
-                        header: 1,
+            let worksheet = null;
+            let rawRows = [];
+            let selectedSheetName = "";
 
-                        defval:
-                            "",
+            for (
+                const sheetName
+                of workbook.SheetNames
+            ) {
+                const candidateWorksheet =
+                    workbook.Sheets[
+                        sheetName
+                    ];
 
-                        blankrows:
-                            false,
+                const candidateRows =
+                    XLSX.utils.sheet_to_json(
+                        candidateWorksheet,
+                        {
+                            header: 1,
+                            defval: "",
+                            blankrows: false,
+                            raw: false,
+                        }
+                    );
 
-                        raw:
-                            false,
-                    }
-                );
+                const hasData =
+                    Array.isArray(
+                        candidateRows
+                    ) &&
+                    candidateRows.some(
+                        (row) =>
+                            Array.isArray(
+                                row
+                            ) &&
+                            row.some(
+                                (cell) =>
+                                    !isEmptyExcelValue(
+                                        cleanExcelValue(
+                                            cell
+                                        )
+                                    )
+                            )
+                    );
+
+                if (hasData) {
+                    worksheet =
+                        candidateWorksheet;
+
+                    rawRows =
+                        candidateRows;
+
+                    selectedSheetName =
+                        sheetName;
+
+                    break;
+                }
+            }
 
             if (
+                !worksheet ||
                 !Array.isArray(
                     rawRows
                 ) ||
-                rawRows.length ===
-                0
+                rawRows.length === 0
             ) {
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
-                        error:
-                            "Excel sheet is empty",
+                        success: false,
+                        error: "Excel sheet is empty",
                     });
             }
+
+            // =====================================================
+            // DETECT VERTICAL EMPLOYEE FORM
+            // =====================================================
+            //
+            // Example:
+            //
+            // 1 | Name      | Ayush
+            // 2 | Gender    | Male
+            // 3 | Email ID* | abc@gmail.com
+            //
+            // We search each row for a known employee field.
+            // If Name + Email + several employee fields appear
+            // vertically, this is treated as a vertical form.
+            // =====================================================
+
+            const verticalFields =
+                [];
+
+            const verticalKnownFields =
+                new Set();
+
+            const maxVerticalCheckRows =
+                Math.min(
+                    rawRows.length,
+                    150
+                );
+
+            for (
+                let rowIndex = 0;
+                rowIndex <
+                maxVerticalCheckRows;
+                rowIndex++
+            ) {
+                const row =
+                    rawRows[
+                        rowIndex
+                    ] || [];
+
+                if (
+                    !Array.isArray(
+                        row
+                    )
+                ) {
+                    continue;
+                }
+
+                let detectedField =
+                    null;
+
+                for (
+                    let cellIndex = 0;
+                    cellIndex <
+                    row.length;
+                    cellIndex++
+                ) {
+                    const rawLabel =
+                        cleanExcelValue(
+                            row[
+                                cellIndex
+                            ]
+                        );
+
+                    if (
+                        isEmptyExcelValue(
+                            rawLabel
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    const normalizedLabel =
+                        normalizeExcelHeader(
+                            rawLabel
+                        );
+
+                    if (
+                        !normalizedLabel
+                    ) {
+                        continue;
+                    }
+
+                    const knownField =
+                        EXCEL_FIELD_ALIASES[
+                            normalizedLabel
+                        ];
+
+                    if (
+                        !knownField
+                    ) {
+                        continue;
+                    }
+
+                    let value = "";
+
+                    // Find first non-empty cell after label.
+                    for (
+                        let valueIndex =
+                            cellIndex + 1;
+                        valueIndex <
+                            row.length;
+                        valueIndex++
+                    ) {
+                        const candidate =
+                            cleanExcelValue(
+                                row[
+                                    valueIndex
+                                ]
+                            );
+
+                        if (
+                            !isEmptyExcelValue(
+                                candidate
+                            )
+                        ) {
+                            value =
+                                candidate;
+
+                            break;
+                        }
+                    }
+
+                    detectedField = {
+                        rowIndex,
+                        cellIndex,
+
+                        label:
+                            textValue(
+                                rawLabel
+                            ),
+
+                        normalizedLabel,
+
+                        knownField,
+
+                        value,
+                    };
+
+                    break;
+                }
+
+                if (
+                    detectedField
+                ) {
+                    verticalFields.push(
+                        detectedField
+                    );
+
+                    verticalKnownFields.add(
+                        detectedField
+                            .knownField
+                    );
+                }
+            }
+
+            const verticalHasName =
+                verticalKnownFields.has(
+                    "name"
+                ) ||
+                verticalKnownFields.has(
+                    "firstName"
+                ) ||
+                verticalKnownFields.has(
+                    "lastName"
+                );
+
+            const verticalHasEmail =
+                verticalKnownFields.has(
+                    "email"
+                );
+
+            const isVerticalExcel =
+                verticalHasName &&
+                verticalHasEmail &&
+                verticalFields.length >= 3;
+
+            // =====================================================
+            // CONVERT VERTICAL FORM INTO INTERNAL HORIZONTAL FORMAT
+            // =====================================================
+
+            if (
+                isVerticalExcel
+            ) {
+                const verticalHeaderRow =
+                    [];
+
+                const verticalValueRow =
+                    [];
+
+                const usedKnownFields =
+                    new Set();
+
+                for (
+                    const field
+                    of verticalFields
+                ) {
+                    /*
+                        If the same known field appears again later
+                        in another section of the form, preserve the
+                        first employee-level value.
+
+                        This avoids secondary/dependent sections
+                        overwriting the main employee information.
+                    */
+
+                    if (
+                        usedKnownFields.has(
+                            field.knownField
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    usedKnownFields.add(
+                        field.knownField
+                    );
+
+                    verticalHeaderRow.push(
+                        field.label
+                    );
+
+                    verticalValueRow.push(
+                        field.value
+                    );
+                }
+
+                rawRows = [
+                    verticalHeaderRow,
+                    verticalValueRow,
+                ];
+            }
+
+            // =====================================================
+            // DETECT HEADER ROW
+            // =====================================================
 
             let headerRowIndex =
                 -1;
@@ -2938,13 +3284,11 @@ export const bulkUploadEmployees =
             ) {
                 const row =
                     rawRows[
-                    rowIndex
+                        rowIndex
                     ] || [];
 
                 let score = 0;
-
-                let nonEmpty =
-                    0;
+                let nonEmpty = 0;
 
                 for (
                     const cell
@@ -2972,7 +3316,7 @@ export const bulkUploadEmployees =
 
                     if (
                         EXCEL_FIELD_ALIASES[
-                        normalized
+                            normalized
                         ]
                     ) {
                         score += 3;
@@ -2982,8 +3326,7 @@ export const bulkUploadEmployees =
                 }
 
                 if (
-                    nonEmpty >=
-                    2 &&
+                    nonEmpty >= 2 &&
                     score >
                     highestScore
                 ) {
@@ -2996,15 +3339,12 @@ export const bulkUploadEmployees =
             }
 
             if (
-                headerRowIndex ===
-                -1
+                headerRowIndex === -1
             ) {
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
+                        success: false,
                         error:
                             "Unable to detect Excel header row",
                     });
@@ -3012,7 +3352,7 @@ export const bulkUploadEmployees =
 
             const headerRow =
                 rawRows[
-                headerRowIndex
+                    headerRowIndex
                 ];
 
             const columns =
@@ -3034,19 +3374,15 @@ export const bulkUploadEmployees =
 
                         const knownField =
                             EXCEL_FIELD_ALIASES[
-                            normalizedHeader
+                                normalizedHeader
                             ] ||
                             "";
 
                         return {
                             index,
-
                             originalHeader,
-
                             normalizedHeader,
-
                             knownField,
-
                             isDynamic:
                                 !knownField,
                         };
@@ -3055,11 +3391,8 @@ export const bulkUploadEmployees =
 
             const hasEmailColumn =
                 columns.some(
-                    (
-                        column
-                    ) =>
-                        column
-                            .knownField ===
+                    (column) =>
+                        column.knownField ===
                         "email"
                 );
 
@@ -3069,9 +3402,7 @@ export const bulkUploadEmployees =
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
+                        success: false,
                         error:
                             EXCEL_EMAIL_REQUIRED_MESSAGE,
                     });
@@ -3079,9 +3410,7 @@ export const bulkUploadEmployees =
 
             const hasNameColumn =
                 columns.some(
-                    (
-                        column
-                    ) =>
+                    (column) =>
                         [
                             "name",
                             "firstName",
@@ -3098,9 +3427,7 @@ export const bulkUploadEmployees =
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
+                        success: false,
                         error:
                             "Employee Name is required in the Excel file.",
                     });
@@ -3113,19 +3440,20 @@ export const bulkUploadEmployees =
                 );
 
             if (
-                dataRows.length ===
-                0
+                dataRows.length === 0
             ) {
                 return res
                     .status(400)
                     .json({
-                        success:
-                            false,
-
+                        success: false,
                         error:
                             "Excel file does not contain employee rows",
                     });
             }
+
+            // =====================================================
+            // LOAD EXISTING EMPLOYEES
+            // =====================================================
 
             const existingEmployees =
                 await Employee.find(
@@ -3151,6 +3479,10 @@ export const bulkUploadEmployees =
                     );
                 }
             }
+
+            // =====================================================
+            // LOAD EXISTING USERS
+            // =====================================================
 
             const existingUsers =
                 await User.find(
@@ -3178,18 +3510,12 @@ export const bulkUploadEmployees =
             }
 
             let created = 0;
-
             let updated = 0;
-
             let restored = 0;
-
             let deleted = 0;
 
-            const skipped =
-                [];
-
-            const conflicts =
-                [];
+            const skipped = [];
+            const conflicts = [];
 
             const dynamicColumnMap =
                 new Map();
@@ -3232,6 +3558,10 @@ export const bulkUploadEmployees =
                     })
                 );
 
+            // =====================================================
+            // PROCESS EMPLOYEE ROWS
+            // =====================================================
+
             for (
                 let rowIndex = 0;
                 rowIndex <
@@ -3240,7 +3570,7 @@ export const bulkUploadEmployees =
             ) {
                 const row =
                     dataRows[
-                    rowIndex
+                        rowIndex
                     ] || [];
 
                 const excelRowNumber =
@@ -3250,9 +3580,7 @@ export const bulkUploadEmployees =
 
                 const rowHasData =
                     row.some(
-                        (
-                            cell
-                        ) =>
+                        (cell) =>
                             !isEmptyExcelValue(
                                 cleanExcelValue(
                                     cell
@@ -3266,8 +3594,7 @@ export const bulkUploadEmployees =
                     continue;
                 }
 
-                const knownData =
-                    {};
+                const knownData = {};
 
                 const incomingDynamicFields =
                     [];
@@ -3278,7 +3605,7 @@ export const bulkUploadEmployees =
                 ) {
                     const rawValue =
                         row[
-                        column.index
+                            column.index
                         ];
 
                     const value =
@@ -3320,8 +3647,7 @@ export const bulkUploadEmployees =
                     }
 
                     knownData[
-                        column
-                            .knownField
+                        column.knownField
                     ] = value;
                 }
 
@@ -3337,6 +3663,10 @@ export const bulkUploadEmployees =
                     normalizeEmail(
                         knownData.email
                     );
+
+                // =================================================
+                // DELETE / REMOVE
+                // =================================================
 
                 if (
                     [
@@ -3400,6 +3730,10 @@ export const bulkUploadEmployees =
                     continue;
                 }
 
+                // =================================================
+                // EMAIL REQUIRED
+                // =================================================
+
                 if (!email) {
                     skipped.push({
                         row:
@@ -3412,6 +3746,10 @@ export const bulkUploadEmployees =
                     continue;
                 }
 
+                // =================================================
+                // NAME REQUIRED
+                // =================================================
+
                 const names =
                     splitEmployeeName(
                         knownData.name,
@@ -3421,7 +3759,9 @@ export const bulkUploadEmployees =
                             .lastName
                     );
 
-                if (!names.name) {
+                if (
+                    !names.name
+                ) {
                     skipped.push({
                         row:
                             excelRowNumber,
@@ -3444,6 +3784,10 @@ export const bulkUploadEmployees =
                     employeeByEmail.get(
                         email
                     );
+
+                // =================================================
+                // EXISTING EMPLOYEE
+                // =================================================
 
                 if (
                     existingEmployee
@@ -3531,10 +3875,7 @@ export const bulkUploadEmployees =
                     }
 
                     // =============================================
-                    // SAME EMAIL + SAME NAME + ACTIVE
-                    //
-                    // Update ONLY the non-blank values supplied
-                    // in the current Excel file.
+                    // ACTIVE EXISTING EMPLOYEE
                     // =============================================
 
                     const employeeData =
@@ -3625,10 +3966,8 @@ export const bulkUploadEmployees =
                         if (
                             linkedUser &&
                             normalizeEmail(
-                                linkedUser
-                                    .email
-                            ) !==
-                            email
+                                linkedUser.email
+                            ) !== email
                         ) {
                             const anotherUser =
                                 await User.findOne({
@@ -3636,8 +3975,7 @@ export const bulkUploadEmployees =
 
                                     _id: {
                                         $ne:
-                                            linkedUser
-                                                ._id,
+                                            linkedUser._id,
                                     },
                                 });
 
@@ -3759,8 +4097,7 @@ export const bulkUploadEmployees =
 
                             role:
                                 textValue(
-                                    knownData
-                                        .role,
+                                    knownData.role,
                                     "EMPLOYEE"
                                 )
                                     .toUpperCase() ===
@@ -3830,7 +4167,7 @@ export const bulkUploadEmployees =
 
                     created++;
                 } catch (
-                createError
+                    createError
                 ) {
                     if (
                         createdUser?._id
@@ -3891,15 +4228,24 @@ export const bulkUploadEmployees =
                 }
             }
 
+            // =====================================================
+            // RESULT
+            // =====================================================
+
             console.log(
                 "Employee Excel Upload Result:",
                 {
+                    selectedSheet:
+                        selectedSheetName,
+
+                    layout:
+                        isVerticalExcel
+                            ? "VERTICAL"
+                            : "HORIZONTAL",
+
                     created,
-
                     updated,
-
                     restored,
-
                     deleted,
 
                     skipped:
@@ -3911,8 +4257,7 @@ export const bulkUploadEmployees =
             );
 
             if (
-                skipped.length >
-                0
+                skipped.length > 0
             ) {
                 console.table(
                     skipped
@@ -3920,8 +4265,7 @@ export const bulkUploadEmployees =
             }
 
             if (
-                conflicts.length >
-                0
+                conflicts.length > 0
             ) {
                 console.table(
                     conflicts
@@ -3929,15 +4273,11 @@ export const bulkUploadEmployees =
             }
 
             return res.json({
-                success:
-                    true,
+                success: true,
 
                 created,
-
                 updated,
-
                 restored,
-
                 deleted,
 
                 skippedCount:
@@ -3952,9 +4292,16 @@ export const bulkUploadEmployees =
 
                 dynamicColumns,
 
+                sheetName:
+                    selectedSheetName,
+
+                excelLayout:
+                    isVerticalExcel
+                        ? "VERTICAL"
+                        : "HORIZONTAL",
+
                 headerRow:
-                    headerRowIndex +
-                    1,
+                    headerRowIndex + 1,
 
                 totalRowsProcessed:
                     created +
@@ -3980,8 +4327,7 @@ export const bulkUploadEmployees =
             return res
                 .status(500)
                 .json({
-                    success:
-                        false,
+                    success: false,
 
                     error:
                         error.message ||
