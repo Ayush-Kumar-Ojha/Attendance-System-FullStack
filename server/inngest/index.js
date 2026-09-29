@@ -915,8 +915,7 @@ const attendanceReminderCron =
             };
         }
     );
-
-// ============================================================
+    // ============================================================
 // (D)
 // LEAVE APPLICATION WORKFLOW
 //
@@ -1567,12 +1566,17 @@ const leaveApplicationReminder =
 // ============================================================
 
 export const functions = [
-    checkoutReminderCron,
+    // TEMPORARILY DISABLED:
+    // 7 PM NOT-CHECKED-OUT EMAIL
+    // checkoutReminderCron,
 
-    // NEW
+    // 7:15 PM AUTO CHECKOUT REMAINS ACTIVE
     autoCheckoutCron,
 
-    attendanceReminderCron,
+    // TEMPORARILY DISABLED:
+    // 11 AM NOT-CHECKED-IN EMAIL
+    // attendanceReminderCron,
 
+    // LEAVE WORKFLOW REMAINS ACTIVE
     leaveApplicationReminder,
 ];
