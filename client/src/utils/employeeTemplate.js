@@ -10,8 +10,7 @@ export const EMPLOYEE_COLUMNS = [
     "Birth Place",
     "Nationality",
     "Mother Tongue",
-    "Language",
-    "Phone Number",
+
     "Passport Number",
     "Identification Mark",
     "Manpower Type",
@@ -19,28 +18,17 @@ export const EMPLOYEE_COLUMNS = [
     "Marital Status",
     "Number of Children",
 
-    "Safety Issued Or Not",
-    "Shoe Size",
-    "Shoe Issue Date",
-    "Safety Helmet",
     "Helmet Color",
-    "Helmet Issue Date",
-    "Jacket",
     "Jacket Size",
-    "Jacket Issue Date",
-    "Eye Protection Equipment",
 
     "Permanent Address Line 1",
     "Permanent Address Line 2",
-    "Permanent City",
     "Permanent Country",
     "Permanent State",
     "Permanent Pin Code",
 
     "Present Address Line 1",
     "Present Address Line 2",
-    "Present City",
-    "Village",
     "Present Country",
     "Present State",
     "Present Pin Code",
@@ -54,17 +42,12 @@ export const EMPLOYEE_COLUMNS = [
 
     "Qualification",
     "Specialization",
-    "College / School Name",
-    "Board / University Name",
     "Year of Passing",
 
     "Resume",
-    "Appointment Letter",
-    "Degree Certificate",
     "KYC Document",
     "Medical Certificate",
     "Previous Employment Appointment Letter",
-    "Previous Employment Relevant Experience Letter",
     "Police Verification",
 
     "Bank Account Number",
@@ -75,10 +58,6 @@ export const EMPLOYEE_COLUMNS = [
     "Branch Name",
     "UAN Number",
     "PF Number",
-    "ESI Number",
-
-    // Existing EMS fields
-    "Employee Code",
 
     /*
         IMPORTANT:
@@ -92,16 +71,9 @@ export const EMPLOYEE_COLUMNS = [
 
     "Department",
     "Designation",
-    "Basic Salary",
-    "Allowance",
-    "Deductions",
     "System Role",
 
-    "Anniversary Date",
-    "Confirmation Date",
-    "Aadhaar Number",
     "PAN Number",
-    "Bio",
 ];
 
 const EXAMPLE_ROW = [
@@ -114,8 +86,7 @@ const EXAMPLE_ROW = [
     "Bengaluru",
     "Indian",
     "Hindi",
-    "Hindi, English, Kannada",
-    "9876543210",
+
     "",
     "Mole on right hand",
     "Direct",
@@ -123,28 +94,17 @@ const EXAMPLE_ROW = [
     "SINGLE",
     0,
 
-    "YES",
-    "9",
-    "2026-01-10",
-    "YES",
     "Yellow",
-    "2026-01-10",
-    "YES",
     "L",
-    "2026-01-10",
-    "YES",
 
     "House No 10",
     "MG Road",
-    "Bengaluru",
     "India",
     "Karnataka",
     "560001",
 
     "House No 10",
     "MG Road",
-    "Bengaluru",
-    "",
     "India",
     "Karnataka",
     "560001",
@@ -158,13 +118,8 @@ const EXAMPLE_ROW = [
 
     "B.Tech",
     "Computer Science",
-    "ABC College",
-    "XYZ University",
     "2025",
 
-    "",
-    "",
-    "",
     "",
     "",
     "",
@@ -179,13 +134,6 @@ const EXAMPLE_ROW = [
     "Bengaluru",
     "100123456789",
     "",
-    "",
-
-    /*
-        Employee Code is optional for matching.
-        It remains normal employee data.
-    */
-    "EMP001",
 
     /*
         REQUIRED EMAIL ID
@@ -194,15 +142,8 @@ const EXAMPLE_ROW = [
 
     "Engineering",
     "Software Engineer",
-    50000,
-    5000,
-    0,
     "EMPLOYEE",
 
-    "",
-    "",
-    "",
-    "",
     "",
 ];
 
