@@ -5,24 +5,24 @@ export const EMPLOYEE_COLUMNS = [
     "Father's Name",
     "Gender",
     "Blood Group",
-    "Date of Birth",
-    "Date of Joining",
+
+    "Date of Birth (MM/DD/YYYY)",
+    "Date of Joining (MM/DD/YYYY)",
+
     "Birth Place",
     "Nationality",
     "Mother Tongue",
 
     "Passport Number",
+    "PVC Expiry Date",
     "Identification Mark",
-    "Manpower Type",
-    "Vendor Code",
-    "Marital Status",
-    "Number of Children",
 
-    "Helmet Color",
-    "Jacket Size",
+    "Marital Status",
+
+    "Dependent Name",
+    "Dependent Details",
 
     "Permanent Address Line 1",
-    "Permanent Address Line 2",
     "Permanent Country",
     "Permanent State",
     "Permanent Pin Code",
@@ -36,8 +36,6 @@ export const EMPLOYEE_COLUMNS = [
     "Mobile Number",
 
     "Emergency Contact Person Name",
-    "Emergency Contact Person Relation",
-    "Emergency Contact Person Address",
     "Emergency Mobile Number",
 
     "Qualification",
@@ -45,10 +43,6 @@ export const EMPLOYEE_COLUMNS = [
     "Year of Passing",
 
     "Resume",
-    "KYC Document",
-    "Medical Certificate",
-    "Previous Employment Appointment Letter",
-    "Police Verification",
 
     "Bank Account Number",
     "Bank Account Name",
@@ -71,7 +65,6 @@ export const EMPLOYEE_COLUMNS = [
 
     "Department",
     "Designation",
-    "System Role",
 
     "PAN Number",
 ];
@@ -81,24 +74,24 @@ const EXAMPLE_ROW = [
     "Ramesh Sharma",
     "MALE",
     "O+",
-    "2000-05-15",
-    "2026-01-10",
+
+    "05/15/2000",
+    "01/10/2026",
+
     "Bengaluru",
     "Indian",
     "Hindi",
 
     "",
-    "Mole on right hand",
-    "Direct",
     "",
-    "SINGLE",
-    0,
+    "Mole on right hand",
 
-    "Yellow",
-    "L",
+    "SINGLE",
+
+    "",
+    "",
 
     "House No 10",
-    "MG Road",
     "India",
     "Karnataka",
     "560001",
@@ -112,18 +105,12 @@ const EXAMPLE_ROW = [
     "9876543210",
 
     "Ramesh Sharma",
-    "Father",
-    "Bengaluru",
     "9876543211",
 
     "B.Tech",
     "Computer Science",
     "2025",
 
-    "",
-    "",
-    "",
-    "",
     "",
 
     "123456789012",
@@ -142,7 +129,6 @@ const EXAMPLE_ROW = [
 
     "Engineering",
     "Software Engineer",
-    "EMPLOYEE",
 
     "",
 ];
