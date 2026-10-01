@@ -22,16 +22,8 @@ export const EMPLOYEE_COLUMNS = [
     "Dependent Name",
     "Dependent Details",
 
-    "Permanent Address Line 1",
-    "Permanent Country",
-    "Permanent State",
-    "Permanent Pin Code",
-
-    "Present Address Line 1",
-    "Present Address Line 2",
-    "Present Country",
-    "Present State",
-    "Present Pin Code",
+    "Permanent Address",
+    "Present Address",
 
     "Mobile Number",
 
@@ -41,8 +33,6 @@ export const EMPLOYEE_COLUMNS = [
     "Qualification",
     "Specialization",
     "Year of Passing",
-
-    "Resume",
 
     "Bank Account Number",
     "Bank Account Name",
@@ -91,16 +81,8 @@ const EXAMPLE_ROW = [
     "",
     "",
 
-    "House No 10",
-    "India",
-    "Karnataka",
-    "560001",
-
-    "House No 10",
-    "MG Road",
-    "India",
-    "Karnataka",
-    "560001",
+    "House No 10, MG Road, Bengaluru, Karnataka - 560001",
+    "House No 10, MG Road, Bengaluru, Karnataka - 560001",
 
     "9876543210",
 
@@ -110,8 +92,6 @@ const EXAMPLE_ROW = [
     "B.Tech",
     "Computer Science",
     "2025",
-
-    "",
 
     "123456789012",
     "Rahul Sharma",
